@@ -1,0 +1,5 @@
+{
+    "events": {
+        "restart": "mergejs js.txt app.js"
+    }
+}

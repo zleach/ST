@@ -1,0 +1,9 @@
+{
+    "watch": {
+        "test": "app/*.js"
+    },
+    "scripts": {
+        "test": "mergejs js.txt app.js",
+        "watch": "npm-watch"
+    }
+}
