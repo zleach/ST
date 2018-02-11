@@ -1,10 +1,10 @@
-class BasicMiner extends Ship {
+class Shuttle extends Ship {
     constructor(game,x,y) {
         super(game,x,y);
         
         this.specs = {
-            name : 'MV Fair Rosamond',
-            description : 'Cobalt Class Mining Vessel',
+            name : 'Shuttle',
+            description : 'Shuttle',
             health: 100,
             turnDecay: .03,
             turnAccel: .1,
@@ -14,7 +14,7 @@ class BasicMiner extends Ship {
             maxReverse: 90,
             maxFuel : 2200,
             maxEnergy: 100,
-            mass: 2, // Tons
+            mass: 1, // Tons
             equipmentSlots : 4,
             centerOfGravity : {
                 x : .5,
@@ -22,16 +22,16 @@ class BasicMiner extends Ship {
             },
             polygon: [
                 {
-                    "shape": [ 5,36, 6,7, 21,39, 20,51, 6,50 ]
-                },
+                    "shape": [   8, 24  ,  19, 24  ,  18, 33  ,  9, 33  ]
+                } ,
                 {
-                    "shape": [ 28,38, 21,39, 6,7, 9,0, 18,0 ]
-                },
+                    "shape": [   27, 22  ,  19, 24  ,  8, 24  ,  0, 16  ,  7, 12  ,  21, 14  ,  27, 16  ]
+                } ,
                 {
-                    "shape": [ 28,38, 20,7, 28,7 ]
-                },
+                    "shape": [   0, 16  ,  8, 24  ,  0, 22  ]
+                } ,
                 {
-                    "shape": [ 6,7, 5,36, 0,36, 0,7 ]
+                    "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
                 }
             ],
             size : {
@@ -40,59 +40,44 @@ class BasicMiner extends Ship {
                 offsetX : 3,
                 offsetY : -8,
             },
-            weaponSlots : [
-                {
-                    position : {
-                        x: 0,
-                        y: 0
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                },
-                {
-                    position : {
-                        x: 9,
-                        y: -22
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                }
-            ],
+            weaponSlots : [],
             engineSlots : [{
                 anchor : {
                     x: 0.57,
-                    y: -1.5
+                    y: -1.6,
                 },
                 angle : 0,
             }],
             RCS :{
                 forward_left : {
-                    x: 0,
-                    y: 8,
+                    x: 10,
+                    y: 3,
                     angle : 90,
                 },
                 forward_right : {
-                    x: 26,
-                    y: 14,
+                    x: 17,
+                    y: 8,
                     angle : 270,                    
                 },
                 aft_left : {
-                    x : 5,
-                    y : 41,
+                    x : 8,
+                    y : 25,
                     angle : 90,
                 },
                 aft_right : {
-                    x: 21,
-                    y: 46,
+                    x: 19,
+                    y: 31,
                     angle : 270,                    
                 },
                 retro_a : {
-                    x: 11,
-                    y: 3,
+                    x: 7,
+                    y: 17,
                     angle : 180,
                     retro : true,                   
                 },
                 retro_b : {
-                    x: 21,
-                    y: 3,
+                    x: 25,
+                    y: 17,
                     angle : 180,
                     retro : true,                   
                 },
@@ -105,10 +90,9 @@ class BasicMiner extends Ship {
                 },
                 inUse: false,
             },
-
             storage : {
-                bulk : 300,
-                passengers : 2,
+                bulk : 10,
+                passengers : 6,
                 gas : 0,
                 liquid : 0,
             }
@@ -116,21 +100,13 @@ class BasicMiner extends Ship {
 
         // Sprites
         
-        
-        this.sprite = this.game.add.sprite(x,y, 'mining_ship');
+        this.sprite = this.game.add.sprite(x,y, 'shuttle');
         this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
 
         this.setupSprite(this.sprite);
 
-        // Weapons
-        var miningLaser = new BasicMiningLaser(this.game,this);
-        this.equipWeaponInSlot(miningLaser,1);
-
-        //var blaster = new BasicBlaster(this.game,this);
-        //this.equipWeaponInSlot(blaster,1);
-
         // Engine
-        var engine = new BasicEngine(this.game,this);
+        var engine = new SmallEngine(this.game,this);
         this.equipEngineInSlot(engine,0);
         this.refuel();
 

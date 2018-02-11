@@ -16,31 +16,32 @@ class Planet extends GameObject{
         this.nameText = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y-20, 
-            'pixelmix_normal2x',
+            'pixelmix_8',
             this.name,
-            7
+            8
         );
         this.nameText.alpha = 0;
 
         this.subText = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y, 
-            'pixelmix_normal2x',
+            'pixelmix_8',
             this.planetClass+' '+this.stellarObjectType,
-            6
+            5
         );
         this.subText.alpha = 0;
 
         this.landingMessage = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y+40, 
-            'pixelmix_normal',
+            'pixelmix_8',
             'Press L to Land',
-            8
+            5
         );
         this.landingMessage.alpha = 0;
 
         //messageText.alpha = 0;
+        //this.game.planets.add(this);
         this.game.register(this);
     }
     
@@ -78,8 +79,8 @@ class Planet extends GameObject{
     
     update() {
         super.update();
-        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-        this.showInfoIfNeeded();
+        //this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+        //this.showInfoIfNeeded();
     }
     
     get shouldShowInfo(){

@@ -5,7 +5,7 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Thu Feb 8 09:41:43 PST 2018  */
+/* Last merge : Sun Feb 11 12:55:17 PST 2018  */
 
 /* Merging order :
 
@@ -19,6 +19,8 @@
 - app/ships/_ship.js
 - app/engines/_engine.js
 - app/engines/basicEngine.js
+- app/engines/smallEngine.js
+- app/engines/_thruster.js
 - app/gameObjects/pickup.js
 - app/gameObjects/flake.js
 - app/gameObjects/asteroid.js
@@ -28,6 +30,7 @@
 - app/items/metoricIron.js
 - app/ships/basicMiner.js
 - app/ships/fuelTanker.js
+- app/ships/shuttle.js
 - app/weapons/basicMiningLaser.js
 - app/weapons/basicBlaster.js
 - app/planets/_planet.js
@@ -61,9 +64,29 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+// Convert from degrees to radians.
+Math.radians = function(degrees) {
+	return degrees * Math.PI / 180;
+}
+
+// Convert from radians to degrees.
+Math.degrees = function(radians) {
+	return radians * 180 / Math.PI;
+}
+
+const P2BODY_DEBUG = false;
+
+const DEG_IN_RAD_90 = 1.5708;
+
 const CREDIT_PREFIX = {
     short : '$',
     long: 'Credits ',
+}
+
+const NAVIGATION_MODE = {
+    free : 'free',
+    stationKeeping : 'stationKeeping',
+    followWaypoints : 'followWaypoints',
 }
 
 const CARGO_STORAGE_CLASS = {
@@ -93,6 +116,11 @@ const WEAPON_TYPES = {
     kinetic :  'kinetic',
     blaster :  'blaster',
     missleLauncher :  'missleLauncher',
+}
+
+const ENGINE_TYPES = {
+    rocket :    'rocket',
+    reactionControlThruster :  'reactionControlThruster',
 }
 
 const RARITY = {
@@ -150,7 +178,7 @@ class GameObject {
         this.game = game;
         this.game.register(this);
     
-        this.showInfoDistance = 100;
+        this.showInfoDistance = 200;
 
         // Basics
         this.health = 0;
@@ -160,7 +188,6 @@ class GameObject {
         // Damage Managment        
         this.damageAccumulating = false;
         this.damageAccumulationAmount = 0;        
-    
     
         // Item Managment
         this.inventory = [];
@@ -184,7 +211,7 @@ class GameObject {
             
             if(this.health>0){
                 this.health -= amount;
-            } else if(this.health<=0){
+            } else if(this.health<=0 && this.alive){
                 this.kill();
             }        
         }
@@ -192,7 +219,7 @@ class GameObject {
         
     showDamage(amount){
         var x = this.sprite.x + game.rnd.integerInRange(-this.sprite.width/5, this.sprite.width/5);
-        var damageText = game.add.bitmapText(x, this.sprite.y, 'pixelmix_bold2x',amount,6);
+        var damageText = game.add.bitmapText(x, this.sprite.y, 'pixelmix_8',amount,10);
         damageText.anchor.x = 0.5;
         damageText.alpha = 0;
         damageText.tint = 0xf1c40f;
@@ -237,7 +264,7 @@ class GameObject {
             var verticalSpacing = 18;
             var itemGroup = items[key];
             var itemMessage = `+${itemGroup.amount} ${itemGroup.item.name}`;
-            var itemText = game.add.bitmapText(this.sprite.x, this.sprite.y-(verticalSpacing*index), 'pixelmix_normal2x',itemMessage,5);
+            var itemText = game.add.bitmapText(this.sprite.x, this.sprite.y-(verticalSpacing*index), 'pixelmix_8',itemMessage,8);
             itemText.anchor.x = .5;
             itemText.alpha = 0;
             itemText.tint = RARITY_COLOR[itemGroup.item.rarity];
@@ -291,13 +318,12 @@ class GameObject {
         }
     }
     
-    
     kill(){
         this.alive = false;
         this.game.unregister(this);        
 
         if(this.sprite!=undefined){
-            this.sprite.body.kill();
+            //this.sprite.body.kill();
             this.sprite.kill();
         }
     }
@@ -307,8 +333,7 @@ class GameObject {
 
         this.game.unregister(this);        
         if(this.sprite!=undefined){
-		    this.sprite.body.enable = false;
-            this.sprite.kill();
+            this.sprite.destroy();
         }
     }
 
@@ -377,6 +402,34 @@ class Weapon extends Equipment {
     update(){
         super.update();
     }
+
+    postUpdate(){
+        // Bullet updates
+        if(this.weapon!=undefined && this.alive){        
+            var hits = this.game.physics.p2.hitTest(this.position);
+            if(hits.length) this.weapon.hit(this,hits)
+        }
+
+        if (this.customRender) this.key.render();
+        if (this.components.PhysicsBody) Phaser.Component.PhysicsBody.postUpdate.call(this);
+        if (this.components.FixedToCamera) Phaser.Component.FixedToCamera.postUpdate.call(this);
+        for (var i = 0; i < this.children.length; i++) {
+            this.children[i].postUpdate();
+        }
+    }
+
+    hit(bullet,hits){
+        for (let hit of hits) {
+            var target = hit.parent.sprite.parentObject;
+
+            if(this.game.player.ship == target){
+                return; // Can't hit yourself.
+            }
+            
+            target.inflictDamage(bullet.damage);
+            bullet.kill();
+        }
+    }
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -385,7 +438,7 @@ class Weapon extends Equipment {
 
 
 class Ship extends GameObject {
-    constructor(game) {
+    constructor(game,x,y) {
         super(game);
         
         // Basic Ship
@@ -393,8 +446,11 @@ class Ship extends GameObject {
             name : 'Unknown Ship',
             description : 'Unknown Class',
         }
+        
+        this.xStart = x;
+        this.yStart = y;
 
-        this.dockingDistance = 100;
+        this.dockingDistance = 250;
         this.dockedShips = [];
         this.isDocked = false;
 
@@ -404,47 +460,87 @@ class Ship extends GameObject {
         this.weapons = [];
         this.engines = [];    
         this.equipment = [];
+        
+        this.canPickThingsUp = true;
+    
+        this.navigation = {
+            waypoints : [
+            {
+                x: this.game.world.centerX+200,
+                y: this.game.world.centerY-200,
+            },
+            {
+                x: this.game.world.centerX+200,
+                y: this.game.world.centerY+1000,
+            },
+            {
+                x: this.game.world.centerX-200,
+                y: this.game.world.centerY+1000,
+            },
+            {
+                x: this.game.world.centerX-200,
+                y: this.game.world.centerY-200,
+            },
+            ],
+            currentWaypoint: 0,
+        }
+        this.navigationMode = NAVIGATION_MODE.free;
     }
     
     setupSprite(sprite){
         // Physics
-        this.game.physics.arcade.enable(sprite);
-        sprite.body.maxAngular = this.specs.maxTurning;
-        sprite.body.drag.set(2);
-        sprite.body.bounce.setTo(.2, .2);
-        sprite.body.setSize(
-            this.specs.size.width, 
-            this.specs.size.height, 
-            this.specs.size.offsetX, 
-            this.specs.size.offsetY
-        );
-        sprite.body.collideWorldBounds = true;
+        this.game.physics.p2.enable(sprite,P2BODY_DEBUG);
+        this.sprite.body.clearShapes();
+        this.sprite.body.loadPolygon(null,this.specs.polygon);       
+        this.sprite.body.damping = 0.01;
+        this.sprite.body.mass = this.specs.mass;
         this.sprite.parentObject = this;
+        
+        this.dockingConnector = this.sprite.addChild(this.game.make.sprite(0, 0, 'null'));
+        this.dockingConnector.x = this.specs.dockingConnector.position.x;
+        this.dockingConnector.y = this.specs.dockingConnector.position.y;
+
+        if(this.specs.canBeDockedTo){
+            this.dockingPort = this.sprite.addChild(this.game.make.sprite(0, 0, 'dock-arrow'));
+            this.dockingPort.x = this.specs.dockingPorts[0].position.x;
+            this.dockingPort.y = this.specs.dockingPorts[0].position.y;
+            this.dockingPort.anchor.set(.5,2.5);
+            this.dockingPort.visible = false;
+
+            this.dockingPortBlink = this.game.add.tween(this.dockingPort).to({
+                alpha: 1,
+                y: '5'
+            }, 600, "Quart.easeOut", true, 0, 0, true).loop(true);
+        }
+        
+        this.setupRCSThrusters();
         this.game.ships.add(this.sprite);        
         
+        this.health = this.specs.health;
+        
         // Info
-        this.nameText = this.game.add.bitmapText(0,0, 'pixelmix_normal2x', this.specs.name, 7 );
+        this.nameText = this.game.add.bitmapText(0,0, 'pixelmix_8', this.specs.name, 8);
         this.nameText.alpha = 0;
 
-        this.subText = this.game.add.bitmapText(0,0, 'pixelmix_normal2x', this.specs.description, 6);
+        this.subText = this.game.add.bitmapText(0,0, 'pixelmix_8', this.specs.description, 5);
         this.subText.alpha = 0;
 
-        this.landingMessage = this.game.add.bitmapText(0,0, 'pixelmix_normal', 'Press D to Dock', 8);
+        this.landingMessage = this.game.add.bitmapText(0,0, 'pixelmix_8', 'Cleared to Dock', 5);
         this.landingMessage.alpha = 0;
     }
     
     positionInfo(){
-            var x = 20+this.sprite.x + this.sprite.width/2;
-            var y = this.sprite.y;
-            
-            this.nameText.x = x; 
-            this.nameText.y = y-40; 
-    
-            this.subText.x = x; 
-            this.subText.y = y-20; 
-    
-            this.landingMessage.x = x; 
-            this.landingMessage.y = y+20;             
+        var x = 20+this.sprite.x + this.sprite.width/2;
+        var y = this.sprite.y;
+        
+        this.nameText.x = x; 
+        this.nameText.y = y-40; 
+
+        this.subText.x = x; 
+        this.subText.y = y-20; 
+
+        this.landingMessage.x = x; 
+        this.landingMessage.y = y+20;             
     }
     
     // Weapons
@@ -459,12 +555,13 @@ class Ship extends GameObject {
 
     equipWeaponInSlot(weapon,slot){
         this.weapons.push(weapon);
-
+        
         weapon.weapon.trackSprite(
             this.sprite,
             this.specs.weaponSlots[slot].position.x,
             this.specs.weaponSlots[slot].position.y,
-            true
+            true,
+            270,
         );
     }
 
@@ -479,8 +576,43 @@ class Ship extends GameObject {
         for (let engine of this.engines) {
             maxSpeed += engine.maxSpeed;
         }
+        this.maxSpeed = maxSpeed/10 // No idea.
+    }
+    
+    setupRCSThrusters(){
+        if(this.specs.RCS != undefined){
+            this.thrusters = {};
+            for (var thruster in this.specs.RCS) {
+                this.addThruster(thruster,this.specs.RCS[thruster])
+            }
+        }
+    }    
+    
+    addThruster(thruster,layout){
+        this.thrusters[thruster] = new Thruster(this.game,this,layout)
+        
+        // Hande retro thrusters
+        if(layout.retro !=undefined){
+            this.thrusters[thruster].retro = layout.retro
+        }
+    }
+    
+    fireThruster(thrusterKey){
+        if(this.thrusters[thrusterKey]!=undefined && this.hasFuel){
+            var thruster = this.thrusters[thrusterKey];
+            this.consumeFuel(thruster.fuelConsumption)
+            thruster.fire();
+        }
+    }
 
-        this.sprite.body.maxVelocity.set(maxSpeed / this.engines.length);
+    shutdownThruster(thruster){
+        this.thrusters[thruster].shutdown();
+    }
+    
+    shutdownAllThrusters(){
+        for (var thruster in this.specs.RCS) {
+            this.shutdownThruster(thruster)
+        }        
     }
     
     // Equipment
@@ -490,6 +622,20 @@ class Ship extends GameObject {
 
     
     // Movement
+    get speed(){
+        var body = this.sprite.body
+        var vx, vy;
+        
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        
+        return vx * vx + vy * vy;
+    }
+    
+    get heading(){
+        return this.sprite.angle;
+    }
+    
     accelerate() {
         if(!this.isDocked){
             // Not Docked
@@ -503,12 +649,7 @@ class Ship extends GameObject {
                     engine.deaccelerate();                
                 }
             }
-    
-            this.game.physics.arcade.accelerationFromRotation(
-                this.sprite.rotation,
-                totalThurst,
-                this.sprite.body.acceleration
-            );
+            this.sprite.body.thrust(totalThurst)
         } else {
             // Docked
             for (let engine of this.engines) {
@@ -517,32 +658,89 @@ class Ship extends GameObject {
         }
     }
     
-    deadSlowAhead(){
-        this.game.physics.arcade.accelerationFromRotation(
-            this.sprite.rotation,
-            .33,
-            this.sprite.body.acceleration
-        );
+    get totalThurst(){
+        var totalThurst = 0;
+        for (let engine of this.engines) {
+            totalThurst += engine.thrust;
+        }
+        return totalThurst;
     }
     
+    limitSpeed() {
+        var maxVelocity = this.maxSpeed;
+        var sprite = this.sprite;
+
+        var body = sprite.body
+        var angle, currVelocitySqr, vx, vy;
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        currVelocitySqr = vx * vx + vy * vy;
+        if (currVelocitySqr > maxVelocity * maxVelocity) {
+            angle = Math.atan2(vy, vx);
+            vx = Math.cos(angle) * maxVelocity;
+            vy = Math.sin(angle) * maxVelocity;
+            body.data.velocity[0] = vx;
+            body.data.velocity[1] = vy;
+        }
+    };
+        
     deaccelerate() {
         if(this.sprite){
-            this.sprite.body.acceleration.set(0);
+            this.sprite.body.acceleration = 0;
     
             for (let engine of this.engines) {
                 engine.deaccelerate();
             }            
         }
     }
+
+    goInReverse() {
+        if(!this.isDocked && this.hasFuel) {
+            if(this.speed<this.specs.maxReverse){
+                this.sprite.body.reverse(this.specs.reverseThrust)
+            }
+
+            this.fireThruster('retro_a');
+            this.fireThruster('retro_b');
+        }
+    }
     
     turnLeft(){
-        if(!this.isDocked) this.sprite.body.angularVelocity -= this.specs.turnAccel;
+        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel) {
+            this.sprite.body.angularVelocity -= this.specs.turnAccel;
+        
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_left');
+        }
     }
 
     turnRight(){
-        if(!this.isDocked) this.sprite.body.angularVelocity += this.specs.turnAccel;
+        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel) {
+            this.sprite.body.angularVelocity += this.specs.turnAccel;
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_right');
+        }
     }
-    
+
+    moveLeft(){
+        if(!this.isDocked && this.hasFuel) {
+            this.sprite.body.thrustLeft(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_right');
+        }
+    }
+
+    moveRight(){
+        if(!this.isDocked && this.hasFuel) {
+            this.sprite.body.thrustRight(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_left');
+        }
+    }
+
     deaccelerateTurning(){
         if(this.sprite){
             if(this.sprite.body.angularVelocity>0){
@@ -552,6 +750,92 @@ class Ship extends GameObject {
                 this.sprite.body.angularVelocity = Math.min(this.sprite.body.angularVelocity+this.specs.turnDecay,0);
             }
         }
+        
+        this.shutdownAllThrusters();
+    }
+    
+    
+    // Navigation
+    navigate(){
+        if(this.navigationMode.free) return;
+
+        if(this.navigationMode.stationKeeping) this.keepStation();
+        
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            this.goToWayPoint(this.navigation.waypoints[this.navigation.currentWaypoint]);
+        }
+    }
+
+    goToWayPoint(waypoint){
+        var shipAngle = this.sprite.rotation;
+        
+        // Heading
+        var angleToWaypoint = this.game.physics.arcade.angleToXY(this.sprite, waypoint.x, waypoint.y) + 1.5708;
+        var vx = this.sprite.body.velocity.x;
+        var vy = this.sprite.body.velocity.y;
+        var eta = this.distanceToWaypoint/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2)); // Seconds until impact.
+        
+        var difference = Phaser.Math.wrapAngle(Math.degrees(angleToWaypoint - this.sprite.body.rotation));
+
+        var distanceTolerance = 30;
+        if(this.distanceToWaypoint<distanceTolerance){
+            this.deaccelerate();
+            this.sprite.body.setZeroVelocity();
+            this.sprite.body.setZeroRotation();
+            this.reachedWaypoint();
+        } else {
+            var turnSpeed = Math.abs(difference)*.02;
+            //sconsole.log(`turn:${turnSpeed.toFixed(2)} | dist: ${this.distanceToWaypoint.toFixed(2)} | eta: ${eta.toFixed(2)}s`);
+            if(difference<-3 && difference>-180){
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnLeft();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else if(difference>3 && difference<180) {
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnRight();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else {
+                if(eta < 8){
+                    if(this.distanceToWaypoint>distanceTolerance){
+                        this.goInReverse();                    
+                    }
+                    this.deaccelerate();
+                } else {
+                    this.accelerate();
+                }
+            }
+        }
+    }
+
+    reachedWaypoint(){
+        console.log("reached");
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            var w = this.navigation.currentWaypoint + 1;
+            if(w>this.navigation.waypoints.length-1){
+                w = 0;
+            }
+            
+            this.navigation.currentWaypoint = w;
+        }
+    }
+            
+    get distanceToWaypoint(){
+        var waypoint = this.navigation.waypoints[this.navigation.currentWaypoint];
+        return this.game.physics.arcade.distanceToXY(this.sprite, waypoint.x,waypoint.y);
+    }
+    
+    navigateWaypoints(){
+        this.navigationMode = NAVIGATION_MODE.followWaypoints;
+    }
+    
+    keepStation(){
+        // Holds steady speed and heading
     }
     
     // Fuel Mgmt
@@ -644,66 +928,62 @@ class Ship extends GameObject {
         for (let ship of this.game.gameObjects) {
             if(ship.specs!=undefined && ship!=this){
                 var distance = this.game.physics.arcade.distanceBetween(ship.sprite, this.sprite);
-                if(distance<=ship.dockingDistance){
                     shipsInRange.push({
                         distance: distance,
                         ship: ship,
                     })
-                }
             }
         }
         if(shipsInRange.length>0){
             shipsInRange.sort(function(a, b) {
                 return a.distance - b.distance;
             });
-            var shipToDockTo = shipsInRange[0].ship;
 
+            var shipToDockTo = shipsInRange[0].ship;
             var maxSpeedWhenDocking = 10;
+            
+            
+
             if((this.sprite.body.speed-shipToDockTo.sprite.body.speed)>maxSpeedWhenDocking){
                 this.game.hud.message("Moving too fast to dock");
                 return;
             }
             
-            this.dockWith(shipToDockTo);
+            if(!this.okToDock){
+                this.game.hud.message("Not aligned for docking");
+            } else {
+                this.dockWith(shipToDockTo);
+            }
         } else {
-            this.game.hud.message("No Dock Availabe");
+            this.game.hud.message("No Dock Available");
         }
     }
     
     dockWith(ship){
         var dockingSpeed = 3000;
         
-        this.sprite.body.acceleration.set(0);
-        this.sprite.body.velocity.set(0);
-        
         var dockingPortNumber = 0;
+
+        this.sprite.body.clearShapes();
+        ship.sprite.body.clearShapes();
+        ship.sprite.body.static = true;        
         
         var dockingPosition = ship.specs.dockingPorts[dockingPortNumber].position
-        this.dockingTween = this.game.add.tween(this.sprite).to({
-            x: ship.sprite.x - dockingPosition.x,
-            y: ship.sprite.y - dockingPosition.y,
-            angle : ship.sprite.angle - dockingPosition.angle,
-        }, dockingSpeed, "Quart.easeOut", true);
 
-        this.dockingTween.onUpdateCallback(this.matchSpeedForDocking,this);
+        var dockingAngle = 180 * Math.PI / 180;        
+        this.dockingConstraint = game.physics.p2.createLockConstraint(this.sprite, ship.sprite, [0, 72], dockingAngle, 500);
+        this.dockedToShip = ship;
 
         this.isDocked = true;
         this.dockingTarget = ship;
         ship.landingMessage.setText('Docking...');
 
-        game.time.events.add(Phaser.Timer.SECOND * dockingSpeed/1000, this.dockingComplete, {
+        game.time.events.add(Phaser.Timer.SECOND * .5, this.dockingComplete, {
             target: ship,
             dockedShip: this,
             portNumber: dockingPortNumber,
             game: this.game,
         });
-    }
-
-    matchSpeedForDocking(){
-        var endingAngle = this.dockingTween.timeline[0].vEnd.angle;
-        var x = this.dockingTween.timeline[0].vEnd.x + this.dockingTarget.sprite.deltaX
-        var y = this.dockingTween.timeline[0].vEnd.y + this.dockingTarget.sprite.deltaY
-        this.dockingTween.timeline[0].vEnd={x:x,y:y, angle: endingAngle};
     }
     
     dockingComplete(){
@@ -711,6 +991,14 @@ class Ship extends GameObject {
         var dockedShip = this.dockedShip;
         var portNumber = this.portNumber; // What docking port am i at?
         
+        target.sprite.body.loadPolygon(null,target.specs.polygon);       
+        target.sprite.body.dynamic = true
+        target.sprite.body.mass = true
+
+        dockedShip.sprite.body.loadPolygon(null,dockedShip.specs.polygon)
+        dockedShip.dockedToShip.sprite.body.dynamic = true;        
+        dockedShip.dockedToShip.sprite.body.mass = dockedShip.specs.mass;        
+
         dockedShip.isDocked = true;
         dockedShip.dockedAtPortNumber = portNumber;
         dockedShip.hardDocked = true;
@@ -718,25 +1006,24 @@ class Ship extends GameObject {
 
         target.dockedShips.push(dockedShip);
 
-        this.game.hud.message("Docking Complete");
+        this.game.hud.message("Docking Successful");
         target.landingMessage.setText('Press D to Release');
     }    
 
     releaseDock(){
         if(this.hardDocked && this.isDocked){
+            game.physics.p2.removeConstraint(this.dockingConstraint);
             // Docking animation completed and ship is completely docked
+/*
             this.game.physics.arcade.accelerationFromRotation(
                 this.sprite.rotation - Math.PI,
                 1000,
                 this.sprite.body.acceleration
             );
-    
-    	    var emitter = this.game.add.emitter(
-    	        this.sprite.x - this.specs.dockingConnectorPosition.x,
-                this.sprite.y - this.specs.dockingConnectorPosition.y,
-                100
-            );
-    
+*/
+    	    var emitter = this.game.add.emitter(0,0,100);
+            this.dockingConnector.addChild(emitter);
+                
             emitter.makeParticles('cloud');
             emitter.gravity = 0;
             emitter.maxRotation = 100;
@@ -753,6 +1040,8 @@ class Ship extends GameObject {
 
     abortDocking(){
         //this.dockedToShip.landingMessage.setText('Press D to Dock');
+
+
         this.isDocked = false;
         this.dockedToShip = null;
         this.dockedAtPortNumber = null;
@@ -783,11 +1072,13 @@ class Ship extends GameObject {
             //this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
         
             this.infoShowing = true;
+            this.dockingPort.visible = true;
         }
         
         if(!this.shouldShowInfo && this.infoShowing){
             this.hideInfo();
             this.infoShowing = false;
+            this.dockingPort.visible = false;
         }
     }
     
@@ -831,10 +1122,33 @@ class Ship extends GameObject {
     // Rendering
     update() {
         super.update(); 
-        
-        if(this.specs.canBeDockedTo){
-            this.positionInfo();
-            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+        this.positionInfo();        
+        this.navigate();
+
+        this.limitSpeed();
+
+        if(this.specs.canBeDockedTo && this.sprite != this.game.player.ship.sprite){
+            var a = this.dockingPort.worldPosition.x - this.game.player.ship.dockingConnector.worldPosition.x;
+            var b = this.dockingPort.worldPosition.y - this.game.player.ship.dockingConnector.worldPosition.y;
+            var d = Math.sqrt(a*a + b*b);
+           
+            // Rotation
+            var r = Math.abs(Math.abs(this.sprite.angle - this.game.player.ship.sprite.angle) - 180); 
+
+            if(d<15 && r<20){
+                this.game.player.ship.okToDock = true;
+                this.landingMessage.setText("Press D to Dock");
+            } else {
+                this.game.player.ship.okToDock = false;
+                this.landingMessage.setText("Cleared to Dock");
+            }
+            
+            // Update distance for info
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(
+                this.sprite,
+                this.game.player.sprite
+            );
+
             this.showInfoIfNeeded();
         }
 
@@ -843,19 +1157,6 @@ class Ship extends GameObject {
             this.sprite.y += this.dockingTarget.sprite.deltaY;
         }
 
-        this.game.ships.forEachAlive(function(ship) {
-            if(ship.parentObject.weapons.length>0 && ship.parentObject != this.game.player.ship){
-                for (let weapon of ship.parentObject.weapons) {
-                    this.game.physics.arcade.collide(
-                        this.sprite, 
-                        weapon.weapon.bullets, 
-                        this.didCollide, 
-                        this.processBulletCollision, 
-                        this
-                    );
-                }
-            }            
-        }, this)
     }   
 }
 
@@ -875,7 +1176,7 @@ class Engine extends Equipment {
         this.fuelConsumption = 1;
 
         this.thrust = 100;
-        this.spoolUpSpeed =.2;
+        this.spoolUpSpeed = 1;
         this.spoolDownSpeed = .04;
     }
 
@@ -889,10 +1190,25 @@ class Engine extends Equipment {
         if(this.currentSpool<=1){
             this.currentSpool = Math.min(this.currentSpool+this.spoolUpSpeed,1);
         }
+        if(this.retro) {
+            this.currentSpool = 1
+        }
     }
 
-    deaccelerate(){    
-        this.currentSpool = Math.max(this.currentSpool-this.spoolDownSpeed,0)
+    deaccelerate(){
+        if(!this.retro) {
+            this.currentSpool = Math.max(this.currentSpool-this.spoolDownSpeed,0)
+        } else {
+            this.currentSpool = Math.max(this.currentSpool-.1,0)            
+        }
+    }
+
+    fire(){
+        this.accelerate();
+    }
+    
+    shutdown(){
+        this.deaccelerate();    
     }
 
     update(){
@@ -909,7 +1225,7 @@ class BasicEngine extends Engine {
     constructor(game,parentObject) {
         super(game,parentObject);
 
-        this.thrust = 100;
+        this.thrust = 200;
         this.maxSpeed = 150;
         this.spoolUpSpeed =.08;
         this.spoolDownSpeed = .04;
@@ -917,6 +1233,82 @@ class BasicEngine extends Engine {
 
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
         this.flames.blendMode = PIXI.blendModes.ADD;    
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/smallEngine.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class SmallEngine extends Engine {
+    constructor(game,parentObject) {
+        super(game,parentObject);
+
+        this.thrust = 130;
+        this.maxSpeed = 150;
+        this.spoolUpSpeed =.08;
+        this.spoolDownSpeed = .04;
+        this.fuelConsumption = .8;
+
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
+        this.flames.blendMode = PIXI.blendModes.ADD;
+        this.flames.scale.set(.6);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/_thruster.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Thruster extends Engine {
+    constructor(game,parentObject,layout) {
+        super(game,parentObject);
+
+        this.engineType = ENGINE_TYPES.reactionControlThruster;
+        this.thrust = 0;
+        this.fuelConsumption = .1;
+
+        this.spoolUpSpeed = .3;
+        this.spoolDownSpeed = .6;
+
+        this.layout = layout;
+
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'rcs_flame'));
+        this.flames.x = layout.x-this.parentObject.sprite.width/2;
+        this.flames.y = layout.y-this.parentObject.sprite.height/2;
+        this.flames.angle = layout.angle;
+        this.flames.scale.set(.9);
+        this.flames.anchor.set(0,0);
+        this.flames.blendMode = PIXI.blendModes.ADD;    
+
+        var smoke = {
+            image: 'smoke-trail',
+            blendMode: 'HARD_LIGHT',
+            lifespan: { min: 150, max: 400 },
+            scale: { value: { min: .03, max: .1 } },
+            vx: { value: { min: 0, max: 0 } },
+            vy: { value: { min: 0, max: 0 }, delta: .2, control: [ { x: 0, y: 1 }, { x: 0, y: 0 } ] },
+            alpha: { value: .3, control :[ { x: 0, y: 0 }, { x: 0.3, y: 1 }, { x: 1, y: 0 }] },
+            rotation: { value: 0, delta: { min: -2.0, max: 2.0 } }
+        };
+
+        this.emitter = this.game.ps.createEmitter(); 
+        this.emitter.addToWorld();
+
+        this.game.ps.addData('smoke', smoke);
+
+    }
+    accelerate(){
+        super.accelerate();
+        this.puff();
+    }
+    puff(){
+        var px = this.flames.worldPosition.x + game.camera.x;
+        var py = this.flames.worldPosition.y + game.camera.y;
+
+        this.emitter.emit('smoke', px, py, { total: 1 });
     }
 }
 
@@ -930,18 +1322,18 @@ class Pickup extends GameObject {
         super(game);
      
         this.group = group        
-        this.magneticDistance = 100;
+        this.magneticDistance = 150;
     
         this.contents = new InventoryObject(this.game);
     }
 
     pickedUpBy(object){
+        this.destroy();
         return object.collectNumberOfItems(1,this.contents);
     }
 
     processCollision(pickup,object){
         this.pickedUpBy(this.game.player.ship)
-        this.destroy();
     }
             
     kill(){
@@ -954,13 +1346,14 @@ class Pickup extends GameObject {
     // Rendering
     update() {
         super.update();
-        this.game.physics.arcade.collide(
-            this.sprite, 
-            this.game.player.sprite, 
-            this.didCollide, 
-            this.processCollision, 
-            this
-        );
+
+        if(this.alive){
+            var hits = this.game.physics.p2.hitTest(this.sprite.position);
+            for (let hit of hits) {
+                var target = hit.parent.sprite.parentObject;                
+                if(target.canPickThingsUp) this.pickedUpBy(target);                
+            }
+        }
     }
     
     
@@ -1018,11 +1411,13 @@ class FlakePickup extends Pickup {
     update() {
         super.update();
         // Spin
-        this.sprite.body.angularVelocity = this.roationSpeed;
-
-        var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-        if(distance<this.magneticDistance){
-            this.game.physics.arcade.accelerateToObject(this.sprite, this.game.player.sprite, 500, 500, 500)
+        if(this.sprite.alive){
+            this.sprite.body.angularVelocity = this.roationSpeed;
+    
+            var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+            if(distance<this.magneticDistance){
+                this.game.physics.arcade.moveToObject(this.sprite, this.game.player.sprite, 100)
+            }            
         }
     }
     
@@ -1045,45 +1440,48 @@ class Asteroid extends GameObject {
         if(size==undefined) size = 'large';
         this.size = size;
         
-        this.sprite = this.group.create(x,y,'asteroid-'+size)
+        this.sprite = this.game.asteroids.create(x,y,'asteroid-'+size);
+        this.sprite.parentObject = this;
+        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
 
-        this.game.physics.enable(this.sprite, Phaser.Physics.ARCADE);
-        this.sprite.body.bounce.setTo(1, 1);
-        this.sprite.body.collideWorldBounds = true;
+        this.sprite.body.clearShapes();
+        this.sprite.body.damping = 0;
 
         if(size=='large'){
             this.health = game.rnd.integerInRange(150, 200);
-        this.sprite.body.velocity.setTo(game.rnd.integerInRange(-5, 5),game.rnd.integerInRange(-5, 5));
-            this.sprite.body.mass = 30;
-            this.sprite.body.setSize(70, 70, 10, 15);
-            this.roationSpeed = game.rnd.integerInRange(-10, 10);
-        
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+            this.sprite.body.mass = 100;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(32);
+            this.sprite.body.applyImpulseLocal([0,100],0,0)
+
             this.minimapSize = 1.2;
         } else if(size=='medium'){
             this.health = game.rnd.integerInRange(70, 100);
-            this.sprite.body.velocity.setTo(game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10));
-            this.sprite.body.mass = 15;
-            this.sprite.body.setSize(50, 50, 5, 5);
-            this.roationSpeed = game.rnd.integerInRange(-15, 15);
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+
+            this.sprite.body.mass = 50;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(20);
+            this.sprite.body.applyImpulseLocal([0,10],0,0)
+
             this.minimapSize = .8;
         } else if(size=='small'){
             // Small
             this.health = game.rnd.integerInRange(20, 30);
-            this.sprite.body.velocity.setTo(game.rnd.integerInRange(-15, 15),game.rnd.integerInRange(-15, 15));
-            this.sprite.body.mass = 3;
-            this.sprite.body.setSize(30, 30, 6, 6);
-            this.roationSpeed = game.rnd.integerInRange(-25,25);
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+
+            this.sprite.body.mass = 10;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(14);
+            this.sprite.body.applyImpulseLocal([0,1],0,0)
+
             this.minimapSize = .5;
         }
-        this.sprite.anchor.set(0.5);
 
+        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
+        this.sprite.anchor.set(0.5);
 
     }
 
-    processBulletCollision(asteroid, bullet){
+    processBulletCollision(asteroid, bullet){        
 	    var emitter = this.game.add.emitter(bullet.x, bullet.y, 100);
         emitter.makeParticles('asteroid-flake-3');
         emitter.minParticleScale = .5;
@@ -1100,34 +1498,31 @@ class Asteroid extends GameObject {
         
     kill(){
         if(this.size=='large'){
-            var gap = 45;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            var a1 = new Asteroid(this.game,this.group,'medium',this.sprite.x+offsetX,this.sprite.y+offsetY);            
-            var a2 = new Asteroid(this.game,this.group,'medium',this.sprite.x-offsetX,this.sprite.y-offsetY);
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
+            this.explode();
+            this.destroy();
+            var a1 = new Asteroid(this.game,this.group,'medium',x-20,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'medium',x+20,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='medium'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
             this.destroy();
-        } else if(this.size=='medium'){
-            var gap = 35;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            var a1 = new Asteroid(this.game,this.group,'small',this.sprite.x+offsetX,this.sprite.y+offsetY);            
-            var a2 = new Asteroid(this.game,this.group,'small',this.sprite.x-offsetX,this.sprite.y-offsetY);
-            this.explode();         
-            this.destroy();            
+            var a1 = new Asteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
         } else if(this.size=='small'){
-            var gap = 25;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            
-            // Create flakes when destroyed
-            var flakeCount = game.rnd.integerInRange(3,6);
-            for (var i = 0; i < flakeCount; i++) { 
-                new FlakePickup(this.game,this.group,this.sprite.x+offsetX,this.sprite.y+offsetY)
-            }
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
-            this.destroy();            
+            this.destroy();
+            var flakeCount = game.rnd.integerInRange(3,6);
+
+            for (var i = 0; i < flakeCount; i++) { 
+                new FlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
+            }
+
         }     
     } 
        
@@ -1149,10 +1544,7 @@ class Asteroid extends GameObject {
         
         // Spin
         this.sprite.body.angularVelocity = this.roationSpeed;
-        
-        // Collide with player
-        this.game.physics.arcade.collide(this.sprite, this.game.player.sprite);
-        
+                
         // Collide with player's weapons
         for (let weapon of this.game.player.ship.weapons) {
             this.game.physics.arcade.collide(
@@ -1163,7 +1555,6 @@ class Asteroid extends GameObject {
                 this
             );
         }
-
     }
 }
 
@@ -1180,10 +1571,9 @@ class AsteroidField extends GameObject {
         if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1500, 1500);
         if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1500, 1500);
         if(size==undefined) size = 800;
-        var densityLowerBound = 22;
-        var densityUpperBound = 26;
+        var densityLowerBound = 200;
+        var densityUpperBound = 200;
         
-
         this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
         this.asteroids = this.game.add.physicsGroup(Phaser.Physics.ARCADE);
         for (var i = 0; i < this.asteroidsCount; i++) { 
@@ -1256,55 +1646,113 @@ class Item_MeteoricIron extends InventoryObject {
 
 
 class BasicMiner extends Ship {
-    constructor(game) {
-        super(game);
+    constructor(game,x,y) {
+        super(game,x,y);
         
         this.specs = {
             name : 'MV Fair Rosamond',
             description : 'Cobalt Class Mining Vessel',
-            turnDecay: 15,
-            turnAccel: 30,
-            maxTurning: 150,
+            health: 100,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
             maxFuel : 2200,
             maxEnergy: 100,
+            mass: 2, // Tons
             equipmentSlots : 4,
             centerOfGravity : {
                 x : .5,
                 y : .5,
             },
+            polygon: [
+                {
+                    "shape": [ 5,36, 6,7, 21,39, 20,51, 6,50 ]
+                },
+                {
+                    "shape": [ 28,38, 21,39, 6,7, 9,0, 18,0 ]
+                },
+                {
+                    "shape": [ 28,38, 20,7, 28,7 ]
+                },
+                {
+                    "shape": [ 6,7, 5,36, 0,36, 0,7 ]
+                }
+            ],
             size : {
                 width : 45,
                 height : 45,
                 offsetX : 3,
                 offsetY : -8,
             },
-            dockingConnectorPosition : {
-                x : -10,
-                y : 20,
-            },
             weaponSlots : [
                 {
                     position : {
-                        x: 40,
-                        y: 10
+                        x: 0,
+                        y: 0
                     },
                     typesAllowed: [WEAPON_TYPES.miningLaser],
                 },
                 {
                     position : {
-                        x: 23,
-                        y: -10
+                        x: 9,
+                        y: -22
                     },
                     typesAllowed: [WEAPON_TYPES.miningLaser],
                 }
             ],
             engineSlots : [{
                 anchor : {
-                    x: 2.45,
-                    y: 0.53
+                    x: 0.57,
+                    y: -1.5
                 },
                 angle : 0,
             }],
+            RCS :{
+                forward_left : {
+                    x: 0,
+                    y: 8,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 26,
+                    y: 14,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 5,
+                    y : 41,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 21,
+                    y: 46,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 11,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 21,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: -3,
+                    y: -24,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+
             storage : {
                 bulk : 300,
                 passengers : 2,
@@ -1314,7 +1762,9 @@ class BasicMiner extends Ship {
         }
 
         // Sprites
-        this.sprite = this.game.add.sprite(this.game.world.centerX,this.game.world.centerX, 'mining_ship');
+        
+        
+        this.sprite = this.game.add.sprite(x,y, 'mining_ship');
         this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
 
         this.setupSprite(this.sprite);
@@ -1348,67 +1798,143 @@ class BasicMiner extends Ship {
 
 
 class FuelTanker extends Ship {
-    constructor(game) {
-        super(game);
-                
+    constructor(game,x,y) {
+        super(game,x,y);
+        
         this.specs = {
-            name : 'USS Ajax',
+            name : 'AOG Belvidera',
             description : 'Fuel Tanker',
-            turnDecay: .4,
-            turnAccel: .8,
-            maxTurning: 30,
-            maxFuel : 12200,
-            maxEnergy: 100,
+            health : 100,
+            turnDecay: .005,
+            turnAccel: .007,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 40,
+            maxReverse: 60,
+            maxFuel : 9000,
+            maxEnergy: 150,
+            mass: 10, // Tons
             equipmentSlots : 4,
             centerOfGravity : {
                 x : .5,
-                y : .6,
+                y : .5,
             },
+            polygon: [
+                {
+                    "shape": [ 51,54, 37,53, 36,32, 86,32, 87,54 ]
+                },
+                {
+                    "shape": [ 36,32, 37,53, 0,54, 0,32 ]
+                },
+                {
+                    "shape": [ 36,93, 37,53, 51,54, 52,93 ]
+                },
+                {
+                    "shape": [ 37,27, 51,32, 36,32 ]
+                },
+                {
+                    "shape": [ 35,5, 50,27, 51,32, 37,27 ]
+                },
+                {
+                    "shape": [ 46,1, 51.83333206176758,4.333335876464844, 50,27, 35,5, 40,1 ]
+                }
+            ],
             size : {
-                width : 80,
-                height : 100,
-                offsetX : 10,
-                offsetY : 20,
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
             },
             weaponSlots : [
                 {
                     position : {
-                        x: 40,
-                        y: 10
+                        x: 0,
+                        y: 0
                     },
                     typesAllowed: [WEAPON_TYPES.miningLaser],
                 },
                 {
                     position : {
-                        x: 23,
-                        y: -10
+                        x: 9,
+                        y: -22
                     },
                     typesAllowed: [WEAPON_TYPES.miningLaser],
                 }
             ],
             engineSlots : [{
                 anchor : {
-                    x: 4,
-                    y: .49
+                    x: 0.55,
+                    y: -2.8
                 },
                 angle : 0,
             }],
+            RCS :{
+                forward_left : {
+                    x: 35,
+                    y: 16,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 52,
+                    y: 22,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x: 35,
+                    y : 71,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 52,
+                    y: 76,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 41,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 51,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            storage : {
+                bulk : 300,
+                passengers : 2,
+                gas : 0,
+                liquid : 0,
+            },
             dockingPorts : [{
                 position : {
-                    x: 16,
-                    y: -31,
+                    x: 0,
+                    y: -47,
                     angle : 90,
                 },
                 inUse: false,
             }],
+            dockingConnector : {
+                position : {
+                    x: 0,
+                    y: -50,
+                    angle : 90,
+                },
+                inUse: false,
+            },
             canBeDockedTo: true,
         }
-    
+
         // Sprites
-        this.sprite = this.game.add.sprite(this.game.world.centerX,this.game.world.centerX, 'fuelTanker');
+        this.sprite = this.game.add.sprite(x,y, 'fuelTanker2');
         this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
 
         this.setupSprite(this.sprite);
+
+        //var blaster = new BasicBlaster(this.game,this);
+        //this.equipWeaponInSlot(blaster,1);
 
         // Engine
         var engine = new BasicEngine(this.game,this);
@@ -1419,6 +1945,137 @@ class FuelTanker extends Ship {
         var reactor = new Reactor(this.game,this);
         this.equipEquipmentInSlot(reactor,0);
         this.recharge();
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/shuttle.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Shuttle extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'Shuttle',
+            description : 'Shuttle',
+            health: 100,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
+            maxFuel : 2200,
+            maxEnergy: 100,
+            mass: 1, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [   8, 24  ,  19, 24  ,  18, 33  ,  9, 33  ]
+                } ,
+                {
+                    "shape": [   27, 22  ,  19, 24  ,  8, 24  ,  0, 16  ,  7, 12  ,  21, 14  ,  27, 16  ]
+                } ,
+                {
+                    "shape": [   0, 16  ,  8, 24  ,  0, 22  ]
+                } ,
+                {
+                    "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
+                }
+            ],
+            size : {
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
+            },
+            weaponSlots : [],
+            engineSlots : [{
+                anchor : {
+                    x: 0.57,
+                    y: -1.6,
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 10,
+                    y: 3,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 17,
+                    y: 8,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 8,
+                    y : 25,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 19,
+                    y: 31,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 7,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 25,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: -3,
+                    y: -24,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            storage : {
+                bulk : 10,
+                passengers : 6,
+                gas : 0,
+                liquid : 0,
+            }
+        }
+
+        // Sprites
+        
+        this.sprite = this.game.add.sprite(x,y, 'shuttle');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+
+        // Engine
+        var engine = new SmallEngine(this.game,this);
+        this.equipEngineInSlot(engine,0);
+        this.refuel();
+
+        // Reactor
+        var reactor = new Reactor(this.game,this);
+        this.equipEquipmentInSlot(reactor,0);
+        this.recharge();
+        
+        // Cargo
+        this.emptyCargoHold();
     }
 }
 
@@ -1432,10 +2089,12 @@ class BasicMiningLaser extends Weapon {
     constructor(game,parentObject) {
         super(game,parentObject);
 
+        this.baseBulletSpeed = 400;
+
         this.weapon = game.add.weapon(40, 'laser-sparkle');
         this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
         this.weapon.bulletLifespan = 150;
-        this.weapon.bulletSpeed = 400;
+        this.weapon.bulletSpeed = this.baseBulletSpeed;
         this.weapon.fireRate = 20;
         this.weapon.bulletAngleVariance = 1.5;
         this.weapon.bulletSpeedVariance = 90;
@@ -1443,13 +2102,27 @@ class BasicMiningLaser extends Weapon {
         this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
         this.weapon.bullets.setAll('scale.x', 0.3);
         this.weapon.bullets.setAll('scale.y', 0.1);
-        this.weapon.bullets.setAll('damage',2);
+        this.weapon.bullets.setAll('damage',1);
         this.weapon.bullets.setAll('smoothed',false);
         this.weapon.setBulletBodyOffset(6, 6, 50, 30);
         
-        this.energyConsumption = 0;
+        // Should be on the ships
+        this.game.ships.addChild(this.weapon.bullets)
+        
+        this.weapon.bullets.forEach(function(bullet){
+            bullet.weapon = this;
+            bullet.postUpdate = this.postUpdate;
+        },this);
+
+        this.energyConsumption = .3;
+    }
+    
+    update(){
+        this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
     }
 }
+
+
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -1498,31 +2171,32 @@ class Planet extends GameObject{
         this.nameText = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y-20, 
-            'pixelmix_normal2x',
+            'pixelmix_8',
             this.name,
-            7
+            8
         );
         this.nameText.alpha = 0;
 
         this.subText = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y, 
-            'pixelmix_normal2x',
+            'pixelmix_8',
             this.planetClass+' '+this.stellarObjectType,
-            6
+            5
         );
         this.subText.alpha = 0;
 
         this.landingMessage = this.game.add.bitmapText(
             20+this.sprite.x + this.sprite.width/2, 
             this.sprite.y+40, 
-            'pixelmix_normal',
+            'pixelmix_8',
             'Press L to Land',
-            8
+            5
         );
         this.landingMessage.alpha = 0;
 
         //messageText.alpha = 0;
+        //this.game.planets.add(this);
         this.game.register(this);
     }
     
@@ -1560,8 +2234,8 @@ class Planet extends GameObject{
     
     update() {
         super.update();
-        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-        this.showInfoIfNeeded();
+        //this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+        //this.showInfoIfNeeded();
     }
     
     get shouldShowInfo(){
@@ -1631,7 +2305,7 @@ class Player extends GameObject {
     constructor(game) {
         super(game);
 
-        this.ship = new BasicMiner(game);
+        this.ship = new BasicMiner(game,this.game.world.centerX,this.game.world.centerY);
         this.sprite = this.ship.sprite;
 
         this.name = 'Dash Riprock';
@@ -1656,6 +2330,12 @@ class Player extends GameObject {
     update() {
         super.update();
 
+        if (this.cursors.down.isDown) {
+            this.ship.goInReverse();
+        } else {
+            this.ship.deaccelerate();
+        }
+
         if (this.cursors.up.isDown) {
             this.ship.accelerate();
         } else {
@@ -1663,9 +2343,17 @@ class Player extends GameObject {
         }
     
         if (this.cursors.left.isDown) {
-            this.ship.turnLeft();
+            if(this.cursors.left.shiftKey){
+                this.ship.moveLeft();
+            } else {
+                this.ship.turnLeft();
+            }
         } else if (this.cursors.right.isDown) {
-            this.ship.turnRight();
+            if(this.cursors.right.shiftKey){
+                this.ship.moveRight();
+            } else {
+                this.ship.turnRight();
+            }
         } else {
             this.ship.deaccelerateTurning();
         }
@@ -1685,7 +2373,7 @@ class Player extends GameObject {
 class HUD {
     constructor(game) {
         this.game = game;
-        this.group = game.add.group();
+        this.group = this.game.hudGroup;
         this.group.fixedToCamera = true;
         var x = this.game.camera.width-132;
         var y = 160
@@ -1719,9 +2407,9 @@ class HUD {
             this.game.game, 
             x+100,
             y+82,
-            'pixelmix_normal',
+            'pixelmix_8',
             '',
-            8
+            5
         );  
         this.group.add(this.creditsText);
         this.creditsText.anchor.set(1,0);
@@ -1730,9 +2418,9 @@ class HUD {
             this.game.game, 
             x,
             this.creditsText.y,
-            'pixelmix_normal',
+            'pixelmix_8',
             CREDIT_PREFIX.long.toUpperCase(),
-            8
+            5
         );  
         this.creditsLabel.tint = 0x948f9c;
         this.group.add(this.creditsLabel)
@@ -1742,9 +2430,9 @@ class HUD {
             this.game.game, 
             x+100,
             y+138,
-            'pixelmix_normal',
+            'pixelmix_8',
             '0',
-            8
+            5
         );
         this.group.add(this.cargoText);
         this.cargoText.anchor.set(1,0);
@@ -1753,9 +2441,9 @@ class HUD {
             this.game.game, 
             x,
             y+138,
-            'pixelmix_normal',
+            'pixelmix_8',
             'BULK',
-            8
+            5
         );
         this.group.add(this.bulkText);
 
@@ -1764,23 +2452,22 @@ class HUD {
             this.game.game, 
             x,
             y+118,
-            'pixelmix_normal',
-            'CARGO HOLD USAGE',
-            8
+            'pixelmix_8',
+            'CARGO',
+            5
         );  
         this.cargoLabel.tint = 0x948f9c;
         this.group.add(this.cargoLabel)
-
     }
     
     title(message,submessage){
         var delay = 2000;
         
-        var messageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-50, 'pixelmix_normal2x',message,8);  
+        var messageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-50, 'pixelmix_8',message,10);  
         messageText.alpha = 0;      
         this.group.add(messageText)
 
-        var submessageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-25, 'pixelmix_normal2x',submessage,6);        
+        var submessageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-25, 'pixelmix_8',submessage,8);        
         submessageText.alpha = 0;      
         this.group.add(submessageText)
             
@@ -1802,9 +2489,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-100, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;
@@ -1823,9 +2510,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-100, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;
@@ -1844,9 +2531,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-70, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;
@@ -1884,7 +2571,7 @@ class Minimap {
         this.scale = this.defaultScale;
         this.distanceFactor = 45;
             
-        this.background = this.hud.group.create(this.phaserGame.camera.width-132,32,'minimap-bg')
+        this.background = this.hud.group.create(32,32,'minimap-bg')
         this.background.tint = 0x504d54;
 
         this.dotsBitmapData = this.phaserGame.add.bitmapData(100);
@@ -1948,21 +2635,21 @@ class ProgressBar {
         var label = new Phaser.BitmapText(
             this.game.game,
             x,
-            y-15, 'pixelmix_normal',
+            y-15, 'pixelmix_8',
             this.title,
-            8
+            5,
         );
-        label.tint = 0xFFFFFF;
+        label.tint = 0x948f9c;
         this.hud.group.add(label)
 
         this.amountDisplay = new Phaser.BitmapText(
             this.game.game,
             x+100,
-            label.y, 'pixelmix_normal',
+            label.y, 'pixelmix_8',
             '',
-            8
+            5
         );
-        this.amountDisplay.tint = 0x948f9c;
+        this.amountDisplay.tint = 0xFFFFFF;
         this.amountDisplay.anchor.set(1,0);
         this.hud.group.add(this.amountDisplay)
         
@@ -1995,22 +2682,28 @@ const screenHeight = 800/1.3
 var game = new Phaser.Game(screenWith, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
-        this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+        //this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
         this.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
-        //this.game.renderer.renderSession.roundPixels = true;
+        this.game.renderer.renderSession.roundPixels = true;
 
         Phaser.Canvas.setImageRenderingCrisp(this.game.canvas);
+        PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST
 
         this.load.image('planet-1', 'assets/planet-1.png');
         this.load.image('moon-1', 'assets/moon-1.png');
     
         this.load.image('bullet', 'default_assets/bullets/bullet11.png');
+        this.load.image('null', 'assets/FFFFFF-0.png');
         this.load.image('blasterBullet', 'default_assets/bullets/bullet13.png');
         this.load.image('laser', 'default_assets/bullets/bullet05.png');
         this.load.image('laser-sparkle', 'default_assets/particles/red.png');
         this.load.image('stars', 'assets/stars_new.gif');
         this.load.image('blue_flame', 'assets/engines/blue_flame.png');
+        this.load.image('rcs_flame', 'assets/engines/rcs.png');
         this.load.image('cloud', 'default_assets/particles/cloud.png');
+        this.load.image('smoke-trail', 'default_assets/particlestorm/particles/white-smoke.png');
+        this.load.image('dot', 'assets/map-dot.png');
+        this.load.image('dock-arrow', 'assets/dock-indicator.png');
         
         // Roids
         this.load.image('asteroid-flake-1', 'assets/asteroid-flake-a.png');
@@ -2023,26 +2716,49 @@ var game = new Phaser.Game(screenWith, screenHeight, Phaser.WEBGL, 'screen', {
         // Ships
         this.load.image('mining_ship', 'assets/ships/miner.png');
         this.load.image('fuelTanker', 'assets/ships/fuelTanker.png');
+        this.load.image('fuelTanker2', 'assets/ships/fuelTanker2.png');
+        this.load.image('shuttle', 'assets/ships/shuttle.png');
+
 
         this.load.bitmapFont(
-            'pixelmix_normal',
-            'assets/fonts/pixelmix_normal1.png',
-            'assets/fonts/pixelmix_normal1.fnt'
+            'pixelmix_5',
+            'assets/fonts/pixelmix0.png',
+            'assets/fonts/pixelmix0.fnt'
         );
         this.load.bitmapFont(
-            'pixelmix_bold',
-            'assets/fonts/pixelmix_bold1.png',
-            'assets/fonts/pixelmix_bold1.fnt'
+            'pixelmix_8',
+            'assets/fonts/pixelmix1.png',
+            'assets/fonts/pixelmix1.fnt'
         );
         this.load.bitmapFont(
-            'pixelmix_normal2x',
-            'assets/fonts/pixelmix_normal2.png',
-            'assets/fonts/pixelmix_normal2.fnt'
+            'pixelmix_10',
+            'assets/fonts/pixelmix2.png',
+            'assets/fonts/pixelmix2.fnt'
         );
         this.load.bitmapFont(
-            'pixelmix_bold2x',
-            'assets/fonts/pixelmix_bold2.png',
-            'assets/fonts/pixelmix_bold2.fnt'
+            'pixelmix_11',
+            'assets/fonts/pixelmix3.png',
+            'assets/fonts/pixelmix3.fnt'
+        );
+        this.load.bitmapFont(
+            'pixelmix_12',
+            'assets/fonts/pixelmix_12.png',
+            'assets/fonts/pixelmix_12.fnt'
+        );
+        this.load.bitmapFont(
+            'pixelmix_14',
+            'assets/fonts/pixelmix4.png',
+            'assets/fonts/pixelmix4.fnt'
+        );
+        this.load.bitmapFont(
+            'pixelmix_15',
+            'assets/fonts/pixelmix5.png',
+            'assets/fonts/pixelmix5.fnt'
+        );
+        this.load.bitmapFont(
+            'pixelmix_20',
+            'assets/fonts/pixelmix6.png',
+            'assets/fonts/pixelmix6.fnt'
         );
 
         // Hud
@@ -2060,28 +2776,40 @@ var game = new Phaser.Game(screenWith, screenHeight, Phaser.WEBGL, 'screen', {
         }
     },
     create : function(){
+        this.game.physics.startSystem(Phaser.Physics.P2JS);
+        this.game.physics.p2.restitution = 0.05;
         this.game.world.setBounds(0, 0, 50000, 50000);
+        
+        this.ps = this.game.plugins.add(Phaser.ParticleStorm);
         
         //  Tiled scrolling background
         this.stars = this.game.add.tileSprite(0, 0, screenWith, screenHeight, 'stars');
         this.stars.fixedToCamera = true;
-        
-        // System
-        var planet = new BasicPlanet(this,this.game.world.centerX-100,this.game.world.centerY-200);
-        var moon = new BasicMoon(this,this.game.world.centerX+2600,this.game.world.centerY+400);
-        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.medium,-800,4000);
-        var asteroidField2 = new AsteroidField(this,ASTEROID_FIELD_SIZE.small,700,-2000);
-        
-        // Player
-        this.ships = this.game.add.physicsGroup(Phaser.Physics.ARCADE);
 
+        this.planets = this.game.add.group();
+        this.asteroids = this.game.add.group();
+        this.ships = this.game.add.group();
+        
+        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.large,4000,4000);
+        var planet = new BasicPlanet(this,this.game.world.centerX,this.game.world.centerY);
+        var moon = new BasicMoon(this,this.game.world.centerX+2600,this.game.world.centerY+400);
+
+        //var ft = new FuelTanker(this,this.game.world.centerX+200,this.game.world.centerY-200);
+        //ft.sprite.body.angle = 270;
+        //ft.navigationMode = NAVIGATION_MODE.followWaypoints;
+
+        this.game.world.bringToTop(this.asteroids);
+        this.game.world.bringToTop(this.ships);
+        this.player = new Player(this);
+
+/*
         var fuelTanker2 = new FuelTanker(this);
         fuelTanker2.sprite.x = fuelTanker2.sprite.x+10;
         fuelTanker2.sprite.y = fuelTanker2.sprite.y-200;
+*/
         //fuelTanker2.sprite.angle = 32;
         //fuelTanker2.deadSlowAhead();
-        
-        this.player = new Player(this); 
+        //this.game.physics.p2.world.bringToTop(this.player.sprite)
 
         // Camera
         this.game.camera.follow(this.player.sprite);
@@ -2091,8 +2819,11 @@ var game = new Phaser.Game(screenWith, screenHeight, Phaser.WEBGL, 'screen', {
         fKey.onDown.add(this.fullScreen, this);
         
         // HUD
+        this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
         this.hud.title("Eta Blerreon System","June 12th, 2310");
+
+        this.game.physics.p2.setImpactEvents(true);
     },
     update : function(){
         //this.game.physics.arcade.collide(this.ships, this.ships);
@@ -2132,9 +2863,17 @@ var game = new Phaser.Game(screenWith, screenHeight, Phaser.WEBGL, 'screen', {
         }, this);
 */
 
+/*
         this.ships.forEach(function(ship) {
             this.game.debug.body(ship);
             //ship.angle += 5;
         }, this);
+*/
     },
 });
+
+Number.prototype.between = function(a, b, inclusive) {
+  var min = Math.min.apply(Math, [a, b]),
+    max = Math.max.apply(Math, [a, b]);
+  return inclusive ? this >= min && this <= max : this > min && this < max;
+};

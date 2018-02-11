@@ -9,45 +9,48 @@ class Asteroid extends GameObject {
         if(size==undefined) size = 'large';
         this.size = size;
         
-        this.sprite = this.group.create(x,y,'asteroid-'+size)
+        this.sprite = this.game.asteroids.create(x,y,'asteroid-'+size);
+        this.sprite.parentObject = this;
+        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
 
-        this.game.physics.enable(this.sprite, Phaser.Physics.ARCADE);
-        this.sprite.body.bounce.setTo(1, 1);
-        this.sprite.body.collideWorldBounds = true;
+        this.sprite.body.clearShapes();
+        this.sprite.body.damping = 0;
 
         if(size=='large'){
             this.health = game.rnd.integerInRange(150, 200);
-        this.sprite.body.velocity.setTo(game.rnd.integerInRange(-5, 5),game.rnd.integerInRange(-5, 5));
-            this.sprite.body.mass = 30;
-            this.sprite.body.setSize(70, 70, 10, 15);
-            this.roationSpeed = game.rnd.integerInRange(-10, 10);
-        
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+            this.sprite.body.mass = 100;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(32);
+            this.sprite.body.applyImpulseLocal([0,100],0,0)
+
             this.minimapSize = 1.2;
         } else if(size=='medium'){
             this.health = game.rnd.integerInRange(70, 100);
-            this.sprite.body.velocity.setTo(game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10));
-            this.sprite.body.mass = 15;
-            this.sprite.body.setSize(50, 50, 5, 5);
-            this.roationSpeed = game.rnd.integerInRange(-15, 15);
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+
+            this.sprite.body.mass = 50;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(20);
+            this.sprite.body.applyImpulseLocal([0,10],0,0)
+
             this.minimapSize = .8;
         } else if(size=='small'){
             // Small
             this.health = game.rnd.integerInRange(20, 30);
-            this.sprite.body.velocity.setTo(game.rnd.integerInRange(-15, 15),game.rnd.integerInRange(-15, 15));
-            this.sprite.body.mass = 3;
-            this.sprite.body.setSize(30, 30, 6, 6);
-            this.roationSpeed = game.rnd.integerInRange(-25,25);
-            this.sprite.scale.setTo(game.rnd.realInRange(.5,1));
+
+            this.sprite.body.mass = 10;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(14);
+            this.sprite.body.applyImpulseLocal([0,1],0,0)
+
             this.minimapSize = .5;
         }
-        this.sprite.anchor.set(0.5);
 
+        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
+        this.sprite.anchor.set(0.5);
 
     }
 
-    processBulletCollision(asteroid, bullet){
+    processBulletCollision(asteroid, bullet){        
 	    var emitter = this.game.add.emitter(bullet.x, bullet.y, 100);
         emitter.makeParticles('asteroid-flake-3');
         emitter.minParticleScale = .5;
@@ -64,34 +67,31 @@ class Asteroid extends GameObject {
         
     kill(){
         if(this.size=='large'){
-            var gap = 45;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            var a1 = new Asteroid(this.game,this.group,'medium',this.sprite.x+offsetX,this.sprite.y+offsetY);            
-            var a2 = new Asteroid(this.game,this.group,'medium',this.sprite.x-offsetX,this.sprite.y-offsetY);
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
+            this.explode();
+            this.destroy();
+            var a1 = new Asteroid(this.game,this.group,'medium',x-20,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'medium',x+20,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='medium'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
             this.destroy();
-        } else if(this.size=='medium'){
-            var gap = 35;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            var a1 = new Asteroid(this.game,this.group,'small',this.sprite.x+offsetX,this.sprite.y+offsetY);            
-            var a2 = new Asteroid(this.game,this.group,'small',this.sprite.x-offsetX,this.sprite.y-offsetY);
-            this.explode();         
-            this.destroy();            
+            var a1 = new Asteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
         } else if(this.size=='small'){
-            var gap = 25;
-            var offsetX = game.rnd.integerInRange(-gap, gap)
-            var offsetY= game.rnd.integerInRange(-gap, gap)
-            
-            // Create flakes when destroyed
-            var flakeCount = game.rnd.integerInRange(3,6);
-            for (var i = 0; i < flakeCount; i++) { 
-                new FlakePickup(this.game,this.group,this.sprite.x+offsetX,this.sprite.y+offsetY)
-            }
+            var x = this.sprite.x;
+            var y = this.sprite.y;
             this.explode();         
-            this.destroy();            
+            this.destroy();
+            var flakeCount = game.rnd.integerInRange(3,6);
+
+            for (var i = 0; i < flakeCount; i++) { 
+                new FlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
+            }
+
         }     
     } 
        
@@ -113,10 +113,7 @@ class Asteroid extends GameObject {
         
         // Spin
         this.sprite.body.angularVelocity = this.roationSpeed;
-        
-        // Collide with player
-        this.game.physics.arcade.collide(this.sprite, this.game.player.sprite);
-        
+                
         // Collide with player's weapons
         for (let weapon of this.game.player.ship.weapons) {
             this.game.physics.arcade.collide(
@@ -127,6 +124,5 @@ class Asteroid extends GameObject {
                 this
             );
         }
-
     }
 }

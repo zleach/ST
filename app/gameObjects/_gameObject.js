@@ -3,7 +3,7 @@ class GameObject {
         this.game = game;
         this.game.register(this);
     
-        this.showInfoDistance = 100;
+        this.showInfoDistance = 200;
 
         // Basics
         this.health = 0;
@@ -13,7 +13,6 @@ class GameObject {
         // Damage Managment        
         this.damageAccumulating = false;
         this.damageAccumulationAmount = 0;        
-    
     
         // Item Managment
         this.inventory = [];
@@ -37,7 +36,7 @@ class GameObject {
             
             if(this.health>0){
                 this.health -= amount;
-            } else if(this.health<=0){
+            } else if(this.health<=0 && this.alive){
                 this.kill();
             }        
         }
@@ -45,7 +44,7 @@ class GameObject {
         
     showDamage(amount){
         var x = this.sprite.x + game.rnd.integerInRange(-this.sprite.width/5, this.sprite.width/5);
-        var damageText = game.add.bitmapText(x, this.sprite.y, 'pixelmix_bold2x',amount,6);
+        var damageText = game.add.bitmapText(x, this.sprite.y, 'pixelmix_8',amount,10);
         damageText.anchor.x = 0.5;
         damageText.alpha = 0;
         damageText.tint = 0xf1c40f;
@@ -90,7 +89,7 @@ class GameObject {
             var verticalSpacing = 18;
             var itemGroup = items[key];
             var itemMessage = `+${itemGroup.amount} ${itemGroup.item.name}`;
-            var itemText = game.add.bitmapText(this.sprite.x, this.sprite.y-(verticalSpacing*index), 'pixelmix_normal2x',itemMessage,5);
+            var itemText = game.add.bitmapText(this.sprite.x, this.sprite.y-(verticalSpacing*index), 'pixelmix_8',itemMessage,8);
             itemText.anchor.x = .5;
             itemText.alpha = 0;
             itemText.tint = RARITY_COLOR[itemGroup.item.rarity];
@@ -144,13 +143,12 @@ class GameObject {
         }
     }
     
-    
     kill(){
         this.alive = false;
         this.game.unregister(this);        
 
         if(this.sprite!=undefined){
-            this.sprite.body.kill();
+            //this.sprite.body.kill();
             this.sprite.kill();
         }
     }
@@ -160,8 +158,7 @@ class GameObject {
 
         this.game.unregister(this);        
         if(this.sprite!=undefined){
-		    this.sprite.body.enable = false;
-            this.sprite.kill();
+            this.sprite.destroy();
         }
     }
 

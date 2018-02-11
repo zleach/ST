@@ -21,21 +21,21 @@ class ProgressBar {
         var label = new Phaser.BitmapText(
             this.game.game,
             x,
-            y-15, 'pixelmix_normal',
+            y-15, 'pixelmix_8',
             this.title,
-            8
+            5,
         );
-        label.tint = 0xFFFFFF;
+        label.tint = 0x948f9c;
         this.hud.group.add(label)
 
         this.amountDisplay = new Phaser.BitmapText(
             this.game.game,
             x+100,
-            label.y, 'pixelmix_normal',
+            label.y, 'pixelmix_8',
             '',
-            8
+            5
         );
-        this.amountDisplay.tint = 0x948f9c;
+        this.amountDisplay.tint = 0xFFFFFF;
         this.amountDisplay.anchor.set(1,0);
         this.hud.group.add(this.amountDisplay)
         

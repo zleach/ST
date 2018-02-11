@@ -8,6 +8,8 @@ app/weapons/_weapon.js
 app/ships/_ship.js
 app/engines/_engine.js
 app/engines/basicEngine.js
+app/engines/smallEngine.js
+app/engines/_thruster.js
 app/gameObjects/pickup.js
 app/gameObjects/flake.js
 app/gameObjects/asteroid.js
@@ -17,6 +19,7 @@ app/items/paladium.js
 app/items/metoricIron.js
 app/ships/basicMiner.js
 app/ships/fuelTanker.js
+app/ships/shuttle.js
 app/weapons/basicMiningLaser.js
 app/weapons/basicBlaster.js
 app/planets/_planet.js

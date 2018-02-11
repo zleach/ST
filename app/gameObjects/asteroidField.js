@@ -5,10 +5,9 @@ class AsteroidField extends GameObject {
         if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1500, 1500);
         if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1500, 1500);
         if(size==undefined) size = 800;
-        var densityLowerBound = 22;
-        var densityUpperBound = 26;
+        var densityLowerBound = 200;
+        var densityUpperBound = 200;
         
-
         this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
         this.asteroids = this.game.add.physicsGroup(Phaser.Physics.ARCADE);
         for (var i = 0; i < this.asteroidsCount; i++) { 

@@ -8,7 +8,7 @@ class Minimap {
         this.scale = this.defaultScale;
         this.distanceFactor = 45;
             
-        this.background = this.hud.group.create(this.phaserGame.camera.width-132,32,'minimap-bg')
+        this.background = this.hud.group.create(32,32,'minimap-bg')
         this.background.tint = 0x504d54;
 
         this.dotsBitmapData = this.phaserGame.add.bitmapData(100);

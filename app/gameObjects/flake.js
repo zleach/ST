@@ -44,11 +44,13 @@ class FlakePickup extends Pickup {
     update() {
         super.update();
         // Spin
-        this.sprite.body.angularVelocity = this.roationSpeed;
-
-        var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-        if(distance<this.magneticDistance){
-            this.game.physics.arcade.accelerateToObject(this.sprite, this.game.player.sprite, 500, 500, 500)
+        if(this.sprite.alive){
+            this.sprite.body.angularVelocity = this.roationSpeed;
+    
+            var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+            if(distance<this.magneticDistance){
+                this.game.physics.arcade.moveToObject(this.sprite, this.game.player.sprite, 100)
+            }            
         }
     }
     

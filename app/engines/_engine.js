@@ -7,7 +7,7 @@ class Engine extends Equipment {
         this.fuelConsumption = 1;
 
         this.thrust = 100;
-        this.spoolUpSpeed =.2;
+        this.spoolUpSpeed = 1;
         this.spoolDownSpeed = .04;
     }
 
@@ -21,10 +21,25 @@ class Engine extends Equipment {
         if(this.currentSpool<=1){
             this.currentSpool = Math.min(this.currentSpool+this.spoolUpSpeed,1);
         }
+        if(this.retro) {
+            this.currentSpool = 1
+        }
     }
 
-    deaccelerate(){    
-        this.currentSpool = Math.max(this.currentSpool-this.spoolDownSpeed,0)
+    deaccelerate(){
+        if(!this.retro) {
+            this.currentSpool = Math.max(this.currentSpool-this.spoolDownSpeed,0)
+        } else {
+            this.currentSpool = Math.max(this.currentSpool-.1,0)            
+        }
+    }
+
+    fire(){
+        this.accelerate();
+    }
+    
+    shutdown(){
+        this.deaccelerate();    
     }
 
     update(){

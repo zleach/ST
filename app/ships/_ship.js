@@ -1,5 +1,5 @@
 class Ship extends GameObject {
-    constructor(game) {
+    constructor(game,x,y) {
         super(game);
         
         // Basic Ship
@@ -7,8 +7,11 @@ class Ship extends GameObject {
             name : 'Unknown Ship',
             description : 'Unknown Class',
         }
+        
+        this.xStart = x;
+        this.yStart = y;
 
-        this.dockingDistance = 100;
+        this.dockingDistance = 250;
         this.dockedShips = [];
         this.isDocked = false;
 
@@ -18,47 +21,87 @@ class Ship extends GameObject {
         this.weapons = [];
         this.engines = [];    
         this.equipment = [];
+        
+        this.canPickThingsUp = true;
+    
+        this.navigation = {
+            waypoints : [
+            {
+                x: this.game.world.centerX+200,
+                y: this.game.world.centerY-200,
+            },
+            {
+                x: this.game.world.centerX+200,
+                y: this.game.world.centerY+1000,
+            },
+            {
+                x: this.game.world.centerX-200,
+                y: this.game.world.centerY+1000,
+            },
+            {
+                x: this.game.world.centerX-200,
+                y: this.game.world.centerY-200,
+            },
+            ],
+            currentWaypoint: 0,
+        }
+        this.navigationMode = NAVIGATION_MODE.free;
     }
     
     setupSprite(sprite){
         // Physics
-        this.game.physics.arcade.enable(sprite);
-        sprite.body.maxAngular = this.specs.maxTurning;
-        sprite.body.drag.set(2);
-        sprite.body.bounce.setTo(.2, .2);
-        sprite.body.setSize(
-            this.specs.size.width, 
-            this.specs.size.height, 
-            this.specs.size.offsetX, 
-            this.specs.size.offsetY
-        );
-        sprite.body.collideWorldBounds = true;
+        this.game.physics.p2.enable(sprite,P2BODY_DEBUG);
+        this.sprite.body.clearShapes();
+        this.sprite.body.loadPolygon(null,this.specs.polygon);       
+        this.sprite.body.damping = 0.01;
+        this.sprite.body.mass = this.specs.mass;
         this.sprite.parentObject = this;
+        
+        this.dockingConnector = this.sprite.addChild(this.game.make.sprite(0, 0, 'null'));
+        this.dockingConnector.x = this.specs.dockingConnector.position.x;
+        this.dockingConnector.y = this.specs.dockingConnector.position.y;
+
+        if(this.specs.canBeDockedTo){
+            this.dockingPort = this.sprite.addChild(this.game.make.sprite(0, 0, 'dock-arrow'));
+            this.dockingPort.x = this.specs.dockingPorts[0].position.x;
+            this.dockingPort.y = this.specs.dockingPorts[0].position.y;
+            this.dockingPort.anchor.set(.5,2.5);
+            this.dockingPort.visible = false;
+
+            this.dockingPortBlink = this.game.add.tween(this.dockingPort).to({
+                alpha: 1,
+                y: '5'
+            }, 600, "Quart.easeOut", true, 0, 0, true).loop(true);
+        }
+        
+        this.setupRCSThrusters();
         this.game.ships.add(this.sprite);        
         
+        this.health = this.specs.health;
+        
         // Info
-        this.nameText = this.game.add.bitmapText(0,0, 'pixelmix_normal2x', this.specs.name, 7 );
+        this.nameText = this.game.add.bitmapText(0,0, 'pixelmix_8', this.specs.name, 8);
         this.nameText.alpha = 0;
 
-        this.subText = this.game.add.bitmapText(0,0, 'pixelmix_normal2x', this.specs.description, 6);
+        this.subText = this.game.add.bitmapText(0,0, 'pixelmix_8', this.specs.description, 5);
         this.subText.alpha = 0;
 
-        this.landingMessage = this.game.add.bitmapText(0,0, 'pixelmix_normal', 'Press D to Dock', 8);
+        this.landingMessage = this.game.add.bitmapText(0,0, 'pixelmix_8', 'Cleared to Dock', 5);
         this.landingMessage.alpha = 0;
     }
     
     positionInfo(){
-            var x = 20+this.sprite.x + this.sprite.width/2;
-            var y = this.sprite.y;
-            
-            this.nameText.x = x; 
-            this.nameText.y = y-40; 
-    
-            this.subText.x = x; 
-            this.subText.y = y-20; 
-    
-            this.landingMessage.x = x; 
-            this.landingMessage.y = y+20;             
+        var x = 20+this.sprite.x + this.sprite.width/2;
+        var y = this.sprite.y;
+        
+        this.nameText.x = x; 
+        this.nameText.y = y-40; 
+
+        this.subText.x = x; 
+        this.subText.y = y-20; 
+
+        this.landingMessage.x = x; 
+        this.landingMessage.y = y+20;             
     }
     
     // Weapons
@@ -73,12 +116,13 @@ class Ship extends GameObject {
 
     equipWeaponInSlot(weapon,slot){
         this.weapons.push(weapon);
-
+        
         weapon.weapon.trackSprite(
             this.sprite,
             this.specs.weaponSlots[slot].position.x,
             this.specs.weaponSlots[slot].position.y,
-            true
+            true,
+            270,
         );
     }
 
@@ -93,8 +137,43 @@ class Ship extends GameObject {
         for (let engine of this.engines) {
             maxSpeed += engine.maxSpeed;
         }
+        this.maxSpeed = maxSpeed/10 // No idea.
+    }
+    
+    setupRCSThrusters(){
+        if(this.specs.RCS != undefined){
+            this.thrusters = {};
+            for (var thruster in this.specs.RCS) {
+                this.addThruster(thruster,this.specs.RCS[thruster])
+            }
+        }
+    }    
+    
+    addThruster(thruster,layout){
+        this.thrusters[thruster] = new Thruster(this.game,this,layout)
+        
+        // Hande retro thrusters
+        if(layout.retro !=undefined){
+            this.thrusters[thruster].retro = layout.retro
+        }
+    }
+    
+    fireThruster(thrusterKey){
+        if(this.thrusters[thrusterKey]!=undefined && this.hasFuel){
+            var thruster = this.thrusters[thrusterKey];
+            this.consumeFuel(thruster.fuelConsumption)
+            thruster.fire();
+        }
+    }
 
-        this.sprite.body.maxVelocity.set(maxSpeed / this.engines.length);
+    shutdownThruster(thruster){
+        this.thrusters[thruster].shutdown();
+    }
+    
+    shutdownAllThrusters(){
+        for (var thruster in this.specs.RCS) {
+            this.shutdownThruster(thruster)
+        }        
     }
     
     // Equipment
@@ -104,6 +183,20 @@ class Ship extends GameObject {
 
     
     // Movement
+    get speed(){
+        var body = this.sprite.body
+        var vx, vy;
+        
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        
+        return vx * vx + vy * vy;
+    }
+    
+    get heading(){
+        return this.sprite.angle;
+    }
+    
     accelerate() {
         if(!this.isDocked){
             // Not Docked
@@ -117,12 +210,7 @@ class Ship extends GameObject {
                     engine.deaccelerate();                
                 }
             }
-    
-            this.game.physics.arcade.accelerationFromRotation(
-                this.sprite.rotation,
-                totalThurst,
-                this.sprite.body.acceleration
-            );
+            this.sprite.body.thrust(totalThurst)
         } else {
             // Docked
             for (let engine of this.engines) {
@@ -131,32 +219,89 @@ class Ship extends GameObject {
         }
     }
     
-    deadSlowAhead(){
-        this.game.physics.arcade.accelerationFromRotation(
-            this.sprite.rotation,
-            .33,
-            this.sprite.body.acceleration
-        );
+    get totalThurst(){
+        var totalThurst = 0;
+        for (let engine of this.engines) {
+            totalThurst += engine.thrust;
+        }
+        return totalThurst;
     }
     
+    limitSpeed() {
+        var maxVelocity = this.maxSpeed;
+        var sprite = this.sprite;
+
+        var body = sprite.body
+        var angle, currVelocitySqr, vx, vy;
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        currVelocitySqr = vx * vx + vy * vy;
+        if (currVelocitySqr > maxVelocity * maxVelocity) {
+            angle = Math.atan2(vy, vx);
+            vx = Math.cos(angle) * maxVelocity;
+            vy = Math.sin(angle) * maxVelocity;
+            body.data.velocity[0] = vx;
+            body.data.velocity[1] = vy;
+        }
+    };
+        
     deaccelerate() {
         if(this.sprite){
-            this.sprite.body.acceleration.set(0);
+            this.sprite.body.acceleration = 0;
     
             for (let engine of this.engines) {
                 engine.deaccelerate();
             }            
         }
     }
+
+    goInReverse() {
+        if(!this.isDocked && this.hasFuel) {
+            if(this.speed<this.specs.maxReverse){
+                this.sprite.body.reverse(this.specs.reverseThrust)
+            }
+
+            this.fireThruster('retro_a');
+            this.fireThruster('retro_b');
+        }
+    }
     
     turnLeft(){
-        if(!this.isDocked) this.sprite.body.angularVelocity -= this.specs.turnAccel;
+        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel) {
+            this.sprite.body.angularVelocity -= this.specs.turnAccel;
+        
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_left');
+        }
     }
 
     turnRight(){
-        if(!this.isDocked) this.sprite.body.angularVelocity += this.specs.turnAccel;
+        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel) {
+            this.sprite.body.angularVelocity += this.specs.turnAccel;
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_right');
+        }
     }
-    
+
+    moveLeft(){
+        if(!this.isDocked && this.hasFuel) {
+            this.sprite.body.thrustLeft(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_right');
+        }
+    }
+
+    moveRight(){
+        if(!this.isDocked && this.hasFuel) {
+            this.sprite.body.thrustRight(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_left');
+        }
+    }
+
     deaccelerateTurning(){
         if(this.sprite){
             if(this.sprite.body.angularVelocity>0){
@@ -166,6 +311,92 @@ class Ship extends GameObject {
                 this.sprite.body.angularVelocity = Math.min(this.sprite.body.angularVelocity+this.specs.turnDecay,0);
             }
         }
+        
+        this.shutdownAllThrusters();
+    }
+    
+    
+    // Navigation
+    navigate(){
+        if(this.navigationMode.free) return;
+
+        if(this.navigationMode.stationKeeping) this.keepStation();
+        
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            this.goToWayPoint(this.navigation.waypoints[this.navigation.currentWaypoint]);
+        }
+    }
+
+    goToWayPoint(waypoint){
+        var shipAngle = this.sprite.rotation;
+        
+        // Heading
+        var angleToWaypoint = this.game.physics.arcade.angleToXY(this.sprite, waypoint.x, waypoint.y) + 1.5708;
+        var vx = this.sprite.body.velocity.x;
+        var vy = this.sprite.body.velocity.y;
+        var eta = this.distanceToWaypoint/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2)); // Seconds until impact.
+        
+        var difference = Phaser.Math.wrapAngle(Math.degrees(angleToWaypoint - this.sprite.body.rotation));
+
+        var distanceTolerance = 30;
+        if(this.distanceToWaypoint<distanceTolerance){
+            this.deaccelerate();
+            this.sprite.body.setZeroVelocity();
+            this.sprite.body.setZeroRotation();
+            this.reachedWaypoint();
+        } else {
+            var turnSpeed = Math.abs(difference)*.02;
+            //sconsole.log(`turn:${turnSpeed.toFixed(2)} | dist: ${this.distanceToWaypoint.toFixed(2)} | eta: ${eta.toFixed(2)}s`);
+            if(difference<-3 && difference>-180){
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnLeft();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else if(difference>3 && difference<180) {
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnRight();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else {
+                if(eta < 8){
+                    if(this.distanceToWaypoint>distanceTolerance){
+                        this.goInReverse();                    
+                    }
+                    this.deaccelerate();
+                } else {
+                    this.accelerate();
+                }
+            }
+        }
+    }
+
+    reachedWaypoint(){
+        console.log("reached");
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            var w = this.navigation.currentWaypoint + 1;
+            if(w>this.navigation.waypoints.length-1){
+                w = 0;
+            }
+            
+            this.navigation.currentWaypoint = w;
+        }
+    }
+            
+    get distanceToWaypoint(){
+        var waypoint = this.navigation.waypoints[this.navigation.currentWaypoint];
+        return this.game.physics.arcade.distanceToXY(this.sprite, waypoint.x,waypoint.y);
+    }
+    
+    navigateWaypoints(){
+        this.navigationMode = NAVIGATION_MODE.followWaypoints;
+    }
+    
+    keepStation(){
+        // Holds steady speed and heading
     }
     
     // Fuel Mgmt
@@ -258,66 +489,62 @@ class Ship extends GameObject {
         for (let ship of this.game.gameObjects) {
             if(ship.specs!=undefined && ship!=this){
                 var distance = this.game.physics.arcade.distanceBetween(ship.sprite, this.sprite);
-                if(distance<=ship.dockingDistance){
                     shipsInRange.push({
                         distance: distance,
                         ship: ship,
                     })
-                }
             }
         }
         if(shipsInRange.length>0){
             shipsInRange.sort(function(a, b) {
                 return a.distance - b.distance;
             });
-            var shipToDockTo = shipsInRange[0].ship;
 
+            var shipToDockTo = shipsInRange[0].ship;
             var maxSpeedWhenDocking = 10;
+            
+            
+
             if((this.sprite.body.speed-shipToDockTo.sprite.body.speed)>maxSpeedWhenDocking){
                 this.game.hud.message("Moving too fast to dock");
                 return;
             }
             
-            this.dockWith(shipToDockTo);
+            if(!this.okToDock){
+                this.game.hud.message("Not aligned for docking");
+            } else {
+                this.dockWith(shipToDockTo);
+            }
         } else {
-            this.game.hud.message("No Dock Availabe");
+            this.game.hud.message("No Dock Available");
         }
     }
     
     dockWith(ship){
         var dockingSpeed = 3000;
         
-        this.sprite.body.acceleration.set(0);
-        this.sprite.body.velocity.set(0);
-        
         var dockingPortNumber = 0;
+
+        this.sprite.body.clearShapes();
+        ship.sprite.body.clearShapes();
+        ship.sprite.body.static = true;        
         
         var dockingPosition = ship.specs.dockingPorts[dockingPortNumber].position
-        this.dockingTween = this.game.add.tween(this.sprite).to({
-            x: ship.sprite.x - dockingPosition.x,
-            y: ship.sprite.y - dockingPosition.y,
-            angle : ship.sprite.angle - dockingPosition.angle,
-        }, dockingSpeed, "Quart.easeOut", true);
 
-        this.dockingTween.onUpdateCallback(this.matchSpeedForDocking,this);
+        var dockingAngle = 180 * Math.PI / 180;        
+        this.dockingConstraint = game.physics.p2.createLockConstraint(this.sprite, ship.sprite, [0, 72], dockingAngle, 500);
+        this.dockedToShip = ship;
 
         this.isDocked = true;
         this.dockingTarget = ship;
         ship.landingMessage.setText('Docking...');
 
-        game.time.events.add(Phaser.Timer.SECOND * dockingSpeed/1000, this.dockingComplete, {
+        game.time.events.add(Phaser.Timer.SECOND * .5, this.dockingComplete, {
             target: ship,
             dockedShip: this,
             portNumber: dockingPortNumber,
             game: this.game,
         });
-    }
-
-    matchSpeedForDocking(){
-        var endingAngle = this.dockingTween.timeline[0].vEnd.angle;
-        var x = this.dockingTween.timeline[0].vEnd.x + this.dockingTarget.sprite.deltaX
-        var y = this.dockingTween.timeline[0].vEnd.y + this.dockingTarget.sprite.deltaY
-        this.dockingTween.timeline[0].vEnd={x:x,y:y, angle: endingAngle};
     }
     
     dockingComplete(){
@@ -325,6 +552,14 @@ class Ship extends GameObject {
         var dockedShip = this.dockedShip;
         var portNumber = this.portNumber; // What docking port am i at?
         
+        target.sprite.body.loadPolygon(null,target.specs.polygon);       
+        target.sprite.body.dynamic = true
+        target.sprite.body.mass = true
+
+        dockedShip.sprite.body.loadPolygon(null,dockedShip.specs.polygon)
+        dockedShip.dockedToShip.sprite.body.dynamic = true;        
+        dockedShip.dockedToShip.sprite.body.mass = dockedShip.specs.mass;        
+
         dockedShip.isDocked = true;
         dockedShip.dockedAtPortNumber = portNumber;
         dockedShip.hardDocked = true;
@@ -332,25 +567,24 @@ class Ship extends GameObject {
 
         target.dockedShips.push(dockedShip);
 
-        this.game.hud.message("Docking Complete");
+        this.game.hud.message("Docking Successful");
         target.landingMessage.setText('Press D to Release');
     }    
 
     releaseDock(){
         if(this.hardDocked && this.isDocked){
+            game.physics.p2.removeConstraint(this.dockingConstraint);
             // Docking animation completed and ship is completely docked
+/*
             this.game.physics.arcade.accelerationFromRotation(
                 this.sprite.rotation - Math.PI,
                 1000,
                 this.sprite.body.acceleration
             );
-    
-    	    var emitter = this.game.add.emitter(
-    	        this.sprite.x - this.specs.dockingConnectorPosition.x,
-                this.sprite.y - this.specs.dockingConnectorPosition.y,
-                100
-            );
-    
+*/
+    	    var emitter = this.game.add.emitter(0,0,100);
+            this.dockingConnector.addChild(emitter);
+                
             emitter.makeParticles('cloud');
             emitter.gravity = 0;
             emitter.maxRotation = 100;
@@ -367,6 +601,8 @@ class Ship extends GameObject {
 
     abortDocking(){
         //this.dockedToShip.landingMessage.setText('Press D to Dock');
+
+
         this.isDocked = false;
         this.dockedToShip = null;
         this.dockedAtPortNumber = null;
@@ -397,11 +633,13 @@ class Ship extends GameObject {
             //this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
         
             this.infoShowing = true;
+            this.dockingPort.visible = true;
         }
         
         if(!this.shouldShowInfo && this.infoShowing){
             this.hideInfo();
             this.infoShowing = false;
+            this.dockingPort.visible = false;
         }
     }
     
@@ -445,10 +683,33 @@ class Ship extends GameObject {
     // Rendering
     update() {
         super.update(); 
-        
-        if(this.specs.canBeDockedTo){
-            this.positionInfo();
-            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+        this.positionInfo();        
+        this.navigate();
+
+        this.limitSpeed();
+
+        if(this.specs.canBeDockedTo && this.sprite != this.game.player.ship.sprite){
+            var a = this.dockingPort.worldPosition.x - this.game.player.ship.dockingConnector.worldPosition.x;
+            var b = this.dockingPort.worldPosition.y - this.game.player.ship.dockingConnector.worldPosition.y;
+            var d = Math.sqrt(a*a + b*b);
+           
+            // Rotation
+            var r = Math.abs(Math.abs(this.sprite.angle - this.game.player.ship.sprite.angle) - 180); 
+
+            if(d<15 && r<20){
+                this.game.player.ship.okToDock = true;
+                this.landingMessage.setText("Press D to Dock");
+            } else {
+                this.game.player.ship.okToDock = false;
+                this.landingMessage.setText("Cleared to Dock");
+            }
+            
+            // Update distance for info
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(
+                this.sprite,
+                this.game.player.sprite
+            );
+
             this.showInfoIfNeeded();
         }
 
@@ -457,19 +718,6 @@ class Ship extends GameObject {
             this.sprite.y += this.dockingTarget.sprite.deltaY;
         }
 
-        this.game.ships.forEachAlive(function(ship) {
-            if(ship.parentObject.weapons.length>0 && ship.parentObject != this.game.player.ship){
-                for (let weapon of ship.parentObject.weapons) {
-                    this.game.physics.arcade.collide(
-                        this.sprite, 
-                        weapon.weapon.bullets, 
-                        this.didCollide, 
-                        this.processBulletCollision, 
-                        this
-                    );
-                }
-            }            
-        }, this)
     }   
 }
 

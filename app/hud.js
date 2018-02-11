@@ -1,7 +1,7 @@
 class HUD {
     constructor(game) {
         this.game = game;
-        this.group = game.add.group();
+        this.group = this.game.hudGroup;
         this.group.fixedToCamera = true;
         var x = this.game.camera.width-132;
         var y = 160
@@ -35,9 +35,9 @@ class HUD {
             this.game.game, 
             x+100,
             y+82,
-            'pixelmix_normal',
+            'pixelmix_8',
             '',
-            8
+            5
         );  
         this.group.add(this.creditsText);
         this.creditsText.anchor.set(1,0);
@@ -46,9 +46,9 @@ class HUD {
             this.game.game, 
             x,
             this.creditsText.y,
-            'pixelmix_normal',
+            'pixelmix_8',
             CREDIT_PREFIX.long.toUpperCase(),
-            8
+            5
         );  
         this.creditsLabel.tint = 0x948f9c;
         this.group.add(this.creditsLabel)
@@ -58,9 +58,9 @@ class HUD {
             this.game.game, 
             x+100,
             y+138,
-            'pixelmix_normal',
+            'pixelmix_8',
             '0',
-            8
+            5
         );
         this.group.add(this.cargoText);
         this.cargoText.anchor.set(1,0);
@@ -69,9 +69,9 @@ class HUD {
             this.game.game, 
             x,
             y+138,
-            'pixelmix_normal',
+            'pixelmix_8',
             'BULK',
-            8
+            5
         );
         this.group.add(this.bulkText);
 
@@ -80,23 +80,22 @@ class HUD {
             this.game.game, 
             x,
             y+118,
-            'pixelmix_normal',
-            'CARGO HOLD USAGE',
-            8
+            'pixelmix_8',
+            'CARGO',
+            5
         );  
         this.cargoLabel.tint = 0x948f9c;
         this.group.add(this.cargoLabel)
-
     }
     
     title(message,submessage){
         var delay = 2000;
         
-        var messageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-50, 'pixelmix_normal2x',message,8);  
+        var messageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-50, 'pixelmix_8',message,10);  
         messageText.alpha = 0;      
         this.group.add(messageText)
 
-        var submessageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-25, 'pixelmix_normal2x',submessage,6);        
+        var submessageText = new Phaser.BitmapText(this.game.game, 32, this.game.camera.height-25, 'pixelmix_8',submessage,8);        
         submessageText.alpha = 0;      
         this.group.add(submessageText)
             
@@ -118,9 +117,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-100, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;
@@ -139,9 +138,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-100, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;
@@ -160,9 +159,9 @@ class HUD {
         var messageText = this.game.add.bitmapText(
             this.game.camera.width/2, 
             this.game.camera.height-70, 
-            'pixelmix_normal',
+            'pixelmix_8',
             message,
-            12
+            10
         );
         messageText.anchor.x = .5;
         messageText.fixedToCamera = true;

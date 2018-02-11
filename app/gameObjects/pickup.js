@@ -3,18 +3,18 @@ class Pickup extends GameObject {
         super(game);
      
         this.group = group        
-        this.magneticDistance = 100;
+        this.magneticDistance = 150;
     
         this.contents = new InventoryObject(this.game);
     }
 
     pickedUpBy(object){
+        this.destroy();
         return object.collectNumberOfItems(1,this.contents);
     }
 
     processCollision(pickup,object){
         this.pickedUpBy(this.game.player.ship)
-        this.destroy();
     }
             
     kill(){
@@ -27,13 +27,14 @@ class Pickup extends GameObject {
     // Rendering
     update() {
         super.update();
-        this.game.physics.arcade.collide(
-            this.sprite, 
-            this.game.player.sprite, 
-            this.didCollide, 
-            this.processCollision, 
-            this
-        );
+
+        if(this.alive){
+            var hits = this.game.physics.p2.hitTest(this.sprite.position);
+            for (let hit of hits) {
+                var target = hit.parent.sprite.parentObject;                
+                if(target.canPickThingsUp) this.pickedUpBy(target);                
+            }
+        }
     }
     
     

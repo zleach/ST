@@ -2,7 +2,7 @@ class Player extends GameObject {
     constructor(game) {
         super(game);
 
-        this.ship = new BasicMiner(game);
+        this.ship = new BasicMiner(game,this.game.world.centerX,this.game.world.centerY);
         this.sprite = this.ship.sprite;
 
         this.name = 'Dash Riprock';
@@ -27,6 +27,12 @@ class Player extends GameObject {
     update() {
         super.update();
 
+        if (this.cursors.down.isDown) {
+            this.ship.goInReverse();
+        } else {
+            this.ship.deaccelerate();
+        }
+
         if (this.cursors.up.isDown) {
             this.ship.accelerate();
         } else {
@@ -34,9 +40,17 @@ class Player extends GameObject {
         }
     
         if (this.cursors.left.isDown) {
-            this.ship.turnLeft();
+            if(this.cursors.left.shiftKey){
+                this.ship.moveLeft();
+            } else {
+                this.ship.turnLeft();
+            }
         } else if (this.cursors.right.isDown) {
-            this.ship.turnRight();
+            if(this.cursors.right.shiftKey){
+                this.ship.moveRight();
+            } else {
+                this.ship.turnRight();
+            }
         } else {
             this.ship.deaccelerateTurning();
         }
