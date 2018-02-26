@@ -1,3 +1,27 @@
+//alert("5678".toHHMMSS());
+function TIME_FORMAT(time) {
+    var sec_num = parseInt(time, 10); // don't forget the second param
+    var hours   = Math.floor(sec_num / 3600);
+    var minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+    var seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+    if (hours   < 10) {hours   = "0"+hours;}
+    if (minutes < 10) {minutes = "0"+minutes;}
+    if (seconds < 10) {seconds = "0"+seconds;}
+    
+    if(time==Infinity || isNaN(time)){
+        return '--';
+    } else {
+        return minutes+':'+seconds;
+    }
+    
+    
+}
+
+FONT = 'Fira Code';
+
+DISTANCE_FACTOR = 97;
+
 // Convert from degrees to radians.
 Math.radians = function(degrees) {
 	return degrees * Math.PI / 180;
@@ -8,17 +32,61 @@ Math.degrees = function(radians) {
 	return radians * 180 / Math.PI;
 }
 
+function isEven(n) {
+   return n % 2 == 0;
+}
+
+function isOdd(n) {
+   return Math.abs(n % 2) == 1;
+}
+
+function decimalToHexString(number) {
+    if (number < 0)
+    {
+        number = 0xFFFFFFFF + number + 1;
+    }
+
+    return number.toString(16).toUpperCase();
+}
+
+function extend(a, b){
+    for(var key in b)
+        if(b.hasOwnProperty(key))
+            a[key] = b[key];
+    return a;
+}
+
+
 const P2BODY_DEBUG = false;
 
 const DEG_IN_RAD_90 = 1.5708;
+
+const CONTROL_MODE = {
+    gui : 'gui',
+    play: 'play',
+    landed: 'landed',
+    exchange: 'exchange',
+}
+
+const SCREEN_TRANSITION_STYLE = {
+    none : 'none',
+    fromBottom : 'fromBottom',
+    fromRight : 'fromRight',
+}
 
 const CREDIT_PREFIX = {
     short : '$',
     long: 'Credits ',
 }
 
+const BUTTON_STYLE = {
+    simple : 'simple',
+    twoLine : 'twoLine',
+}
+
 const NAVIGATION_MODE = {
     free : 'free',
+    target : 'target',
     stationKeeping : 'stationKeeping',
     followWaypoints : 'followWaypoints',
 }
@@ -30,11 +98,19 @@ const CARGO_STORAGE_CLASS = {
     liquid : 'liquid',
 }
 
+const CARGO_STORAGE_CLASS_NAMES = {
+    bulk : 'Bulk',
+    passengers : 'Passenger',
+    gas : 'Gas',
+    liquid : 'Liquid',
+}
+
+
 const ASTEROID_FIELD_SIZE = {
-    small : 400,
-    medium : 800,
-    large: 1200,
-    huge: 2000
+    small : 1400,
+    medium : 1800,
+    large: 2200,
+    huge: 4000
 }
 
 const PLANET_SERVICES = {
@@ -42,7 +118,29 @@ const PLANET_SERVICES = {
     fuelDepot : 'fuelDepot',
     shipyard : 'shipyard',
     market : 'market',
-    recruitmentCenter : 'recruitmentCenter',
+    tavern : 'tavern',
+    casino : 'casino',
+    passengerTerminal : 'passengerTerminal',
+}
+
+const PLANET_SERVICES_TITLE = {
+    refinery : 'Refinery',
+    fuelDepot : 'Fuel Depot',
+    shipyard : 'Shipyard',
+    market : 'Marketplace',
+    tavern : 'Tavern',
+    casino : 'Clubhouse',
+    passengerTerminal : 'Starport',
+}
+
+const PLANET_SERVICES_DESC = {
+    refinery : 'Process raw materials',
+    fuelDepot : 'Refuel and recharge',
+    shipyard : 'Trade and repair ships',
+    market : 'Buy, sell & trade goods',
+    tavern : 'Drink with the locals',
+    casino : 'Members only gambling',
+    passengerTerminal : 'Find transport jobs',
 }
 
 const WEAPON_TYPES = {
@@ -61,30 +159,44 @@ const RARITY = {
     common :    'common',
     uncommon :  'uncommon',
     rare :      'rare',
-    epic :      'epic',
-    legendary : 'legendary',
+    exquisite :      'exquisite',
+    exotic : 'exotic',
+}
+
+const RARITY_NAMES = {
+    common :    'Common',
+    uncommon :  'Uncommon',
+    rare :      'Rare',
+    exquisite : 'Exquisite',
+    exotic : 'Exotic',
 }
 
 const RARITY_COLOR = {
     common :    0xFFFFFF,
     uncommon :  0x3DD20B,
     rare :      0x2F78FF,
-    epic :      0x9132C8,
-    legendary : 0xCF4747,
+    exquisite : 0x9132C8,
+    exotic : 0xCF4747,
 }
 
 const RARITY_INDEX = {
     common :    1,
     uncommon :  2,
     rare :      3,
-    epic :      4,
-    legendary : 5,
+    exquisite : 4,
+    exotic : 5,
 }
 
 const RARITY_MINING_CHANCE = {
     common :    1,
     uncommon :  .1,
     rare :      .01,
-    epic :      .001,
-    legendary : .0001,
+    exquisite :      .001,
+    exotic : .0001,
+}
+
+const INVENTORY_LIST_CURSOR_STYLE = {
+    none : 'none',
+    left : 'left',
+    right : 'right',
 }

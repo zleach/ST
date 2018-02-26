@@ -7,42 +7,49 @@ class Planet extends GameObject{
         
         this.showInfoDistance = 90;
         this.infoShowing = false;
+
+        this.canNavigateTo = true;
+        this.canLand = true;
+        
+        this.services = [];
+        this.specs = {
+            storage : {
+                bulk : Infinity,
+                passengers : Infinity,
+                liquid : Infinity,
+                gas : Infinity,
+            }
+        }
+
+        this.itemMarkup = 1.1 // Multuplier
     }
 
     setupSprite(){
+        super.setupSprite(this.sprite);
+
         this.sprite.anchor.setTo(.5, .5);
         this.sprite.smoothed = false;
-                
-        this.nameText = this.game.add.bitmapText(
-            20+this.sprite.x + this.sprite.width/2, 
-            this.sprite.y-20, 
-            'pixelmix_8',
-            this.name,
-            8
+
+        this.nameText = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.y-20, 
+            this.name, 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
         );
         this.nameText.alpha = 0;
 
-        this.subText = this.game.add.bitmapText(
-            20+this.sprite.x + this.sprite.width/2, 
-            this.sprite.y, 
-            'pixelmix_8',
-            this.planetClass+' '+this.stellarObjectType,
-            5
+        this.subText = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.y, 
+            this.description, 
+            { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
         );
         this.subText.alpha = 0;
 
-        this.landingMessage = this.game.add.bitmapText(
-            20+this.sprite.x + this.sprite.width/2, 
-            this.sprite.y+40, 
-            'pixelmix_8',
-            'Press L to Land',
-            5
+        this.landingMessage = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.y + 40, 
+            'Press L to Land', 
+            { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
         );
         this.landingMessage.alpha = 0;
-
-        //messageText.alpha = 0;
-        //this.game.planets.add(this);
-        this.game.register(this);
     }
     
     showInfoIfNeeded(){
@@ -53,8 +60,10 @@ class Planet extends GameObject{
             this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
             this.game.add.tween(this.subText).to( { y: '-30' }, 300, "Quart.easeOut", true);                
 
-            this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true,400);
-            this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
+            if(this.canLand){
+                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true,400);
+                this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
+            }
         
             this.infoShowing = true;
         }
@@ -79,8 +88,12 @@ class Planet extends GameObject{
     
     update() {
         super.update();
-        //this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-        //this.showInfoIfNeeded();
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+        this.showInfoIfNeeded();
+    }
+    
+    hasService(service){
+        return this.services.includes(service);
     }
     
     get shouldShowInfo(){
@@ -90,4 +103,10 @@ class Planet extends GameObject{
             return false;
         }
     }
+
+    // Planets have lots of free space.
+    calculateFreeSpaceForStorageClass(storageClass){
+        return Infinity;
+    }
+
 }

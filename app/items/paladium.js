@@ -6,5 +6,7 @@ class Item_Paladium extends InventoryObject {
         this.storageClass = CARGO_STORAGE_CLASS.bulk
         this.rarity = RARITY.rare;
         this.mass = 20;
+        this.baseValue = 100;
+        this.type = 'Mineral';
     }
 }

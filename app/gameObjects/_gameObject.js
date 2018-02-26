@@ -4,22 +4,57 @@ class GameObject {
         this.game.register(this);
     
         this.showInfoDistance = 200;
-
+        this.canNavigateTo = false;
+        this.navigationIndex = this.game.gameObjects.length;
+        
         // Basics
         this.health = 0;
         this.alive = true;
         this.isInvinsible = false;
+        this._targeted = false;
 
         // Damage Managment        
         this.damageAccumulating = false;
         this.damageAccumulationAmount = 0;        
     
         // Item Managment
+        this.itemMarkup = 1;
+        this.freeSpace = {};
         this.inventory = [];
         this.itemsAccumulating = false;
-        this.itemsAccumulator = [];        
+        this.itemsAccumulator = [];     
+    }
+    
+    setupSprite(sprite){
+        // TODO
+    }
+    
+    // Targeting
+    set targeted(targeted){
+        this._targeted = targeted;
+        
+        if(targeted){
+            this.showReticle();
+        } else {
+            this.hideReticle();
+        }
+
     }
 
+    get targeted(){
+        return this._targeted;
+    }
+
+    showReticle(){
+        
+    }
+    
+    hideReticle(){
+        
+    }
+
+    
+    // Damage
     inflictDamage(amount){
         if(!this.isInvinsible){            
             if(!this.damageAccumulating){
@@ -44,10 +79,15 @@ class GameObject {
         
     showDamage(amount){
         var x = this.sprite.x + game.rnd.integerInRange(-this.sprite.width/5, this.sprite.width/5);
-        var damageText = game.add.bitmapText(x, this.sprite.y, 'pixelmix_8',amount,10);
+
+        var damageText = this.game.add.text(
+            x,
+            this.sprite.y, 
+            Math.round(amount), 
+            { font: `18px ${FONT}`, fill: "#eeed00", align: 'center' }, 
+        );
         damageText.anchor.x = 0.5;
         damageText.alpha = 0;
-        damageText.tint = 0xf1c40f;
                 
         var fadeIn = this.game.add.tween(damageText).to( { alpha: 1 }, 200, "Quart.easeOut", false);
     	var moveUp = this.game.add.tween(damageText).to( { y: '-30' }, 800, "Quart.easeOut", true);
@@ -59,6 +99,11 @@ class GameObject {
         game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, damageText);
     }
     
+    hit(bullet){
+        // Usually specific per object.
+    }
+    
+    // Items
     collectNumberOfItems(amount,item){
         if(this.addItemsToInventory(amount,item)){
             if(!this.itemsAccumulating){
@@ -89,9 +134,15 @@ class GameObject {
             var verticalSpacing = 18;
             var itemGroup = items[key];
             var itemMessage = `+${itemGroup.amount} ${itemGroup.item.name}`;
-            var itemText = game.add.bitmapText(this.sprite.x, this.sprite.y-(verticalSpacing*index), 'pixelmix_8',itemMessage,8);
-            itemText.anchor.x = .5;
-            itemText.alpha = 0;
+
+            var itemText = this.game.add.text(
+                this.sprite.x,
+                this.sprite.y-(verticalSpacing*index), 
+                itemMessage, 
+                { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'center' }, 
+            );
+            itemText.stroke = '#000000';
+            itemText.strokeThickness = 3;
             itemText.tint = RARITY_COLOR[itemGroup.item.rarity];
         
             var fadeIn = this.game.add.tween(itemText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
@@ -102,20 +153,20 @@ class GameObject {
             fadeIn.start();
 
             game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, itemText);
-
         }.bind(this));
     }
 
     // Inventory
-    get bulkFreeSpace(){
-        return numeral(this.freeSpace[CARGO_STORAGE_CLASS.bulk]).format('0a')
-    }
-    get bulkUsedSpace(){
-        return numeral(this.specs.storage.bulk-this.freeSpace[CARGO_STORAGE_CLASS.bulk]).format('0a')
+    usedSpaceForStorageClass(storageClass){
+        return numeral(this.specs.storage[storageClass]-this.freeSpace[storageClass]).format('0a')
     }
 
-    get bulkMaxSpace(){
-        return numeral(this.specs.storage.bulk).format('0a')
+    freeSpaceForStorageClass(storageClass){
+        return numeral(this.freeSpace[storageClass]).format('0a')
+    }
+
+    maxSpaceForStorageClass(storageClass){
+        return numeral(this.specs.storage[storageClass]).format('0a')        
     }
 
     calculateFreeSpaceForStorageClass(storageClass){
@@ -130,9 +181,11 @@ class GameObject {
         }
     }
     
-    addItemsToInventory(amount,item){
+    addItemsToInventory(amount,item){        
         for (var i = 0; i < amount; i++) { 
             if(this.hasEnoughSpaceForItemOfStorageClassWithMass(item.storageClass,item.mass)){
+                item.containedIn = this;
+                
                 this.inventory.push(item);
                 this.freeSpace[item.storageClass] -= item.mass;
                 return true;
@@ -142,7 +195,30 @@ class GameObject {
             }
         }
     }
+
+    removeItemsFromInventory(items){
+        var removedItems = [];
+        for (let item of items) {
+            var index = this.inventory.indexOf(item);
+            if (index > -1) {
+                this.removedItems.push(item);
+                this.inventory.splice(index, 1);
+            }
+        }
+        return removedItems;
+    }
+
+    // Cargo
+    emptyCargoHold(){
+        this.inventory = [];
+
+        this.freeSpace[CARGO_STORAGE_CLASS.bulk] = this.specs.storage.bulk;
+        this.freeSpace[CARGO_STORAGE_CLASS.passengers] = this.specs.storage.passengers;
+        this.freeSpace[CARGO_STORAGE_CLASS.gas] = this.specs.storage.gas;
+        this.freeSpace[CARGO_STORAGE_CLASS.liquid] = this.specs.storage.liquid;
+    }
     
+    // Lifecycle
     kill(){
         this.alive = false;
         this.game.unregister(this);        
@@ -169,6 +245,17 @@ class GameObject {
     destroyObject(){
         this.destroy();        
     } 
+
+    // Misc
+    get speed(){
+        var body = this.sprite.body
+        var vx, vy;
+        
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        
+        return vx * vx + vy * vy;
+    }
 
     update(){
         

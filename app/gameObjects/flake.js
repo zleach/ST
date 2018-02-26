@@ -29,11 +29,11 @@ class FlakePickup extends Pickup {
         // Item
         var chance = game.rnd.realInRange(0,1);
         if(chance<RARITY_MINING_CHANCE.rare){
-            this.contents = new Item_Paladium(this.game);            
+            this.contents = InventoryObject.make('raw_paladium');            
         } else if(chance<RARITY_MINING_CHANCE.uncommon){
-            this.contents = new Item_MeteoricIron(this.game);
+            this.contents = InventoryObject.make('meteoric_iron');            
         } else {
-            this.contents = new Item_Flake(this.game);
+            this.contents = InventoryObject.make('asteroid_flake');            
         }            
     }
 

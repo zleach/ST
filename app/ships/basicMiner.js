@@ -105,12 +105,8 @@ class BasicMiner extends Ship {
                 },
                 inUse: false,
             },
-
             storage : {
                 bulk : 300,
-                passengers : 2,
-                gas : 0,
-                liquid : 0,
             }
         }
 

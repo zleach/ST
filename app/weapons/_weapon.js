@@ -2,8 +2,9 @@ class Weapon extends Equipment {
     constructor(game,parentObject) {
         super(game);
         this.parentObject = parentObject;
-        
         this.energyConsumption = 0;
+        
+        this.isWeapon = true;
     }
 
     update(){
@@ -32,6 +33,8 @@ class Weapon extends Equipment {
             if(this.game.player.ship == target){
                 return; // Can't hit yourself.
             }
+            
+            target.hit(bullet);
             
             target.inflictDamage(bullet.damage);
             bullet.kill();

@@ -1,0 +1,60 @@
+var ITEMS = [{
+		"key": "meteoric_iron",
+		"name": "Meteoric Iron",
+		"type": "Mineral",
+        "description" : "The dark mineral is a prized posession of 'belt miners. Apart from minor amounts of telluric iron, meteoric iron is the only naturally occurring native metal of the element iron on the Earth's surface.",
+		"rarity": "uncommon",
+		"storageClass": "bulk",
+		"baseValue": 32,
+		"mass": 15
+	},
+	{
+		"key": "raw_paladium",
+		"name": "Raw Paladium",
+		"type": "Mineral",
+        "description" : "William Hyde Wollaston noted the discovery of a this noble metal in July 1802 in his lab-book and named it palladium in August of the same year. Wollaston purified enough of the material and offered it, without naming the discoverer, in a small shop in Soho in April 1803.",
+		"rarity": "rare",
+		"storageClass": "bulk",
+		"baseValue": 65,
+		"mass": 20
+	},
+	{
+		"key": "asteroid_flake",
+		"name": "Asteroid Flake",
+		"type": "Mineral",
+        "description" : "A blackish grey flake, found after mining most asteroids.",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 12,
+		"mass": 10
+	},
+	{
+		"key": "potatoes",
+		"name": "Potatoes",
+        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 65,
+		"mass": 100
+	},
+	{
+		"key": "coffee",
+		"name": "Coffee",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "aluminium",
+		"name": "Aluminium",
+		"type": "Metal",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 90,
+		"mass": 10
+	}
+]

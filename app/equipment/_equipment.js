@@ -6,6 +6,10 @@ class Equipment extends GameObject {
         this.equiped = false;
     }
     
+    wearAndTear(){
+        
+    }
+    
     update(){
         super.update();
     }

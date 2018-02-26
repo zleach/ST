@@ -1,10 +1,10 @@
-class Reactor extends Equipment {
+class Batteries extends Equipment {
     constructor(game,parentObject) {
         super(game,parentObject);
         
-        this.name = "Reactor"
+        this.name = "Batteries"
         this.status = "OK"
-        this.chargeRate = .1;
+        this.chargeRate = .03;
     }
 
     update(){

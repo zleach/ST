@@ -2,6 +2,9 @@ class BasicMiningLaser extends Weapon {
     constructor(game,parentObject) {
         super(game,parentObject);
 
+        this.name = 'Mining Laser';
+        this.status = 'OK';
+
         this.baseBulletSpeed = 400;
 
         this.weapon = game.add.weapon(40, 'laser-sparkle');
@@ -15,7 +18,7 @@ class BasicMiningLaser extends Weapon {
         this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
         this.weapon.bullets.setAll('scale.x', 0.3);
         this.weapon.bullets.setAll('scale.y', 0.1);
-        this.weapon.bullets.setAll('damage',1);
+        this.weapon.bullets.setAll('damage',1.2);
         this.weapon.bullets.setAll('smoothed',false);
         this.weapon.setBulletBodyOffset(6, 6, 50, 30);
         

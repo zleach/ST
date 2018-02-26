@@ -34,12 +34,6 @@ class Shuttle extends Ship {
                     "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
                 }
             ],
-            size : {
-                width : 45,
-                height : 45,
-                offsetX : 3,
-                offsetY : -8,
-            },
             weaponSlots : [],
             engineSlots : [{
                 anchor : {
@@ -84,17 +78,14 @@ class Shuttle extends Ship {
             },
             dockingConnector : {
                 position : {
-                    x: -3,
-                    y: -24,
+                    x: 0,
+                    y: -18,
                     angle : 90,
                 },
                 inUse: false,
             },
             storage : {
-                bulk : 10,
                 passengers : 6,
-                gas : 0,
-                liquid : 0,
             }
         }
 
@@ -111,7 +102,7 @@ class Shuttle extends Ship {
         this.refuel();
 
         // Reactor
-        var reactor = new Reactor(this.game,this);
+        var reactor = new Batteries(this.game,this);
         this.equipEquipmentInSlot(reactor,0);
         this.recharge();
         
