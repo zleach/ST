@@ -160,12 +160,46 @@ class ExchangeScreen extends GuiScreen {
             this.saleAmountBg.visible = false;
             this.acceptButton.visible = false;
         }
+        
+        // Is there enough room?
+        this.hasEnoughSpace = true;
+        this.massNeeded = {};
+        if(this.myListDelta.length>0){
+            // Zero each type of storage
+            Object.keys(CARGO_STORAGE_CLASS).forEach(function(key,index) {
+                this.massNeeded[key] = 0
+            }.bind(this));
 
+            // Add mass per storage class
+            for (let item of this.myListDelta) {
+                this.massNeeded[item.storageClass] += this.massNeeded[item.storageClass] + item.mass;
+            }
+
+            // Verify for each storage class there is enough room
+            for (let storageClass of Object.keys(CARGO_STORAGE_CLASS)) {
+                var massNeeded = this.massNeeded[storageClass];
+                if(massNeeded>0){
+                    if(!this.game.player.ship.hasEnoughSpaceForItemOfStorageClassWithMass(storageClass,massNeeded))
+                        this.hasEnoughSpace = false;
+                }
+            }
+        }
+
+        // Button setup
         this.acceptButton.buttonX = saleAmountX + 8;
         this.acceptButton.buttonY = saleAmountY + 8 + 24;
         this.acceptButton.buttonWidth = saleAmountWidth-16;
-        this.acceptButton.text = `Accept ${formattedSaleAmount}`;
-        this.acceptButton.color = 0x1aae5c;
+
+        if(this.hasEnoughSpace){
+            this.acceptButton.text = `Accept ${formattedSaleAmount}`;
+            this.acceptButton.color = this.styles.green;
+        } else {
+            this.acceptButton.text = `Not Enough Space`;
+            this.acceptButton.color = this.styles.red;
+        }
+        
+
+        
     }
     
     calculateSaleAmount(){
@@ -266,7 +300,7 @@ class ExchangeScreen extends GuiScreen {
             this.infoTitleLabel.x = infoX+8;
             this.infoTitleLabel.y = infoY+8;
             this.infoTitleLabel.visible = true;
-            this.infoTitleLabel.setText(item.readableType);
+            this.infoTitleLabel.setText(item.name);
         } else {
             // Item Empty
             this.infoTitleLabel.visible = false;
@@ -276,7 +310,8 @@ class ExchangeScreen extends GuiScreen {
     }
     
     transferSelectedItem(){
-        var item = this.activeList.selectedItem;
+        var item = this.activeList.selectedItem; 
+               
         if(item) {
             if(this.activeList==this.myList){
                 this.exchangeList.addItem(item);
@@ -311,6 +346,11 @@ class ExchangeScreen extends GuiScreen {
     }
     
     acceptTransaction(){
+        if(!this.hasEnoughSpace) {
+            this.showNotEnoughSpaceNotification();
+            return;
+        }
+
         var saleAmount = this.calculateSaleAmount();
         if(saleAmount!=0){
             if(saleAmount<0){
@@ -332,13 +372,16 @@ class ExchangeScreen extends GuiScreen {
     }
 
     completeTransaction(saleAmount){
-        this.game.player.ship.emptyCargoHold();
-        for (let item of this.myList.items) {
+        
+        var myItems = [].concat.apply([], this.myList.items);
+        this.game.player.ship.emptyCargoHold();        
+        for (let item of myItems) {
             this.game.player.ship.addItemsToInventory(1,item);
         }
     
+        var destinationItems = [].concat.apply([], this.exchangeList.items);
         this.destination.emptyCargoHold();
-        for (let item of this.exchangeList.items) {
+        for (let item of destinationItems) {
             this.destination.addItemsToInventory(1,item);
         }
         
@@ -368,7 +411,13 @@ class ExchangeScreen extends GuiScreen {
         notification.subText = 'Cannot accept this transaction.';
         notification.show();
     }
-    
+
+    showNotEnoughSpaceNotification(){
+        var notification = new Notification(this.game);
+        notification.text = 'Not Enough Cargo Space';
+        notification.subText = 'Free up space in your cargo hold.';
+        notification.show();
+    }
     
     setupKeys(){
         this.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);

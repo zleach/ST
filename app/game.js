@@ -180,7 +180,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         // HUD
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
-        this.hud.title(`${this.system.name} System`,moment(this.starDate).format('MMMM Do YYYY, HH:mm'));
+        this.hud.showSystemInfo();
         
         // GUI
         this.guiGroup = this.game.add.group();
@@ -196,12 +196,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('coffee'));
-
         
-        this.player.ship.addItemsToInventory(1, InventoryObject.make('coffee'));
-
 /*
         this.arrivalScreen.destination = planet;
         this.arrivalScreen.show();

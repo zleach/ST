@@ -20,7 +20,7 @@ class GuiScreen {
             lightGrey: 0x4d4b56,
             veryLightGrey : 0x948f9c,
             red: 0xc03b2b,
-            green: 0x24ae5f,
+            green: 0x1aae5c,
             baseText : { font: `${15+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
             smallWhiteText : { font: `${15+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
             smallGreyText : { font: `italic ${13+this.fontSizeOffset}px ${this.fontFamilyLarge}`, fill: '#948f9c', align: 'left'},

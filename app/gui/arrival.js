@@ -191,7 +191,7 @@ class ArrivalScreen extends GuiScreen {
             this.serviceButtons.push(serviceButton);
         }            
 
-        this.updateCredits();      
+        this.updateCredits();    
     }
         
     serviceButtonClicked(button){
@@ -213,17 +213,27 @@ class ArrivalScreen extends GuiScreen {
         this.destBreadcrumb.setText('/ ' + PLANET_SERVICES_TITLE[service]);
         this.destBreadcrumb.alpha = 0;
         var transition = this.game.add.tween(this.destBreadcrumb).to({alpha: 1}, 600, "Quart.easeOut", true);
-    }
-    childScreenDidShow(){
-        this.controlGroup.visible = false;        
+
+        // Disable buttons
+        this.controlGroup.forEach(function(control){
+            control.sprite.input.enabled = false;
+        }, this)
     }
 
     childScreenWillHide(){
         super.childScreenWillHide();
         this.game.add.tween(this.destBreadcrumb).to({alpha: 0}, 600, "Quart.easeOut", true);
-        this.controlGroup.visible = true;  
-        
-        this.updateCredits();      
+
+        // Enable buttons
+        this.controlGroup.forEach(function(control){
+            control.sprite.input.enabled = true;
+        }, this)
+
+        this.updateCredits();   
+    }
+    
+    childScreenDidHide(){
+        super.childScreenDidHide();
     }
     
     show(){
@@ -244,6 +254,11 @@ class ArrivalScreen extends GuiScreen {
 
         // Arrivial Specific
         this.game.player.ship.takeOff();
+
+        // Wait a second then show where we are.
+        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+            this.game.hud.showSystemInfo();
+        }, this);
     }
 
     didHide(){

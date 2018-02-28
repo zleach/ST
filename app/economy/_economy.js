@@ -4,7 +4,7 @@ class Economy {
     }
     
     get globalFuelPrice(){
-        return .05;
+        return .033;
     }
 
     buyFuel(amount){

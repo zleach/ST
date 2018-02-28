@@ -1,4 +1,5 @@
 app/items/items.json
+lib/lodash.js
 lib/tiny-color.js
 lib/numeral.js
 lib/moment.js

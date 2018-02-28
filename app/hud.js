@@ -287,7 +287,7 @@ class HUD {
         // MESSAGES
         // Title
         this.message__title = this.game.add.text(
-            32,this.game.camera.height-50, 
+            0,0,
             '', 
             { font: `16px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
         );
@@ -296,7 +296,7 @@ class HUD {
         
         // Subtitle
         this.message__subTitle = this.game.add.text(
-            32,this.game.camera.height-25, 
+            0,0, 
             '', 
             { font: `12px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
         );
@@ -313,10 +313,26 @@ class HUD {
 
         this.group.add(this.navigationArrow);
 
+
+        // Blinky
+        this.blinkyMessageText = this.game.add.text(
+            this.game.camera.width/2,
+            this.game.camera.height-70, 
+            '', 
+            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
+        );
+        this.blinkyMessageText.anchor.x = .5;
+        this.blinkyMessageText.fixedToCamera = true;
+        this.blinkyMessageText.tint = 0xe74c3c;
     }
     
     title(message,submessage){
         var delay = 2000;
+        
+        this.message__title.x = 32;
+        this.message__title.y = this.game.camera.height-50;
+        this.message__subTitle.x = 32;
+        this.message__subTitle.y = this.game.camera.height-25;
         
         this.message__title.setText(message);
         this.message__subTitle.setText(submessage);
@@ -334,6 +350,7 @@ class HUD {
         fadeIn2.chain(fadeOut2);
         fadeIn2.start();
     }
+
     message(message){
         var delay = 2000;
         var messageText = this.game.add.text(
@@ -377,18 +394,9 @@ class HUD {
     }
     blinkingWarning(message){
         var delay = 2000;
-        var messageText = this.game.add.text(
-            this.game.camera.width/2,
-            this.game.camera.height-70, 
-            message, 
-            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
-        );
-
-        messageText.anchor.x = .5;
-        messageText.fixedToCamera = true;
-        messageText.tint = 0xe74c3c;
+        this.blinkyMessageText.setText(message);
             
-        var blink = this.game.add.tween(messageText).to({
+        var blink = this.game.add.tween(this.blinkyMessageText).to({
             alpha: .5,
         }, 300, "Quart.easeOut", true, 0, 0, true).loop(true);
     }
@@ -439,6 +447,10 @@ class HUD {
         this.game.notificationGroup.add(notification);
 
         notification.show();
+    }
+    
+    showSystemInfo(){
+        this.title(`${this.game.system.name} System`,moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'));
     }
     
     update() {

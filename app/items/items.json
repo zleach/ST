@@ -56,5 +56,85 @@ var ITEMS = [{
 		"storageClass": "bulk",
 		"baseValue": 90,
 		"mass": 10
-	}
+	},
+	{
+		"key": "rice",
+		"name": "rice",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "milk",
+		"name": "milk",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "cats",
+		"name": "cats",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "dogs",
+		"name": "dogs",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "horses",
+		"name": "horses",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "parts",
+		"name": "pars",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "guns",
+		"name": "guns",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
+	{
+		"key": "ammo",
+		"name": "Ammo",
+        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "exotic",
+		"storageClass": "bulk",
+		"baseValue": 870,
+		"mass": 100
+	},
 ]

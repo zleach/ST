@@ -27,6 +27,7 @@ class GameObject {
     
     setupSprite(sprite){
         // TODO
+        this.maxHealth = this.health;
     }
     
     // Targeting
@@ -75,6 +76,10 @@ class GameObject {
                 this.kill();
             }        
         }
+    }
+    
+    get healthPercentage(){
+        return this.health/this.maxHealth;
     }
         
     showDamage(amount){

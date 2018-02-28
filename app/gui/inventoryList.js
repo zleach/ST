@@ -15,7 +15,7 @@ class GuiInventoryList extends Phaser.Group {
         this.itemsPerPage = 8;
 
         this.itemCursorHeight = 32;
-        this.listWidth = 260;
+        this.listWidth = 240;
         this.listHeight = this.itemCursorHeight*(this.itemsPerPage+1);
         this.headerHeight = 30;
 
@@ -89,7 +89,15 @@ class GuiInventoryList extends Phaser.Group {
     }
 
     set items(items){
-        this._items = items
+        this._items = [];
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        
+        this._groupedItems = _.groupBy(items, item => item.key);
+        Object.keys(this._groupedItems).forEach(function(key,index) {
+            var group = this._groupedItems[key];
+            this._items.push(group)
+        }.bind(this));
+
         this.layout();
     }
 
@@ -107,16 +115,24 @@ class GuiInventoryList extends Phaser.Group {
         return totalValue;
     }
     
-    addItem(item){
+    addItem(addedItem){
         this.txSound.play();
-        this._items.push(item)
+
+        var allItems = [].concat.apply([], this._items); // Flatten
+        allItems.push(addedItem);
+        this.items = allItems;
+        
         this.layout();
     }
 
     removeItem(item){
         // Find + Remove Item
-        var index = this._items.indexOf(item);
-        if (index > -1) this._items.splice(index, 1);
+        var allItems = [].concat.apply([], this._items); // Flatten
+
+        var index = allItems.indexOf(item);
+        if (index > -1) allItems.splice(index, 1);
+
+        this.items = allItems;        
         
         // Update Selected Index for last item
         if(this.selectedItemIndex == this._items.length) this.selectedItemIndex--;
@@ -126,7 +142,16 @@ class GuiInventoryList extends Phaser.Group {
     
     get selectedItem(){
         if(this.items.length>0) {
-            return this._items[this.selectedItemIndex+this.itemsPerPage*(this.currentPage-1)]
+            try{
+                if(this.currentPage>1){
+                    return this._items[(this.selectedItemIndex+this.itemsPerPage*(this.currentPage-1))-2][0]                            
+                } else {
+                    return this._items[this.selectedItemIndex][0]            
+                }                
+            } catch(e){
+                return null;
+            }
+            
         } else {
             return null;
         }
@@ -139,7 +164,9 @@ class GuiInventoryList extends Phaser.Group {
     selectNextItem(){
         this.clickSound.play();
 
-        if(this.selectedItem==this.items[this.items.length-1]) return;
+        try {
+            if(this.selectedItem==this.items[this.items.length-1][0]) return;
+        } catch(e){}
             
         if(this.selectedItemIndex<=this.items.length) this.selectedItemIndex++;
         if(this.selectedItemIndex>=this.itemsPerPage-1) {
@@ -221,14 +248,33 @@ class GuiInventoryList extends Phaser.Group {
         this.emptyLabel.x = (this.listWidth/2)-(this.emptyLabel.width/2);
         this.emptyLabel.y = (this.listHeight/2)-(this.emptyLabel.height/2);
 
+        var indexStart = (this.currentPage-1)*this.itemsPerPage;
+        var indexEnd = this.currentPage*this.itemsPerPage;
+        var indexOffset = 0;
+
+        if(this.items.length>this.itemsPerPage){
+            //indexEnd--;
+        }
+        if(this.currentPage>1){
+            indexOffset =-2;
+            indexStart-=2
+            indexEnd-=2;
+        }
+
         // Items
-        for (var i = (this.currentPage-1)*this.itemsPerPage; i < this.currentPage*this.itemsPerPage; i++) {
+        for (var i = indexStart; i < indexEnd; i++) {
             if(this.items[i]!=undefined){
-                var item = this.items[i];
+                var group = this.items[i]
+                var item = group[0];
                 var text = item.name
+                if(group.length>1){
+                    text += ` (${group.length})`;
+                }
+                
                 var arrow = false;
         
                 // Arrows
+
                 if(index==this.itemsPerPage-1){
                     text = String.fromCharCode(0x2193);
                     arrow = true;
@@ -240,7 +286,7 @@ class GuiInventoryList extends Phaser.Group {
                 
                 // Label
                 var itemLabel = this.phaserGame.add.text(
-                    16,this.itemCursorHeight*index + this.headerHeight + 8, 
+                    16,this.itemCursorHeight*(index) + this.headerHeight + 8, 
                     text, 
                     { font: `15px ${FONT}`, fill: '#FFFFFF', align: 'left'},
                     this

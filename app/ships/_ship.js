@@ -25,6 +25,10 @@ class Ship extends GameObject {
 
         this.fuelQuantity = 0;
         this.energyQuantity = 0;
+        this.oxygenQuantity = 3000;
+        this.oxygenMax = 3000;
+        this.hullBreached = false;
+        this.O2Critical = false;
 
         this.weapons = [];
         this.engines = [];    
@@ -75,6 +79,7 @@ class Ship extends GameObject {
         
         // Health
         this.health = this.specs.health;
+        this.maxHealth = this.specs.health;
         
         // Info
         this.name = this.specs.name;
@@ -118,18 +123,19 @@ class Ship extends GameObject {
         this.flamesEmitter.addToWorld();
 
         // Atmosphere
-        var ventData = {
+        this.ventData = {
             lifespan: 8000,
             image: 'white-smooth',
             blendMode: 'ADD',
-            vx: { min: -.2, max: .2 },
-            vy: { min: -.2, max: .2 },
-            alpha: { min: 0, max: .16 },
+            vx: { min: -.4, max: .4 },
+            vy: { min: -.4, max: .4 },
+            alpha: { min: 0, max: .3 },
             scale: { initial: 0.1, value: .4, control: 'linear' },
         };
-        this.game.ps.addData('atmosphere', ventData);
+        this.game.ps.addData('atmosphere', this.ventData);
         this.atmosphereEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
         this.atmosphereEmitter.addToWorld();
+        this.atmosphereWell = this.atmosphereEmitter.createGravityWell(0,0, .01);
 
         // Hyperdrive
         var hyperData = {
@@ -662,7 +668,7 @@ class Ship extends GameObject {
         this.game.skipTime(game.rnd.integerInRange(1, 12),'hour');
 
         this.game.add.tween(this.sprite).to( { alpha: 1 }, 600, "Quart.easeOut", true, 500);
-        this.game.add.tween(this.sprite.scale).to( { x: 1, y: 1 }, 600, "Quart.easeOut", true, 500);
+        this.game.add.tween(this.sprite.scale).to( { x: 1, y: 1 }, 600, "Quart.easeOut", true, 500);    
     }
 
     // Docking
@@ -892,18 +898,59 @@ class Ship extends GameObject {
 
     // Venting
     ventAtmosphere(){
-        this.atmosphereEmitter.emit(
-            'atmosphere',
-            this.sprite.worldPosition.x + this.game.camera.x,
-            this.sprite.worldPosition.y + this.game.camera.y
-        );
-/*
+        var o2Density = (this.oxygenQuantity/this.oxygenMax)/2;
+        this.ventData.alpha = { min: 0, max: o2Density };
+        this.ventData.vx = { min: -o2Density, max: o2Density };
+        this.ventData.vy = { min: -o2Density, max: o2Density };
+        
+        var x = this.sprite.worldPosition.x + this.game.camera.x;
+        var y = this.sprite.worldPosition.y + this.game.camera.y;
+        
+        this.atmosphereWell.position.x = x;
+        this.atmosphereWell.position.y = y;        
+        
+        if(this.oxygenQuantity>0){
+            this.atmosphereEmitter.emit(
+                'atmosphere',
+                x,
+                y
+            );
+            this.oxygenQuantity--;
+            
+            if(this.oxygenQuantity<1000){
+                if(this == this.game.player.ship && !this.O2Critical) {
+                    this.game.hud.blinkingWarning("Oxygen Levels Critical");
+                }
+                this.O2Critical = true;
+            }
+            
+        } else {
+            this.asphyxiate();
+        }
+        
+    }
+    
+    asphyxiate(){
+        this.kill();
+    }
+    
+    burn(){
         this.flamesEmitter.emit(
             'flames',
             this.sprite.worldPosition.x + this.game.camera.x,
             this.sprite.worldPosition.y + this.game.camera.y
-        );
-*/
+        );        
+    }
+
+    // Damage
+    inflictDamage(amount){
+        super.inflictDamage(amount);
+
+        if(this.healthPercentage<1 && !this.hullBreached){
+            this.hullBreached = true;
+            if(this == this.game.player.ship) this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+        }
+
     }
 
     
@@ -913,8 +960,15 @@ class Ship extends GameObject {
         this.positionInfo();        
         this.navigate();        
 
+        // Damage
+        if(this.hullBreached){
+            this.ventAtmosphere();
+        }
+
+        // Hyperdrive
         if(this.hyperDriveEngaged) this.hyperDriveUpdate();
         
+        // Docking
         if(this.specs.canBeDockedTo && this.sprite != this.game.player.ship.sprite){
             var a = this.dockingPort.worldPosition.x - this.game.player.ship.dockingConnector.worldPosition.x;
             var b = this.dockingPort.worldPosition.y - this.game.player.ship.dockingConnector.worldPosition.y;
@@ -945,7 +999,7 @@ class Ship extends GameObject {
             this.sprite.y += this.dockingTarget.sprite.deltaY;
         }
 
-
+        // Finally, limit speed.
         this.limitSpeed();
     }   
 }
