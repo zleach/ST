@@ -35,12 +35,20 @@ class Thruster extends Engine {
 
         this.game.ps.addData('smoke', smoke);
 
+        this.sound = game.add.audio('rcs-loop');
     }
     accelerate(){
         super.accelerate();
         this.puff();
     }
+    deaccelerate(){
+        super.deaccelerate();
+        //this.sound.fadeOut(100);
+    }    
     puff(){
+        //this.sound.volume = .2;
+        //if(!this.sound.isPlaying) this.sound.loopFull();
+
         var px = this.flames.worldPosition.x + game.camera.x;
         var py = this.flames.worldPosition.y + game.camera.y;
 

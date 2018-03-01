@@ -5,7 +5,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
         this.time.advancedTiming = true
-        
+
         //this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
         this.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
         //this.game.renderer.renderSession.roundPixels = true;
@@ -35,6 +35,14 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-ship', 'assets/minimap-ship.png');
         this.load.image('dock-arrow', 'assets/dock-indicator.png');
         this.load.image('nav-arrow', 'assets/nav-arrow.png');
+
+        // Alarm
+        this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
+        this.load.audio('master_alarm', 'assets/audio/alarm.wav');
+
+        // O2
+        this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
+        this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
 
         // Planet Stuff
         this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
@@ -103,9 +111,25 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-mask', 'assets/minimap-mask.png');
 
         // Audio
+/*
+        this.load.audio('crash-1', 'assets/audio/crash-1.mp3');
+        this.load.audio('crash-2', 'assets/audio/crash-2.mp3');
+        this.load.audio('crash-3', 'assets/audio/crash-3.mp3');
+        this.load.audio('crash-4', 'assets/audio/crash-4.mp3');
+        this.load.audio('crash-5', 'assets/audio/crash-5.mp3');
+        this.load.audio('crash-light-1', 'assets/audio/crash-light-1.mp3');
+        this.load.audio('crash-light-2', 'assets/audio/crash-light-2.mp3');
+*/
+
         this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
         this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
         this.load.audio('success', 'assets/audio/Success 3.m4a');
+/*
+        this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
+        this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
+        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
+        this.load.audio('rcs-loop', 'assets/audio/rcs-loop.wav');
+*/
     },
     register : function(object){
         this.gameObjects.push(object);
@@ -130,8 +154,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         // Sounds
         this.game.soundFX = {};
         this.game.soundFX.click = game.add.audio('gui_click_soft');
-        
-        
+                
         //  Tiled scrolling background
         this.bgGroup = this.game.add.group();
         
@@ -181,6 +204,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
         this.hud.showSystemInfo();
+                
         
         // GUI
         this.guiGroup = this.game.add.group();
@@ -215,6 +239,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.starDate = moment(this.starDate).add(amount, unit);        
     },
     broadphaseCallback : function(body1, body2){
+/*
         if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
             var ship;
             if(body1.sprite.parentObject == this.player.ship){
@@ -229,20 +254,19 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
             var damageAmount = shakeAmount*100
             if(shakeAmount>.001){
                 if(shakeAmount>.01){
+                    ship.crashSoft_sound();
                     game.camera.shake(.01, 100);
                 } else {
+                    ship.crash_sound();
                     game.camera.shake(shakeAmount, 100);                    
                 }
-
-                if(damageAmount>1){
-                    ship.inflictDamage(damageAmount);
-                }
-
-
+                
+                if(damageAmount>1) ship.inflictDamage(damageAmount);
             } else {
                 // No shake
             }
         }    
+*/
         return true;
     },
 
@@ -278,7 +302,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         if(this.logValue!=undefined){
             this.game.debug.text(this.logValue, 32, 32) 
         }
-        //this.game.debug.text(game.time.fps +' fps', 32, 32) 
+        this.game.debug.text(game.time.fps +' fps', 32, 32) 
         //this.game.debug.body(this.player.sprite);
         //this.game.debug.bodyInfo(this.player.sprite,32,32);
 

@@ -5,7 +5,7 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Tue Feb 27 02:33:39 PST 2018  */
+/* Last merge : Wed Feb 28 21:13:44 PST 2018  */
 
 /* Merging order :
 
@@ -18157,6 +18157,7 @@ class Ship extends GameObject {
         this.energyQuantity = 0;
         this.oxygenQuantity = 3000;
         this.oxygenMax = 3000;
+        this.hullBreachAtHealthPercentage = .2;
         this.hullBreached = false;
         this.O2Critical = false;
 
@@ -18172,6 +18173,23 @@ class Ship extends GameObject {
         }
         this.navigationMode = NAVIGATION_MODE.free;
         this.navigationIndex = -1;
+
+        // Sounds
+/*
+        this.gasLeakSound = game.add.audio('gas-leak');
+        this.crashSounds = [
+            game.add.audio('crash-1'),
+            game.add.audio('crash-2'),
+            game.add.audio('crash-3'),
+            game.add.audio('crash-4'),
+            game.add.audio('crash-5'),
+        ]
+
+        this.crashLightSounds = [
+            game.add.audio('crash-light-1'),
+            game.add.audio('crash-light-2'),
+        ]        
+*/
     }
     
     setupSprite(sprite){
@@ -18360,13 +18378,21 @@ class Ship extends GameObject {
         }
     }
 
-    shutdownThruster(thruster){
-        this.thrusters[thruster].shutdown();
+    shutdownThruster(thruster){        
+        var thruster = this.thrusters[thruster]
+        thruster.shutdown();
     }
     
-    shutdownAllThrusters(){
-        for (var thruster in this.specs.RCS) {
-            this.shutdownThruster(thruster)
+    shutdownAttitudeThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(!thruster.retro) thruster.shutdown();
+        }        
+    }
+    shutdownRetroThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(thruster.retro) thruster.shutdown();
         }        
     }
     
@@ -18437,7 +18463,9 @@ class Ship extends GameObject {
     
             for (let engine of this.engines) {
                 engine.deaccelerate();
-            }            
+            }
+
+            this.shutdownRetroThrusters();
         }
     }
 
@@ -18498,7 +18526,7 @@ class Ship extends GameObject {
             }
         }
         
-        this.shutdownAllThrusters();
+        this.shutdownAttitudeThrusters();
     }
     
     
@@ -19057,7 +19085,10 @@ class Ship extends GameObject {
         } else {
             this.asphyxiate();
         }
-        
+    }
+    
+    get o2Percent(){
+        return this.oxygenQuantity/this.oxygenMax;
     }
     
     asphyxiate(){
@@ -19076,11 +19107,42 @@ class Ship extends GameObject {
     inflictDamage(amount){
         super.inflictDamage(amount);
 
-        if(this.healthPercentage<1 && !this.hullBreached){
+        if(this.healthPercentage<this.hullBreachAtHealthPercentage && !this.hullBreached){
             this.hullBreached = true;
-            if(this == this.game.player.ship) this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+            if(this == this.game.player.ship) {
+                this.gasLeakSound.play();
+                this.game.hud.showO2Panel();
+                this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+            }
         }
 
+    }
+
+    // Sounds
+    crash_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashSounds[this.game.rnd.integerInRange(0,this.crashSounds.length-1)].play();
+        }               
+    }
+    crashSoft_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashLightSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashLightSounds[this.game.rnd.integerInRange(0,this.crashLightSounds.length-1)].play();
+        }       
+        
     }
 
     
@@ -19166,7 +19228,7 @@ class Engine extends Equipment {
         }
         if(this.retro) {
             this.currentSpool = 1
-        }
+        }        
     }
 
     deaccelerate(){
@@ -19206,8 +19268,23 @@ class BasicEngine extends Engine {
         this.fuelConsumption = .7;
 
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
-        this.flames.blendMode = PIXI.blendModes.ADD;    
+        this.flames.blendMode = PIXI.blendModes.ADD;
+
+        //this.sound = game.add.audio('basic-engine');
     }
+    accelerate(){
+        super.accelerate();
+        //if(!this.sound.isPlaying) this.sound.play();
+        
+        //this.sound.volume = this.flames.alpha;
+    }
+    deaccelerate(){
+        super.deaccelerate();
+        //this.sound.volume = this.flames.alpha;
+        
+        //if(this.sound.volume==0 && this.sound.isPlaying) this.sound.stop();
+    }
+
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -19273,12 +19350,20 @@ class Thruster extends Engine {
 
         this.game.ps.addData('smoke', smoke);
 
+        this.sound = game.add.audio('rcs-loop');
     }
     accelerate(){
         super.accelerate();
         this.puff();
     }
+    deaccelerate(){
+        super.deaccelerate();
+        //this.sound.fadeOut(100);
+    }    
     puff(){
+        //this.sound.volume = .2;
+        //if(!this.sound.isPlaying) this.sound.loopFull();
+
         var px = this.flames.worldPosition.x + game.camera.x;
         var py = this.flames.worldPosition.y + game.camera.y;
 
@@ -20464,12 +20549,7 @@ class Player extends GameObject {
             // Accel
             if (this.cursors.up.isDown) {
                 this.ship.accelerate();
-            } else {
-                this.ship.deaccelerate();
-            }
-
-            // Reverse
-            if (this.cursors.down.isDown) {
+            } else if(this.cursors.down.isDown) {
                 this.ship.goInReverse();
             } else {
                 this.ship.deaccelerate();
@@ -20520,6 +20600,7 @@ class HUD {
         var backgroundColor = 0x3f3c46;
         this.background = this.group.add(new Phaser.Graphics(this.game.game,0,0));
 
+        this.masterAlarmSound = game.add.audio('master_alarm');
 
         this.sidebar = this.group.add(new Phaser.Graphics(this.game.game,0,0));
         this.sidebar.beginFill(0x111111);
@@ -20772,6 +20853,28 @@ class HUD {
             eIndex++;
         }
 
+        // Master Alarm
+        this.masterAlarmSprite = this.game.add.sprite(this.game.camera.width-200,10, 'master-alarm');
+        this.masterAlarmSprite.animations.add('blink');    
+        this.masterAlarmSprite.animations.play('blink', 5, true);
+        this.masterAlarmSprite.visible = false;
+        this.masterAlarmSprite.inputEnabled = true;
+        this.masterAlarmSprite.events.onInputUp.add(this.masterAlarmClicked, this);
+        this.group.add(this.masterAlarmSprite);
+
+        // O2
+        this.o2gauge = this.game.add.group();
+        this.group.add(this.o2gauge);
+        
+        this.o2gaugeBg = this.game.add.sprite(0,0, 'oxygen-gauge');
+        this.o2gaugeArrow = this.game.add.sprite(0,0, 'gauge-arrow');
+        this.group.add(this.o2gaugeBg);
+        this.group.add(this.o2gaugeArrow);
+        
+        this.o2gaugeBg.x = 32 - 100
+        this.o2gaugeArrow.x = this.o2gaugeBg.x + 8;
+        this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
+        this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
 /*
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
@@ -20947,6 +21050,7 @@ class HUD {
         }
     }
     
+
     purchaseReceipt(title,message,amount){
         var notification = new Notification(this.game);
         notification.text = title;
@@ -20959,6 +21063,29 @@ class HUD {
     
     showSystemInfo(){
         this.title(`${this.game.system.name} System`,moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'));
+    }
+    
+    set masterAlarm(alarm){
+        this.masterAlarmSprite.visible = alarm;
+        if(alarm){
+            this.masterAlarmSound.loopFull();
+        } else {
+            this.masterAlarmSound.stop();            
+        }
+    }
+    
+    masterAlarmClicked(){
+        this.masterAlarm = false;
+    }
+    
+    showO2Panel(){
+        this.masterAlarm = true;
+        game.add.tween(this.o2gaugeBg).to( {x: '+100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '+100'}, 600, "Quart.easeOut", true);        
+    }
+    
+    set o2Percent(o2){
+        this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
     update() {
@@ -20974,6 +21101,9 @@ class HUD {
         // EFI
         this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
         this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
+
+        // O2
+        this.o2Percent = this.game.player.ship.o2Percent;
         
         // Credits
         this.creditsText.setText(`${this.game.player.credits}`);
@@ -21133,7 +21263,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
         this.time.advancedTiming = true
-        
+
         //this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
         this.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
         //this.game.renderer.renderSession.roundPixels = true;
@@ -21163,6 +21293,14 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-ship', 'assets/minimap-ship.png');
         this.load.image('dock-arrow', 'assets/dock-indicator.png');
         this.load.image('nav-arrow', 'assets/nav-arrow.png');
+
+        // Alarm
+        this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
+        this.load.audio('master_alarm', 'assets/audio/alarm.wav');
+
+        // O2
+        this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
+        this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
 
         // Planet Stuff
         this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
@@ -21231,9 +21369,25 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-mask', 'assets/minimap-mask.png');
 
         // Audio
+/*
+        this.load.audio('crash-1', 'assets/audio/crash-1.mp3');
+        this.load.audio('crash-2', 'assets/audio/crash-2.mp3');
+        this.load.audio('crash-3', 'assets/audio/crash-3.mp3');
+        this.load.audio('crash-4', 'assets/audio/crash-4.mp3');
+        this.load.audio('crash-5', 'assets/audio/crash-5.mp3');
+        this.load.audio('crash-light-1', 'assets/audio/crash-light-1.mp3');
+        this.load.audio('crash-light-2', 'assets/audio/crash-light-2.mp3');
+*/
+
         this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
         this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
         this.load.audio('success', 'assets/audio/Success 3.m4a');
+/*
+        this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
+        this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
+        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
+        this.load.audio('rcs-loop', 'assets/audio/rcs-loop.wav');
+*/
     },
     register : function(object){
         this.gameObjects.push(object);
@@ -21258,8 +21412,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         // Sounds
         this.game.soundFX = {};
         this.game.soundFX.click = game.add.audio('gui_click_soft');
-        
-        
+                
         //  Tiled scrolling background
         this.bgGroup = this.game.add.group();
         
@@ -21309,6 +21462,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
         this.hud.showSystemInfo();
+                
         
         // GUI
         this.guiGroup = this.game.add.group();
@@ -21343,6 +21497,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.starDate = moment(this.starDate).add(amount, unit);        
     },
     broadphaseCallback : function(body1, body2){
+/*
         if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
             var ship;
             if(body1.sprite.parentObject == this.player.ship){
@@ -21357,20 +21512,19 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
             var damageAmount = shakeAmount*100
             if(shakeAmount>.001){
                 if(shakeAmount>.01){
+                    ship.crashSoft_sound();
                     game.camera.shake(.01, 100);
                 } else {
+                    ship.crash_sound();
                     game.camera.shake(shakeAmount, 100);                    
                 }
-
-                if(damageAmount>1){
-                    ship.inflictDamage(damageAmount);
-                }
-
-
+                
+                if(damageAmount>1) ship.inflictDamage(damageAmount);
             } else {
                 // No shake
             }
         }    
+*/
         return true;
     },
 
@@ -21406,7 +21560,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         if(this.logValue!=undefined){
             this.game.debug.text(this.logValue, 32, 32) 
         }
-        //this.game.debug.text(game.time.fps +' fps', 32, 32) 
+        this.game.debug.text(game.time.fps +' fps', 32, 32) 
         //this.game.debug.body(this.player.sprite);
         //this.game.debug.bodyInfo(this.player.sprite,32,32);
 

@@ -23,7 +23,7 @@ class Engine extends Equipment {
         }
         if(this.retro) {
             this.currentSpool = 1
-        }
+        }        
     }
 
     deaccelerate(){

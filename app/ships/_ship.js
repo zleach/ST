@@ -27,6 +27,7 @@ class Ship extends GameObject {
         this.energyQuantity = 0;
         this.oxygenQuantity = 3000;
         this.oxygenMax = 3000;
+        this.hullBreachAtHealthPercentage = .2;
         this.hullBreached = false;
         this.O2Critical = false;
 
@@ -42,6 +43,23 @@ class Ship extends GameObject {
         }
         this.navigationMode = NAVIGATION_MODE.free;
         this.navigationIndex = -1;
+
+        // Sounds
+/*
+        this.gasLeakSound = game.add.audio('gas-leak');
+        this.crashSounds = [
+            game.add.audio('crash-1'),
+            game.add.audio('crash-2'),
+            game.add.audio('crash-3'),
+            game.add.audio('crash-4'),
+            game.add.audio('crash-5'),
+        ]
+
+        this.crashLightSounds = [
+            game.add.audio('crash-light-1'),
+            game.add.audio('crash-light-2'),
+        ]        
+*/
     }
     
     setupSprite(sprite){
@@ -230,13 +248,21 @@ class Ship extends GameObject {
         }
     }
 
-    shutdownThruster(thruster){
-        this.thrusters[thruster].shutdown();
+    shutdownThruster(thruster){        
+        var thruster = this.thrusters[thruster]
+        thruster.shutdown();
     }
     
-    shutdownAllThrusters(){
-        for (var thruster in this.specs.RCS) {
-            this.shutdownThruster(thruster)
+    shutdownAttitudeThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(!thruster.retro) thruster.shutdown();
+        }        
+    }
+    shutdownRetroThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(thruster.retro) thruster.shutdown();
         }        
     }
     
@@ -307,7 +333,9 @@ class Ship extends GameObject {
     
             for (let engine of this.engines) {
                 engine.deaccelerate();
-            }            
+            }
+
+            this.shutdownRetroThrusters();
         }
     }
 
@@ -368,7 +396,7 @@ class Ship extends GameObject {
             }
         }
         
-        this.shutdownAllThrusters();
+        this.shutdownAttitudeThrusters();
     }
     
     
@@ -927,7 +955,10 @@ class Ship extends GameObject {
         } else {
             this.asphyxiate();
         }
-        
+    }
+    
+    get o2Percent(){
+        return this.oxygenQuantity/this.oxygenMax;
     }
     
     asphyxiate(){
@@ -946,11 +977,42 @@ class Ship extends GameObject {
     inflictDamage(amount){
         super.inflictDamage(amount);
 
-        if(this.healthPercentage<1 && !this.hullBreached){
+        if(this.healthPercentage<this.hullBreachAtHealthPercentage && !this.hullBreached){
             this.hullBreached = true;
-            if(this == this.game.player.ship) this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+            if(this == this.game.player.ship) {
+                this.gasLeakSound.play();
+                this.game.hud.showO2Panel();
+                this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+            }
         }
 
+    }
+
+    // Sounds
+    crash_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashSounds[this.game.rnd.integerInRange(0,this.crashSounds.length-1)].play();
+        }               
+    }
+    crashSoft_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashLightSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashLightSounds[this.game.rnd.integerInRange(0,this.crashLightSounds.length-1)].play();
+        }       
+        
     }
 
     

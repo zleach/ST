@@ -95,12 +95,7 @@ class Player extends GameObject {
             // Accel
             if (this.cursors.up.isDown) {
                 this.ship.accelerate();
-            } else {
-                this.ship.deaccelerate();
-            }
-
-            // Reverse
-            if (this.cursors.down.isDown) {
+            } else if(this.cursors.down.isDown) {
                 this.ship.goInReverse();
             } else {
                 this.ship.deaccelerate();

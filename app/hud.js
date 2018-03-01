@@ -12,6 +12,7 @@ class HUD {
         var backgroundColor = 0x3f3c46;
         this.background = this.group.add(new Phaser.Graphics(this.game.game,0,0));
 
+        this.masterAlarmSound = game.add.audio('master_alarm');
 
         this.sidebar = this.group.add(new Phaser.Graphics(this.game.game,0,0));
         this.sidebar.beginFill(0x111111);
@@ -264,6 +265,28 @@ class HUD {
             eIndex++;
         }
 
+        // Master Alarm
+        this.masterAlarmSprite = this.game.add.sprite(this.game.camera.width-200,10, 'master-alarm');
+        this.masterAlarmSprite.animations.add('blink');    
+        this.masterAlarmSprite.animations.play('blink', 5, true);
+        this.masterAlarmSprite.visible = false;
+        this.masterAlarmSprite.inputEnabled = true;
+        this.masterAlarmSprite.events.onInputUp.add(this.masterAlarmClicked, this);
+        this.group.add(this.masterAlarmSprite);
+
+        // O2
+        this.o2gauge = this.game.add.group();
+        this.group.add(this.o2gauge);
+        
+        this.o2gaugeBg = this.game.add.sprite(0,0, 'oxygen-gauge');
+        this.o2gaugeArrow = this.game.add.sprite(0,0, 'gauge-arrow');
+        this.group.add(this.o2gaugeBg);
+        this.group.add(this.o2gaugeArrow);
+        
+        this.o2gaugeBg.x = 32 - 100
+        this.o2gaugeArrow.x = this.o2gaugeBg.x + 8;
+        this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
+        this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
 /*
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
@@ -439,6 +462,7 @@ class HUD {
         }
     }
     
+
     purchaseReceipt(title,message,amount){
         var notification = new Notification(this.game);
         notification.text = title;
@@ -451,6 +475,29 @@ class HUD {
     
     showSystemInfo(){
         this.title(`${this.game.system.name} System`,moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'));
+    }
+    
+    set masterAlarm(alarm){
+        this.masterAlarmSprite.visible = alarm;
+        if(alarm){
+            this.masterAlarmSound.loopFull();
+        } else {
+            this.masterAlarmSound.stop();            
+        }
+    }
+    
+    masterAlarmClicked(){
+        this.masterAlarm = false;
+    }
+    
+    showO2Panel(){
+        this.masterAlarm = true;
+        game.add.tween(this.o2gaugeBg).to( {x: '+100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '+100'}, 600, "Quart.easeOut", true);        
+    }
+    
+    set o2Percent(o2){
+        this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
     update() {
@@ -466,6 +513,9 @@ class HUD {
         // EFI
         this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
         this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
+
+        // O2
+        this.o2Percent = this.game.player.ship.o2Percent;
         
         // Credits
         this.creditsText.setText(`${this.game.player.credits}`);
