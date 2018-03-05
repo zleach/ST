@@ -31,7 +31,7 @@ ITEMS.push(...[{
 	{
 		"key": "potatoes",
 		"name": "Potatoes",
-        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply.",
+        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply. Best when cut into strips and deep-fried.",
 		"type": "Commodity",
 		"rarity": "common",
 		"storageClass": "bulk",

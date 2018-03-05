@@ -12,10 +12,12 @@ class InventoryScreen extends GuiScreen {
         this.wrapper.visible = false;
 
         this.helpTexts = {
-            default : '(UP/DOWN) Select Item   (DELETE) Jettison',
-            equipment : '(UP/DOWN) Select Item   (DELETE) Jettison   (E) Equip/Unequip',
-            consumable : '(UP/DOWN) Select Item   (DELETE) Jettison   (SPACE) Use',
+            default : '(UP/DOWN) Select Item   (J) Jettison',
+            equipment : '(UP/DOWN) Select Item   (J) Jettison   (E) Equip/Unequip',
+            consumable : '(UP/DOWN) Select Item   (J) Jettison   (SPACE) Use',
         }
+
+        this.jettisonSound = game.add.audio('jettison');
 
     }
     
@@ -57,6 +59,12 @@ class InventoryScreen extends GuiScreen {
             this.consumeSelectedItem();
         }
         this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
+
+        this.jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
+        this.jKeyOnUp = function(){
+            this.jettisonSelectedItem();
+        }
+        this.jKey.onUp.add(this.jKeyOnUp, this);
     }
     
     setupScreen(){
@@ -311,6 +319,14 @@ class InventoryScreen extends GuiScreen {
         this.refreshItems();
         this.myList.layout();
     }
+
+    jettisonSelectedItem(){        
+        this.jettisonSound.play();
+        this.myList.selectedItem.remove();         
+        
+        this.refreshItems();
+        this.myList.layout();
+    }
     
     refreshItems(){
         this.myList.items = this.game.player.ship.inventory;
@@ -350,5 +366,6 @@ class InventoryScreen extends GuiScreen {
         this.iKey.onUp.remove(this.iKeyOnUp, this);
         this.eKey.onUp.remove(this.eKeyOnUp, this);
         this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
+        this.jKey.onUp.remove(this.jKeyOnUp, this);
     }    
 }

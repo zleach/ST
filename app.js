@@ -5,7 +5,7 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Mon Mar 5 02:08:39 PST 2018  */
+/* Last merge : Mon Mar 5 11:34:08 PST 2018  */
 
 /* Merging order :
 
@@ -135,6 +135,8 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-ship', 'assets/minimap-ship.png');
         this.load.image('dock-arrow', 'assets/dock-indicator.png');
         this.load.image('nav-arrow', 'assets/nav-arrow.png');
+        this.load.image('crate-tiny', 'assets/crate-tiny.png');
+        this.load.image('crate-micro', 'assets/crate-micro.png');
 
         // Alarm
         this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
@@ -219,6 +221,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.audio('equip', 'assets/audio/equip.mp3');
         this.load.audio('unequip', 'assets/audio/unequip.mp3');
         this.load.audio('repair-light', 'assets/audio/repair-light.mp3');
+        this.load.audio('jettison', 'assets/audio/jettison.mp3');
 
         this.load.audio('mining-laser', 'assets/audio/mining-laser.mp3');
         
@@ -588,7 +591,7 @@ ITEMS.push(...[{
 	{
 		"key": "potatoes",
 		"name": "Potatoes",
-        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply.",
+        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply. Best when cut into strips and deep-fried.",
 		"type": "Commodity",
 		"rarity": "common",
 		"storageClass": "bulk",
@@ -18130,7 +18133,11 @@ class InventoryObject {
 
     get readableMass(){
         return `${numeral(this.mass).format('0,0')} kg`
-    }        
+    }
+    
+    remove(){
+        this.parentObject.removeItemFromInventory(this);
+    }    
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -18905,6 +18912,12 @@ class Ship extends GameObject {
         this.game.ps.addData('hyperDrive', hyperData);
         this.hyperDriveEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
         this.hyperDriveEmitter.addToWorld();
+
+        // Cargo Jettison
+        this.cargoJettisonEmitter = game.add.emitter(0, 0, 3);    
+        this.cargoJettisonEmitter.makeParticles('crate-tiny');
+        this.cargoJettisonEmitter.gravity = 0;
+        this.cargoJettisonEmitter.setAlpha(1,0,1000);
     }
     
     positionInfo(){
@@ -19052,6 +19065,8 @@ class Ship extends GameObject {
     }
     
     accelerate() {
+        this.playJettisonCargoAnimation();
+
         if(!this.isDocked){
             // Not Docked
             var totalThurst = 0;
@@ -19667,6 +19682,14 @@ class Ship extends GameObject {
         bullet.kill();
         return false; // Never collides, just dies.
     }
+    
+    playJettisonCargoAnimation(){
+        this.cargoJettisonEmitter.setAngle(this.sprite.angle+90-30,this.sprite.angle+90+30);
+        this.cargoJettisonEmitter.x = this.sprite.x;
+        this.cargoJettisonEmitter.y = this.sprite.y;
+        this.cargoJettisonEmitter.start(true, 5000, null, 1);
+    }
+    
 
     // HyperDrive™
     toggleHyperDrive(){
@@ -19818,6 +19841,8 @@ class Ship extends GameObject {
         if(this.hullBreached){
             this.ventAtmosphere();
         }
+
+        // Cargo
 
         // Hyperdrive
         if(this.hyperDriveEngaged) this.hyperDriveUpdate();
@@ -22465,10 +22490,12 @@ class InventoryScreen extends GuiScreen {
         this.wrapper.visible = false;
 
         this.helpTexts = {
-            default : '(UP/DOWN) Select Item   (DELETE) Jettison',
-            equipment : '(UP/DOWN) Select Item   (DELETE) Jettison   (E) Equip/Unequip',
-            consumable : '(UP/DOWN) Select Item   (DELETE) Jettison   (SPACE) Use',
+            default : '(UP/DOWN) Select Item   (J) Jettison',
+            equipment : '(UP/DOWN) Select Item   (J) Jettison   (E) Equip/Unequip',
+            consumable : '(UP/DOWN) Select Item   (J) Jettison   (SPACE) Use',
         }
+
+        this.jettisonSound = game.add.audio('jettison');
 
     }
     
@@ -22510,6 +22537,12 @@ class InventoryScreen extends GuiScreen {
             this.consumeSelectedItem();
         }
         this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
+
+        this.jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
+        this.jKeyOnUp = function(){
+            this.jettisonSelectedItem();
+        }
+        this.jKey.onUp.add(this.jKeyOnUp, this);
     }
     
     setupScreen(){
@@ -22764,6 +22797,14 @@ class InventoryScreen extends GuiScreen {
         this.refreshItems();
         this.myList.layout();
     }
+
+    jettisonSelectedItem(){        
+        this.jettisonSound.play();
+        this.myList.selectedItem.remove();         
+        
+        this.refreshItems();
+        this.myList.layout();
+    }
     
     refreshItems(){
         this.myList.items = this.game.player.ship.inventory;
@@ -22803,6 +22844,7 @@ class InventoryScreen extends GuiScreen {
         this.iKey.onUp.remove(this.iKeyOnUp, this);
         this.eKey.onUp.remove(this.eKeyOnUp, this);
         this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
+        this.jKey.onUp.remove(this.jKeyOnUp, this);
     }    
 }
 

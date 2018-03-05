@@ -180,6 +180,12 @@ class Ship extends GameObject {
         this.game.ps.addData('hyperDrive', hyperData);
         this.hyperDriveEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
         this.hyperDriveEmitter.addToWorld();
+
+        // Cargo Jettison
+        this.cargoJettisonEmitter = game.add.emitter(0, 0, 3);    
+        this.cargoJettisonEmitter.makeParticles('crate-tiny');
+        this.cargoJettisonEmitter.gravity = 0;
+        this.cargoJettisonEmitter.setAlpha(1,0,1000);
     }
     
     positionInfo(){
@@ -327,6 +333,8 @@ class Ship extends GameObject {
     }
     
     accelerate() {
+        this.playJettisonCargoAnimation();
+
         if(!this.isDocked){
             // Not Docked
             var totalThurst = 0;
@@ -942,6 +950,14 @@ class Ship extends GameObject {
         bullet.kill();
         return false; // Never collides, just dies.
     }
+    
+    playJettisonCargoAnimation(){
+        this.cargoJettisonEmitter.setAngle(this.sprite.angle+90-30,this.sprite.angle+90+30);
+        this.cargoJettisonEmitter.x = this.sprite.x;
+        this.cargoJettisonEmitter.y = this.sprite.y;
+        this.cargoJettisonEmitter.start(true, 5000, null, 1);
+    }
+    
 
     // HyperDrive™
     toggleHyperDrive(){
@@ -1093,6 +1109,8 @@ class Ship extends GameObject {
         if(this.hullBreached){
             this.ventAtmosphere();
         }
+
+        // Cargo
 
         // Hyperdrive
         if(this.hyperDriveEngaged) this.hyperDriveUpdate();

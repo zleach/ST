@@ -59,6 +59,8 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-ship', 'assets/minimap-ship.png');
         this.load.image('dock-arrow', 'assets/dock-indicator.png');
         this.load.image('nav-arrow', 'assets/nav-arrow.png');
+        this.load.image('crate-tiny', 'assets/crate-tiny.png');
+        this.load.image('crate-micro', 'assets/crate-micro.png');
 
         // Alarm
         this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
@@ -143,6 +145,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.audio('equip', 'assets/audio/equip.mp3');
         this.load.audio('unequip', 'assets/audio/unequip.mp3');
         this.load.audio('repair-light', 'assets/audio/repair-light.mp3');
+        this.load.audio('jettison', 'assets/audio/jettison.mp3');
 
         this.load.audio('mining-laser', 'assets/audio/mining-laser.mp3');
         

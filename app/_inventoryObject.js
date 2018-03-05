@@ -53,5 +53,9 @@ class InventoryObject {
 
     get readableMass(){
         return `${numeral(this.mass).format('0,0')} kg`
-    }        
+    }
+    
+    remove(){
+        this.parentObject.removeItemFromInventory(this);
+    }    
 }
