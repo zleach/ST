@@ -13,6 +13,11 @@ class ExchangeScreen extends GuiScreen {
         this.insetBottom = 32;
         this.top = 94;
 
+        this.helpTexts = {
+            default : '(UP/DOWN) Select Item   (SPACEBAR) Buy/Sell Item   (TAB) Switch List   (RETURN) Accept',
+            shift : '(UP/DOWN) Select Item   (SHIFT+SPACEBAR) Buy/Sell All   (TAB) Switch List   (RETURN) Accept',
+        }
+
         // BG
         this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
         this.panelBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
@@ -81,11 +86,11 @@ class ExchangeScreen extends GuiScreen {
         // Help Text
         this.helpText = this.game.add.text(
             this.insetX,this.game.camera.height - this.insetBottom-16, 
-            '(UP/DOWN) Select Item   (SPACEBAR) Buy/Sell Item   (TAB) Switch List   (RETURN) Accept', 
+            this.helpTexts.default, 
             { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
             this.screen
         )
-        this.infoTitleLabel.resolution = 2;
+        this.helpText.resolution = 2;
 
 
         // Sale Amount
@@ -309,6 +314,13 @@ class ExchangeScreen extends GuiScreen {
         this.updateSaleAmount();
     }
     
+    transferAllOfSelectedItem(){
+        var amount = this.activeList.amountOfSelectedItem;
+        for (var i = 0; i < amount; i++) { 
+            this.transferSelectedItem();
+        }
+    }
+    
     transferSelectedItem(){
         var item = this.activeList.selectedItem; 
                
@@ -382,6 +394,7 @@ class ExchangeScreen extends GuiScreen {
         var destinationItems = [].concat.apply([], this.exchangeList.items);
         this.destination.emptyCargoHold();
         for (let item of destinationItems) {
+            item.equipped = false;
             this.destination.addItemsToInventory(1,item);
         }
         
@@ -425,6 +438,7 @@ class ExchangeScreen extends GuiScreen {
         this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
         this.tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
         this.enterKey = game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
+        this.shiftKey = game.input.keyboard.addKey(Phaser.Keyboard.SHIFT);
 
         this.downKeyOnUp = function(){
             this.activeList.selectNextItem();
@@ -439,7 +453,11 @@ class ExchangeScreen extends GuiScreen {
         this.upKey.onUp.add(this.upKeyOnUp, this);
 
         this.spaceKeyOnUp = function(){
-            this.transferSelectedItem();
+            if(this.spaceKey.shiftKey){
+                this.transferAllOfSelectedItem();
+            } else {
+                this.transferSelectedItem();
+            }
             this.update();
         }
         this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
@@ -455,6 +473,16 @@ class ExchangeScreen extends GuiScreen {
             this.update();
         }
         this.enterKey.onUp.add(this.enterKeyOnUp, this);
+
+        // Help Text Changes with shift key
+        this.shiftKeyOnDown = function(){
+            this.helpText.setText(this.helpTexts.shift)
+        }
+        this.shiftKey.onDown.add(this.shiftKeyOnDown, this);
+        this.shiftKeyOnUp = function(){
+            this.helpText.setText(this.helpTexts.default);
+        }
+        this.shiftKey.onUp.add(this.shiftKeyOnUp, this);
     }
         
     layout(){        
@@ -490,5 +518,8 @@ class ExchangeScreen extends GuiScreen {
         this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
         this.tabKey.onUp.remove(this.tabKeyOnUp, this);
         this.enterKey.onUp.remove(this.enterKeyOnUp, this);
+
+        this.shiftKey.onUp.remove(this.shiftKeyOnUp, this);
+        this.shiftKey.onDown.remove(this.shiftKeyOnDown, this);
    }
 }

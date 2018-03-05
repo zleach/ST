@@ -1,6 +1,9 @@
 class SmallEngine extends Engine {
-    constructor(game,parentObject) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
+
+        this.name = 'Small Engine';
+        this.key = 'small_engine';
 
         this.thrust = 130;
         this.maxSpeed = 150;

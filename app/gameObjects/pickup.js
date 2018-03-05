@@ -3,9 +3,7 @@ class Pickup extends GameObject {
         super(game);
      
         this.group = group        
-        this.magneticDistance = 150;
-    
-        this.contents = new InventoryObject(this.game);
+        this.magneticDistance = 150;    
     }
 
     pickedUpBy(object){

@@ -16,6 +16,8 @@ class Ship extends GameObject {
             }
         }
         
+        this.isShip = true;
+        
         this.xStart = x;
         this.yStart = y;
 
@@ -25,9 +27,10 @@ class Ship extends GameObject {
 
         this.fuelQuantity = 0;
         this.energyQuantity = 0;
+        this.maxEnergy = 0;
         this.oxygenQuantity = 3000;
         this.oxygenMax = 3000;
-        this.hullBreachAtHealthPercentage = .2;
+        this.hullBreachAtHealthPercentage = .40;
         this.hullBreached = false;
         this.O2Critical = false;
 
@@ -45,8 +48,11 @@ class Ship extends GameObject {
         this.navigationIndex = -1;
 
         // Sounds
-/*
+        this.infoSound = game.add.audio('beep-beep');
         this.gasLeakSound = game.add.audio('gas-leak');
+        this.dockConnectSound = game.add.audio('dock-connect');
+        this.dockReleaseSound = game.add.audio('dock-release');
+        this.navTargetChangedSound = game.add.audio('blorp');
         this.crashSounds = [
             game.add.audio('crash-1'),
             game.add.audio('crash-2'),
@@ -59,7 +65,11 @@ class Ship extends GameObject {
             game.add.audio('crash-light-1'),
             game.add.audio('crash-light-2'),
         ]        
-*/
+
+        this.crashThudSounds = [
+            game.add.audio('crash-thud-1'),
+            game.add.audio('crash-thud-2'),
+        ]        
     }
     
     setupSprite(sprite){
@@ -98,6 +108,9 @@ class Ship extends GameObject {
         // Health
         this.health = this.specs.health;
         this.maxHealth = this.specs.health;
+        
+        // Fuel
+        this.maxFuel = this.specs.maxFuel
         
         // Info
         this.name = this.specs.name;
@@ -194,8 +207,6 @@ class Ship extends GameObject {
     }
 
     equipWeaponInSlot(weapon,slot){
-        weapon.equiped = true;
-        
         this.weapons.push(weapon);
         
         weapon.weapon.trackSprite(
@@ -207,13 +218,38 @@ class Ship extends GameObject {
         );
     }
 
+    unequipWeapon(weapon){
+        weapon.equipped = false;
+
+        var index = this.weapons.indexOf(weapon);
+        if (index > -1) {
+            this.weapons.splice(index, 1);
+        }
+    }
+
     // Engines
     equipEngineInSlot(engine,slot){
         // Equip
-        engine.equiped = true;
         this.engines.push(engine);
+
+        engine.parentObject = this;
         engine.slot = slot;
         
+        this.calculateMaxSpeed(); 
+    }
+    
+    unequipEngine(engine){
+        engine.equipped = false;
+        
+        var index = this.engines.indexOf(engine);
+        if (index > -1) {
+            this.engines.splice(index, 1);
+        }
+        
+        this.calculateMaxSpeed();
+    }
+
+    calculateMaxSpeed(){
         // Calculate new max speed (average of engine max speeds)
         var maxSpeed = 0;
         for (let engine of this.engines) {
@@ -221,6 +257,7 @@ class Ship extends GameObject {
         }
         this.maxSpeed = maxSpeed/10 // No idea.
     }
+    
     
     setupRCSThrusters(){
         if(this.specs.RCS != undefined){
@@ -232,7 +269,10 @@ class Ship extends GameObject {
     }    
     
     addThruster(thruster,layout){
-        this.thrusters[thruster] = new Thruster(this.game,this,layout)
+        this.thrusters[thruster] = new Thruster(this.game,{
+            parentObject : this,
+            layout : layout,
+        })
         
         // Hande retro thrusters
         if(layout.retro !=undefined){
@@ -268,8 +308,16 @@ class Ship extends GameObject {
     
     // Equipment
     equipEquipmentInSlot(equipment,slot){
-        equipment.equiped = true;
         this.equipment.push(equipment);
+    }
+
+    unequipEquipment(equipment){
+        equipment.equipped = false;
+        
+        var index = this.equipment.indexOf(equipment);
+        if (index > -1) {
+            this.equipment.splice(index, 1);
+        }
     }
 
     
@@ -495,6 +543,8 @@ class Ship extends GameObject {
         if(this.navigationIndex>this.navigatableObjects.length-1){
             this.navigationIndex = -1;   
         }
+
+        this.navTargetChangedSound.play();
         
         this.setNavigationTargetToCurrentNavigationTargetIndex();
     }
@@ -564,7 +614,7 @@ class Ship extends GameObject {
     
     // Fuel Mgmt
     refuel(){
-        this.fuelQuantity = this.specs.maxFuel;
+        this.fuelQuantity = this.maxFuel;
         this.lowFuelLightShown = false;
     }
     
@@ -592,7 +642,7 @@ class Ship extends GameObject {
     }
     
     get fuelPercentage(){
-        return Math.round((this.fuelQuantity/this.specs.maxFuel)*100)        
+        return Math.round((this.fuelQuantity/this.maxFuel)*100)        
     }
 
     get hasFuel(){
@@ -605,16 +655,16 @@ class Ship extends GameObject {
     
     // Energy Management
     recharge(){
-        this.energyQuantity = this.specs.maxEnergy;
+        this.energyQuantity = this.maxEnergy;
     }
     
     charge(amount){
-        if(this.energyQuantity <= this.specs.maxEnergy){
+        if(this.energyQuantity <= this.maxEnergy){
             this.energyQuantity += amount;
         }
         
-        if(this.energyQuantity>=this.specs.maxEnergy){
-            this.energyQuantity = this.specs.maxEnergy;
+        if(this.energyQuantity>=this.maxEnergy){
+            this.energyQuantity = this.maxEnergy;
         }
     }
             
@@ -627,7 +677,7 @@ class Ship extends GameObject {
     }
     
     get energyPercentage(){
-        var value = Math.round((this.energyQuantity/this.specs.maxEnergy)*100);
+        var value = Math.round((this.energyQuantity/this.maxEnergy)*100);
         return Math.max(value,0);
     }
         
@@ -775,9 +825,12 @@ class Ship extends GameObject {
     }
     
     dockingComplete(){
+        
         var target = this.target;
         var dockedShip = this.dockedShip;
         var portNumber = this.portNumber; // What docking port am i at?
+
+        this.target.dockConnectSound.play();
         
         target.sprite.body.loadPolygon(null,target.specs.polygon);       
         target.sprite.body.dynamic = true
@@ -800,6 +853,7 @@ class Ship extends GameObject {
 
     releaseDock(){
         if(this.hardDocked && this.isDocked){
+            this.dockReleaseSound.play();
             game.physics.p2.removeConstraint(this.dockingConstraint);
             
     	    var emitter = this.game.add.emitter(0,0,100);
@@ -834,6 +888,8 @@ class Ship extends GameObject {
     // Info
     showInfoIfNeeded(){
         if(this.shouldShowInfo && !this.infoShowing){
+            this.infoSound.play();
+
             this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
             //this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
             
@@ -1012,7 +1068,18 @@ class Ship extends GameObject {
         if(!isPlayingAnySound){
             this.crashLightSounds[this.game.rnd.integerInRange(0,this.crashLightSounds.length-1)].play();
         }       
+    }
+    crashThud_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashThudSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
         
+        if(!isPlayingAnySound){
+            this.crashThudSounds[this.game.rnd.integerInRange(0,this.crashThudSounds.length-1)].play();
+        }       
     }
 
     

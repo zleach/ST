@@ -14,6 +14,7 @@ class ArrivalScreen extends GuiScreen {
         this.wrapper = group;
         this.wrapper.add(this.screen);
         this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
 
         this.controlGroup = this.game.add.group();
         this.screen.add(this.controlGroup);
@@ -24,6 +25,7 @@ class ArrivalScreen extends GuiScreen {
         escKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
         }, this);
+
         var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
         lKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
@@ -38,7 +40,7 @@ class ArrivalScreen extends GuiScreen {
         // Background
         this.bg.clear();
         this.bg.beginFill(this.styles.darkGrey);
-        this.bg.drawRoundedRect(0,0,
+        this.bg.drawRect(0,0,
             this.game.camera.width,
             this.game.camera.height*2,
             0
@@ -238,6 +240,8 @@ class ArrivalScreen extends GuiScreen {
     
     show(){
         super.show();
+
+        this.wrapper.visible = true;
         
         // Arrival Specific 
         this.game.player.stop();                

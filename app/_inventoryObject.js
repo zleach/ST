@@ -1,29 +1,38 @@
 // Things you can pickup and sell.
 class InventoryObject {
-    constructor(game,options = false) {
+    constructor(game,options) {
         this.game = game;
-
+        
         this.name = 'Unknown Object';
         this.baseValue = 0;
         this.type = 'Unknown'
         this.mass = 0;
         this.rarity = RARITY.common;
+
+        this.infoFields = ['baseValue','mass','rarity','storageClass'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','Container'];
+
+        if(options.data) this.initWithData(options.data);
+    }
     
-        if(options) this.initWithData(options);
-    }    
-    
-    initWithData(options){
-        for(var prop in options) this[prop] = options[prop]
+    initWithData(data){
+        for(var prop in data) this[prop] = data[prop]
     }
 
-    static make(key,options = {}){
+    static make(key,game){
         var data = ITEMS.filter(function(e) {
             return e.key == key;
         })[0];
-        
+                
         if(!data) return false; // No Key found
         
-        return new InventoryObject(game,data);
+        if(data._class){
+            // Specific Subclass
+            return eval("new " + data._class + "(game,{data : data})");
+        } else {
+            // Generic
+            return new InventoryObject(game,{data:data});
+        }        
     }
 
     get buyValue(){
@@ -44,5 +53,5 @@ class InventoryObject {
 
     get readableMass(){
         return `${numeral(this.mass).format('0,0')} kg`
-    }    
+    }        
 }

@@ -5,7 +5,7 @@ class BasicMiner extends Ship {
         this.specs = {
             name : 'MV Fair Rosamond',
             description : 'Cobalt Class Mining Vessel',
-            health: 100,
+            health: 130,
             turnDecay: .03,
             turnAccel: .1,
             leftRightThrust: 100,
@@ -13,7 +13,7 @@ class BasicMiner extends Ship {
             reverseThrust: 100,
             maxReverse: 90,
             maxFuel : 2200,
-            maxEnergy: 100,
+            maxEnergy: 0,
             mass: 2, // Tons
             equipmentSlots : 4,
             centerOfGravity : {
@@ -41,13 +41,6 @@ class BasicMiner extends Ship {
                 offsetY : -8,
             },
             weaponSlots : [
-                {
-                    position : {
-                        x: 0,
-                        y: 0
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                },
                 {
                     position : {
                         x: 9,
@@ -106,34 +99,16 @@ class BasicMiner extends Ship {
                 inUse: false,
             },
             storage : {
-                bulk : 300,
+                equipment : 500,
+                bulk : 800,
             }
         }
 
         // Sprites
-        
-        
         this.sprite = this.game.add.sprite(x,y, 'mining_ship');
         this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
 
         this.setupSprite(this.sprite);
-
-        // Weapons
-        var miningLaser = new BasicMiningLaser(this.game,this);
-        this.equipWeaponInSlot(miningLaser,1);
-
-        //var blaster = new BasicBlaster(this.game,this);
-        //this.equipWeaponInSlot(blaster,1);
-
-        // Engine
-        var engine = new BasicEngine(this.game,this);
-        this.equipEngineInSlot(engine,0);
-        this.refuel();
-
-        // Reactor
-        var reactor = new Reactor(this.game,this);
-        this.equipEquipmentInSlot(reactor,0);
-        this.recharge();
         
         // Cargo
         this.emptyCargoHold();

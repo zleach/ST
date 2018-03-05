@@ -3,7 +3,8 @@ class Asteroid extends GameObject {
         super(game);
      
         this.group = group
-           
+        this.emitFlakes = false;
+        
         if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
         if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
         if(size==undefined) size = 'large';
@@ -63,16 +64,32 @@ class Asteroid extends GameObject {
 
         this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
         this.sprite.anchor.set(0.5);
+
+        this.hitEmitter = this.game.add.emitter(0, 0, 100);
+        this.hitEmitter.makeParticles('asteroid-flake-3');
+        this.hitEmitter.minParticleScale = .5;
+        this.hitEmitter.maxParticleScale = 1;
+        this.hitEmitter.gravity = 0;
+        this.hitEmitter.particleBringToTop = true;
+        
+        this.explodeSounds = [
+            game.add.audio('rock-crash-1'),
+            game.add.audio('rock-crash-2'),
+            game.add.audio('rock-crash-3'),
+            game.add.audio('rock-crash-4'),
+            game.add.audio('rock-crash-5'),
+            game.add.audio('rock-crash-6'),
+        ]
+        this.damageSound = game.add.audio('crunch-1');
+        this.soundCountdown = 10;
     }
 
     hit(bullet){
-	    var emitter = this.game.add.emitter(bullet.x, bullet.y, 100);
-        emitter.makeParticles('asteroid-flake-3');
-        emitter.minParticleScale = .5;
-        emitter.maxParticleScale = 1;
-        emitter.gravity = 0;
-        emitter.explode(200, 1);
-        this.game.time.events.add(500, this.destroyEmitter, emitter);        
+	    this.hitEmitter.x = bullet.x;
+	    this.hitEmitter.y = bullet.y;	
+	    this.emitFlakes = true;
+	    this.soundCountdown = 10;
+	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
     }
         
     kill(){
@@ -104,24 +121,32 @@ class Asteroid extends GameObject {
         } else if(this.size=='tiny'){
             this.destroy();
         }
+        this.damageSound.stop();
     } 
        
     explode(){
 	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
 	    this.game.asteroids.add(emitter);
-        emitter.makeParticles('asteroid-flake-1');
+        emitter.makeParticles('asteroid-flake-1',0,7);
         emitter.gravity = 0;
         emitter.maxRotation = 100;
         emitter.minRotation = 30;
         emitter.minParticleScale = .5;
         emitter.maxParticleScale = 1;
-        emitter.explode(3500, game.rnd.integerInRange(5, 10));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);        
+        emitter.explode(6000, game.rnd.integerInRange(3, 7));
+        this.game.time.events.add(5000, this.destroyEmitter, emitter);
+        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
     }
     
     // Rendering
     update() {
         super.update();
+        
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
         
         // Spin
         this.sprite.body.angularVelocity = this.roationSpeed;                

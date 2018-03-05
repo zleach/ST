@@ -1,0 +1,51 @@
+ITEMS.push(...[{
+		"key": "meteoric_iron",
+		"name": "Meteoric Iron",
+		"type": "Mineral",
+        "description" : "This dark mineral is a prized posession of 'belt miners. Apart from minor amounts of telluric iron, meteoric iron is the only naturally occurring native metal of the element iron on the Earth's surface.",
+		"rarity": "uncommon",
+		"storageClass": "bulk",
+		"baseValue": 32,
+		"mass": 15
+	},
+	{
+		"key": "raw_paladium",
+		"name": "Raw Paladium",
+		"type": "Mineral",
+        "description" : "A bright coppery and very hard ore. The interconnects of most modern hyperdrive systems rely in this and other rare mineral based alloys.",
+		"rarity": "rare",
+		"storageClass": "bulk",
+		"baseValue": 65,
+		"mass": 20
+	},
+	{
+		"key": "asteroid_flake",
+		"name": "Asteroid Flake",
+		"type": "Mineral",  
+        "description" : "A blackish grey flake, found after mining most asteroids. If you didn't know any better, you'd think it was worthless dust.",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 12,
+		"mass": 10
+	},
+	{
+		"key": "potatoes",
+		"name": "Potatoes",
+        "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply.",
+		"type": "Commodity",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 65,
+		"mass": 100
+	},
+	{
+		"key": "coffee",
+		"name": "Coffee",
+        "description" : "Coffee keeps the galaxy running. These beans are the seeds of berries from the Coffea plant. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+		"type": "Commodity",
+		"rarity": "uncommon",
+		"storageClass": "bulk",
+		"baseValue": 1270,
+		"mass": 100
+	},
+]);

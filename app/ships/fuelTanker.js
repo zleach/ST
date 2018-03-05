@@ -138,6 +138,7 @@ class FuelTanker extends Ship {
         //this.equipWeaponInSlot(blaster,1);
 
         // Engine
+/*
         var engine = new BasicEngine(this.game,this);
         this.equipEngineInSlot(engine,0);
         this.refuel();
@@ -146,6 +147,7 @@ class FuelTanker extends Ship {
         var reactor = new Reactor(this.game,this);
         this.equipEquipmentInSlot(reactor,0);
         this.recharge();
+*/
         
         // Cargo
         this.emptyCargoHold();

@@ -23,6 +23,8 @@ class GameObject {
         this.inventory = [];
         this.itemsAccumulating = false;
         this.itemsAccumulator = [];     
+
+        this.dingSound = game.add.audio('pickup-1');
     }
     
     setupSprite(sprite){
@@ -159,6 +161,8 @@ class GameObject {
 
             game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, itemText);
         }.bind(this));
+        
+        this.dingSound.play();
     }
 
     // Inventory
@@ -204,13 +208,18 @@ class GameObject {
     removeItemsFromInventory(items){
         var removedItems = [];
         for (let item of items) {
-            var index = this.inventory.indexOf(item);
-            if (index > -1) {
-                this.removedItems.push(item);
-                this.inventory.splice(index, 1);
-            }
+            removedItems.push(item);
+            this.removeItemFromInventory(item);
         }
         return removedItems;
+    }
+
+    removeItemFromInventory(item){
+        var index = this.inventory.indexOf(item);
+        if (index > -1) {
+            this.inventory.splice(index, 1);
+        }
+        return true;
     }
 
     // Cargo
@@ -221,6 +230,7 @@ class GameObject {
         this.freeSpace[CARGO_STORAGE_CLASS.passengers] = this.specs.storage.passengers;
         this.freeSpace[CARGO_STORAGE_CLASS.gas] = this.specs.storage.gas;
         this.freeSpace[CARGO_STORAGE_CLASS.liquid] = this.specs.storage.liquid;
+        this.freeSpace[CARGO_STORAGE_CLASS.equipment] = this.specs.storage.equipment;
     }
     
     // Lifecycle

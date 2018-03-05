@@ -14,12 +14,18 @@ class HUD {
 
         this.masterAlarmSound = game.add.audio('master_alarm');
 
+        // Updaters
+        game.time.events.loop(Phaser.Timer.SECOND * .25, this.slowUpdate, this);
+        game.time.events.loop(Phaser.Timer.SECOND * 1, this.verySlowUpdate, this);
+
+        // Sidebar
+        this.sidebarWidth = 140;
         this.sidebar = this.group.add(new Phaser.Graphics(this.game.game,0,0));
         this.sidebar.beginFill(0x111111);
         this.sidebar.drawRect(
             x-20,
             0,
-            200,
+            this.sidebarWidth,
             this.game.camera.height,
             
         )
@@ -55,32 +61,7 @@ class HUD {
         
         // Navigation
         this.navigationGroup = this.game.add.group()
-/*
-        this.navBackground = this.navigationGroup.add(new Phaser.Graphics(this.game.game,0,0));
-        this.navBackground.beginFill(backgroundColor);
-        this.navBackground.drawRoundedRect(
-            20,
-            20,
-            this.minimap.width,
-            53,
-            borderRadius
-        )
-        this.background.endFill();
-*/
         this.group.add(this.navigationGroup)
-        
-/*
-        this.navLabel = new Phaser.BitmapText(
-            this.game.game, 
-            20,
-            20,
-            'pixelmix_8',
-            'NAVIGATION',
-            5
-        );  
-        this.navLabel.tint = 0x948f9c;
-        this.navigationGroup.add(this.navLabel)
-*/
 
         this.navDestDisplay = new Phaser.BitmapText(
             this.game.game, 
@@ -139,11 +120,10 @@ class HUD {
         this.navigationGroup.add(this.navDistanceDisplay)
 
         // EFI
-        this.fuelProgressBar = new ProgressBar(this.game,this,'FUEL',x-8,y+8);
-        this.game.register(this.fuelProgressBar)
+        this.healthProgressBar = new ProgressBar(this.game,this,'HULL',x-8,y+8);
+        this.fuelProgressBar = new ProgressBar(this.game,this,'FUEL',x-8,y+43);
+        this.energyProgressBar = new ProgressBar(this.game,this,'ENERGY',x-8,y+78);
 
-        this.energyProgressBar = new ProgressBar(this.game,this,'ENERGY',x-8,y+43);
-        this.game.register(this.energyProgressBar)
 
         // Credits
         this.creditsText = new Phaser.BitmapText(
@@ -166,16 +146,6 @@ class HUD {
         );  
         this.creditsLabel.tint = 0x948f9c;
         this.group.add(this.creditsLabel)
-/*
-        this.background.beginFill(backgroundColor);
-        this.background.drawRoundedRect(
-            x-padding,
-            this.creditsText.y-padding,
-            width+padding*2,
-            lineHeight+padding+4,
-            borderRadius)
-        this.background.endFill();
-*/
 
         // Cargo
         this.cargoText = {};
@@ -183,9 +153,9 @@ class HUD {
         this.cargoLabel = new Phaser.BitmapText(
             this.game.game, 
             x-8,
-            y+105,
+            y+142,
             'pixelmix_8',
-            'CARGO',
+            'CARGO (kg)',
             5
         );  
         this.cargoLabel.tint = 0x948f9c;
@@ -221,6 +191,7 @@ class HUD {
         this.equipmentText = {};
         var eIndex = 0;
         var equipmentHeight = 0;
+/*
         this.equipmentLabel = new Phaser.BitmapText(
             this.game.game, 
             x-8,
@@ -231,39 +202,38 @@ class HUD {
         );  
         this.equipmentLabel.tint = 0x948f9c;
         this.group.add(this.equipmentLabel)
+*/
         var equipmentList = this.game.player.ship.equipment.concat(this.game.player.ship.weapons);        
+/*
         for (let equipment of equipmentList) {
             var name = equipment.name;
-            if(equipment.isWeapon && equipment.equiped){
-                name = `> ${name}`
+            if(equipment.equipped){
+                var equipmentNameLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    (this.equipmentLabel.y+padding)+(lineHeight*eIndex)+padding,
+                    'pixelmix_8',
+                    name,
+                    5
+                );
+                this.group.add(equipmentNameLabel);
+                equipmentNameLabel.anchor.set(0,0);
+    
+                var equipmentStatusLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x+108,
+                    equipmentNameLabel.y,
+                    'pixelmix_8',
+                    equipment.status,
+                    5
+                );
+                equipmentStatusLabel.tint = 0x948f9c;
+                this.group.add(equipmentStatusLabel);
+                equipmentStatusLabel.anchor.set(1,0);
             }
-
-            var equipmentNameLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x-8,
-                (this.equipmentLabel.y+padding)+(lineHeight*eIndex)+padding,
-                'pixelmix_8',
-                name,
-                5
-            );
-            this.group.add(equipmentNameLabel);
-            equipmentNameLabel.anchor.set(0,0);
-
-            var equipmentStatusLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x+108,
-                equipmentNameLabel.y,
-                'pixelmix_8',
-                equipment.status,
-                5
-            );
-            equipmentStatusLabel.tint = 0x948f9c;
-            this.group.add(equipmentStatusLabel);
-            equipmentStatusLabel.anchor.set(1,0);
-
-
             eIndex++;
         }
+*/
 
         // Master Alarm
         this.masterAlarmSprite = this.game.add.sprite(this.game.camera.width-200,10, 'master-alarm');
@@ -288,23 +258,22 @@ class HUD {
         this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
         this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
-/*
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
-            var equipmentType = this.game.player.ship.specs.storage[key];
-    
-            var equipmentTypeLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x-8,
-                this.equipmentText[key].y,
-                'pixelmix_8',
-                key.charAt(0).toUpperCase() + key.slice(1),
-                5
-            );
-            equipmentTypeLabel.tint = 0x948f9c;
-            this.group.add(equipmentTypeLabel);
-            equipmentHeight = (index*lineHeight)+padding*4;
+            if(this.equipmentText[key]){
+                var equipmentType = this.game.player.ship.specs.storage[key];    
+                var equipmentTypeLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    this.equipmentText[key].y,
+                    'pixelmix_8',
+                    key.charAt(0).toUpperCase() + key.slice(1),
+                    5
+                );
+                equipmentTypeLabel.tint = 0x948f9c;
+                this.group.add(equipmentTypeLabel);
+                equipmentHeight = (index*lineHeight)+padding*4;
+            }
         }.bind(this));
-*/
 
 
         // MESSAGES
@@ -347,6 +316,9 @@ class HUD {
         this.blinkyMessageText.anchor.x = .5;
         this.blinkyMessageText.fixedToCamera = true;
         this.blinkyMessageText.tint = 0xe74c3c;
+
+        this.verySlowUpdate();
+        this.slowUpdate();
     }
     
     title(message,submessage){
@@ -425,39 +397,31 @@ class HUD {
     }
     
     updateNavigationDisplay(){
-        var player = this.game.player.ship;
-        var target = player.navigationTarget;
-        if(target==null){
-            this.navDestDisplay.setText('Navigation Off');
-            this.navigationGroup.visible = false;
-            this.navigationArrow.visible = false;
-        } else {
-            this.navDestDisplay.setText(`> ${target.name} (${target.description})`);
-            this.navETADisplay.setText(`${this.game.player.ship.formattedTimeToCurrentNavigationTarget}`);
-            this.navDistanceDisplay.setText(`${this.game.player.ship.formattedDistanceToCurrentNavigationTarget}`);        
-            this.navigationGroup.visible = true;
-                        
-            if(player.distanceToCurrentNavigationTarget>150){
-                this.navigationArrow.visible = true;
-                
-                this.navigationArrow.angle = player.angleToCurrentNavigationTarget;
-                this.navigationArrow.x = this.game.player.ship.sprite.x - this.game.camera.x;
-                this.navigationArrow.y = this.game.player.ship.sprite.y - this.game.camera.y;                
+        if(this.navDestDisplay!=undefined){
+            var player = this.game.player.ship;
+            var target = player.navigationTarget;
+            if(target==null){
+                this.navDestDisplay.setText('Navigation Off');
+                this.navigationGroup.visible = false;
+                this.navigationArrow.visible = false;
             } else {
-                
-                this.game.add.tween(this.navigationArrow).to({
-                    angle: 90,
-                    x: target.sprite.x - this.game.camera.x,
-                    y: ((target.sprite.y - target.sprite.height/2) - this.game.camera.y)-100,
-                }, 300, "Quart.easeOut", true);
-/*
-                this.game.add.tween(this.navigationArrow.anchor).to({
-                    x: .5,
-                    y: .5,
-                }, 300, "Quart.easeOut", true);
-*/
-                
-               // this.navigationArrow.anchor.set(1,.5);
+                this.navDestDisplay.setText(`> ${target.name} (${target.description})`);
+                this.navETADisplay.setText(`${this.game.player.ship.formattedTimeToCurrentNavigationTarget}`);
+                this.navDistanceDisplay.setText(`${this.game.player.ship.formattedDistanceToCurrentNavigationTarget}`);        
+                this.navigationGroup.visible = true;
+                            
+                if(player.distanceToCurrentNavigationTarget>150){
+                    this.navigationArrow.visible = true;
+                    this.navigationArrow.angle = player.angleToCurrentNavigationTarget;
+                    this.navigationArrow.x = this.game.player.ship.sprite.x - this.game.camera.x;
+                    this.navigationArrow.y = this.game.player.ship.sprite.y - this.game.camera.y;                
+                } else {        
+                    this.game.add.tween(this.navigationArrow).to({
+                        angle: 90,
+                        x: target.sprite.x - this.game.camera.x,
+                        y: ((target.sprite.y - target.sprite.height/2) - this.game.camera.y)-100,
+                    }, 300, "Quart.easeOut", true);
+                }
             }
         }
     }
@@ -500,23 +464,11 @@ class HUD {
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
-    update() {
-        // Date
-        this.stardateLabel.setText(moment(this.game.starDate).format('MMM Do'));
-
-        // Map
+    slowUpdate(){
         this.minimap.update();
+    }
 
-        // Navigation
-        this.updateNavigationDisplay();
-        
-        // EFI
-        this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
-        this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
-
-        // O2
-        this.o2Percent = this.game.player.ship.o2Percent;
-        
+    verySlowUpdate(){
         // Credits
         this.creditsText.setText(`${this.game.player.credits}`);
 
@@ -524,9 +476,33 @@ class HUD {
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
             var usedSpace = this.game.player.ship.usedSpaceForStorageClass(key);
             var maxSpace = this.game.player.ship.maxSpaceForStorageClass(key);
-            
             this.cargoText[key].setText(`${usedSpace}/${maxSpace}`);
         }.bind(this));
+    }
+    
+    update() {
+        // Navigation
+        this.updateNavigationDisplay();
 
+        // EFI
+        if(this.healthValue_cache!=this.game.player.ship.health || this.healthMaxValue_cache!=this.game.player.ship.maxHealth){
+            this.healthProgressBar.value = this.game.player.ship.health;
+            this.healthProgressBar.max = this.game.player.ship.maxHealth;
+        }
+        this.healthValue_cache = this.healthProgressBar.value
+        this.healthMaxValue_cache = this.healthProgressBar.max
+
+        
+        if(this.fuelPercentage_cache!=this.game.player.ship.fuelPercentage)
+            this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
+        
+        if(this.energyPercentage_cache!=this.game.player.ship.energyPercentage)        
+            this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
+        
+        this.fuelPercentage_cache = this.fuelProgressBar.valuePercent;
+        this.energyPercentage_cache = this.energyProgressBar.valuePercent;
+
+        // O2
+        this.o2Percent = this.game.player.ship.o2Percent;
     }
 }

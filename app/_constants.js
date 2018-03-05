@@ -96,6 +96,7 @@ const CARGO_STORAGE_CLASS = {
     passengers : 'passengers',
     gas : 'gas',
     liquid : 'liquid',
+    equipment : 'equipment',
 }
 
 const CARGO_STORAGE_CLASS_NAMES = {
@@ -103,6 +104,7 @@ const CARGO_STORAGE_CLASS_NAMES = {
     passengers : 'Passenger',
     gas : 'Gas',
     liquid : 'Liquid',
+    equipment : 'Equipment',
 }
 
 

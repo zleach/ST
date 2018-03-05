@@ -1,6 +1,6 @@
 class Thruster extends Engine {
-    constructor(game,parentObject,layout) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
 
         this.engineType = ENGINE_TYPES.reactionControlThruster;
         this.thrust = 0;
@@ -9,12 +9,12 @@ class Thruster extends Engine {
         this.spoolUpSpeed = .3;
         this.spoolDownSpeed = .6;
 
-        this.layout = layout;
+        this.layout = options.layout;
 
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'rcs_flame'));
-        this.flames.x = layout.x-this.parentObject.sprite.width/2;
-        this.flames.y = layout.y-this.parentObject.sprite.height/2;
-        this.flames.angle = layout.angle;
+        this.flames.x = this.layout.x-this.parentObject.sprite.width/2;
+        this.flames.y = this.layout.y-this.parentObject.sprite.height/2;
+        this.flames.angle = this.layout.angle;
         this.flames.scale.set(.9);
         this.flames.anchor.set(0,0);
         this.flames.blendMode = PIXI.blendModes.ADD;    
@@ -34,8 +34,7 @@ class Thruster extends Engine {
         this.emitter.addToWorld();
 
         this.game.ps.addData('smoke', smoke);
-
-        this.sound = game.add.audio('rcs-loop');
+        this.soundCountdown = 10;
     }
     accelerate(){
         super.accelerate();
@@ -43,12 +42,8 @@ class Thruster extends Engine {
     }
     deaccelerate(){
         super.deaccelerate();
-        //this.sound.fadeOut(100);
     }    
     puff(){
-        //this.sound.volume = .2;
-        //if(!this.sound.isPlaying) this.sound.loopFull();
-
         var px = this.flames.worldPosition.x + game.camera.x;
         var py = this.flames.worldPosition.y + game.camera.y;
 

@@ -22,11 +22,6 @@ class AsteroidField extends GameObject {
                 var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
             }
         }
-        for (var i = 0; i < this.asteroidsCount*3; i++) { 
-            var xPos = game.rnd.integerInRange(x-size, x+size);
-            var yPos = game.rnd.integerInRange(y-size, y+size);
-            var asteroid = new Asteroid(this.game,this.asteroids,'tiny',xPos,yPos);
-        }
 
         new Buoy(this.game,xPos,yPos);
     }

@@ -1,6 +1,8 @@
 const screenWidth = 1600/2
 const screenHeight = 1000/2
 
+var ITEMS = [];
+
 var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
@@ -11,13 +13,35 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         //this.game.renderer.renderSession.roundPixels = true;
 
         Phaser.Canvas.setImageRenderingCrisp(this.game.canvas);
-        PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST
-        
-        //this.load.shader('stars', 'assets/stars.frag');
+        PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST        
+    },
+    create : function(){
+        this.loaded = false;
+        this.load.onLoadStart.add(this.loadStart, this);
+        this.load.onFileComplete.add(this.fileComplete, this);
+        this.load.onLoadComplete.add(this.loadComplete, this);
 
+        this.loadText = this.add.text(0, 0, 'Loading...', { font: `12px Fira Code`, fill: '#FFFFFF', boundsAlignH: "center", boundsAlignV: "middle"});
+        this.loadText.setTextBounds(0, 0, screenWidth, screenHeight);
+        
+        this.init();
+    },
+    loadStart : function(){
+	    this.loadText.setText("Loading...");
+    },
+    fileComplete : function(progress, cacheKey, success, totalLoaded, totalFiles) {
+    	this.loadText.setText("Loading: " + progress + "%");
+    },
+    loadComplete:function() {
+        this.setup();
+        this.loaded = true;
+    },
+    init : function(){
+        // Planets
         this.load.image('planet-1', 'assets/planet-1.png');
         this.load.image('moon-1', 'assets/moon-1.png');
     
+        // Misc
         this.load.image('bullet', 'default_assets/bullets/bullet11.png');
         this.load.image('null', 'assets/FFFFFF-0.png');
         this.load.image('blasterBullet', 'default_assets/bullets/bullet13.png');
@@ -38,7 +62,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
 
         // Alarm
         this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
-        this.load.audio('master_alarm', 'assets/audio/alarm.wav');
+        this.load.audio('master_alarm', 'assets/audio/alarm.mp3');
 
         // O2
         this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
@@ -47,7 +71,6 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         // Planet Stuff
         this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
         
-    
         // Roids
         this.load.image('asteroid-flake-1', 'assets/asteroid-flake-a.png');
         this.load.image('asteroid-flake-2', 'assets/asteroid-flake-b.png');
@@ -65,44 +88,9 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.spritesheet('buoy', 'assets/ships/buoy.png', 21, 55);
 
         this.load.bitmapFont(
-            'pixelmix_5',
-            'assets/fonts/pixelmix0.png',
-            'assets/fonts/pixelmix0.fnt'
-        );
-        this.load.bitmapFont(
             'pixelmix_8',
             'assets/fonts/pixelmix1.png',
             'assets/fonts/pixelmix1.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_10',
-            'assets/fonts/pixelmix2.png',
-            'assets/fonts/pixelmix2.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_11',
-            'assets/fonts/pixelmix3.png',
-            'assets/fonts/pixelmix3.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_12',
-            'assets/fonts/pixelmix_12.png',
-            'assets/fonts/pixelmix_12.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_14',
-            'assets/fonts/pixelmix4.png',
-            'assets/fonts/pixelmix4.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_15',
-            'assets/fonts/pixelmix5.png',
-            'assets/fonts/pixelmix5.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_20',
-            'assets/fonts/pixelmix6.png',
-            'assets/fonts/pixelmix6.fnt'
         );
         
         // Hud
@@ -111,7 +99,6 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.image('minimap-mask', 'assets/minimap-mask.png');
 
         // Audio
-/*
         this.load.audio('crash-1', 'assets/audio/crash-1.mp3');
         this.load.audio('crash-2', 'assets/audio/crash-2.mp3');
         this.load.audio('crash-3', 'assets/audio/crash-3.mp3');
@@ -119,28 +106,49 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.audio('crash-5', 'assets/audio/crash-5.mp3');
         this.load.audio('crash-light-1', 'assets/audio/crash-light-1.mp3');
         this.load.audio('crash-light-2', 'assets/audio/crash-light-2.mp3');
-*/
+        this.load.audio('rock-crash-1', 'assets/audio/rock-crash-1.mp3');
+        this.load.audio('rock-crash-2', 'assets/audio/rock-crash-2.mp3');
+        this.load.audio('rock-crash-3', 'assets/audio/rock-crash-3.mp3');
+        this.load.audio('rock-crash-4', 'assets/audio/rock-crash-4.mp3');
+        this.load.audio('rock-crash-5', 'assets/audio/rock-crash-5.mp3');
+        this.load.audio('rock-crash-6', 'assets/audio/rock-crash-6.mp3');
+        this.load.audio('crash-thud-1', 'assets/audio/crash-thud-1.mp3');
+        this.load.audio('crash-thud-2', 'assets/audio/crash-thud-2.mp3');
+        this.load.audio('crunch-1', 'assets/audio/crunch-1.mp3');
 
+        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
+        this.load.audio('rcs-loop', 'assets/audio/rcs-loop-2.mp3');
+        this.load.audio('hiss-1', 'assets/audio/hiss-1.mp3');
+        this.load.audio('hiss-2', 'assets/audio/hiss-2.mp3');
+        this.load.audio('hiss-3', 'assets/audio/hiss-3.mp3');
+        this.load.audio('hiss-4', 'assets/audio/hiss-4.mp3');
+        this.load.audio('hiss-5', 'assets/audio/hiss-5.mp3');
+
+        this.load.audio('pickup-1', 'assets/audio/pickup-1.mp3');
         this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
         this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
+        this.load.audio('gui_collapse', 'assets/audio/Collapse.m4a');
+        this.load.audio('gui_expand', 'assets/audio/Expand.m4a');
+        this.load.audio('beep-beep', 'assets/audio/Error 1.m4a');
+        this.load.audio('blorp', 'assets/audio/Error 4.m4a');
         this.load.audio('success', 'assets/audio/Success 3.m4a');
-/*
         this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
         this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
-        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
-        this.load.audio('rcs-loop', 'assets/audio/rcs-loop.wav');
-*/
+
+        this.load.audio('dock-connect', 'assets/audio/dock-connect.mp3');
+        this.load.audio('dock-release', 'assets/audio/dock-release.mp3');
+        this.load.audio('power-up', 'assets/audio/power-up.mp3');
+        this.load.audio('power-down', 'assets/audio/power-down.mp3');
+
+        this.load.audio('equip', 'assets/audio/equip.mp3');
+        this.load.audio('unequip', 'assets/audio/unequip.mp3');
+        this.load.audio('repair-light', 'assets/audio/repair-light.mp3');
+
+        this.load.audio('mining-laser', 'assets/audio/mining-laser.mp3');
+        
+        this.load.start();
     },
-    register : function(object){
-        this.gameObjects.push(object);
-    },
-    unregister : function(object){
-        var index = this.gameObjects.indexOf(object);
-        if(index !== -1) {
-          this.gameObjects.splice(index, 1);
-        }
-    },
-    create : function(){
+    setup : function(){                
         this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
 
         this.game.physics.startSystem(Phaser.Physics.P2JS);
@@ -152,9 +160,9 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.game.physics.p2.setImpactEvents(true);
         
         // Sounds
-        this.game.soundFX = {};
-        this.game.soundFX.click = game.add.audio('gui_click_soft');
-                
+        this.soundFX = {};
+        this.soundFX.click = game.add.audio('gui_click_soft');
+
         //  Tiled scrolling background
         this.bgGroup = this.game.add.group();
         
@@ -179,16 +187,10 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.game.world.bringToTop(this.asteroids);
         this.game.world.bringToTop(this.ships);
         this.player = new Player(this);
-
-        // Date
-        this.starDate = moment("22841207", "YYYYMMDD");
-        game.time.events.loop(Phaser.Timer.SECOND * 5, this.tickTime, this);
         
         // Camera
         this.game.camera.follow(this.player.sprite);
-        
         var deadzonePadding = 100;
-        
         this.game.camera.deadzone = new Phaser.Rectangle(
             deadzonePadding,
             deadzonePadding,
@@ -197,6 +199,8 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         );
 
         this.game.camera.focusOnXY(this.game.world.centerX,this.game.world.centerY);
+        
+        // FullSCreen
         var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
         fKey.onDown.add(this.fullScreen, this);
         
@@ -204,15 +208,13 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
         this.hud.showSystemInfo();
-                
         
         // GUI
         this.guiGroup = this.game.add.group();
         this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
+        this.inventoryScreen = new InventoryScreen(this,this.guiGroup);
         
         // DEBUG ////////
-        planet.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
-        planet.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
@@ -220,26 +222,76 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
         planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        
+        planet.addItemsToInventory(1, InventoryObject.make('small_fuel_tank',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+
+
+/*
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
+*/
+
+        // Weapons
+        var miningLaser = InventoryObject.make('mining_laser_1',this);
+            miningLaser.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,miningLaser);
+
+        // Engine
+        var engine = InventoryObject.make('basic_engine',this);
+            engine.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,engine);
+        this.player.ship.refuel();
+
+        // Reactor
+        var reactor = InventoryObject.make('prospector_reactor',this);
+            reactor.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,reactor);
+        this.player.ship.recharge();        
+
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+
+
 /*
         this.arrivalScreen.destination = planet;
         this.arrivalScreen.show();
 */
-        //
+        // Date
+        this.starDate = moment("22841207", "YYYYMMDD");
+        game.time.events.loop(Phaser.Timer.SECOND * 5, this.tickTime, this);
+        this.updateTime();
 
         // Very top layer
         this.notificationGroup = this.game.add.group(); 
         this.notificationGroup.fixedToCamera = true;       
     },
+    
+    register : function(object){
+        this.gameObjects.push(object);
+    },
+    unregister : function(object){
+        var index = this.gameObjects.indexOf(object);
+        if(index !== -1) {
+          this.gameObjects.splice(index, 1);
+        }
+    },
     tickTime : function(){
         // Tick Tock
         this.starDate = moment(this.starDate).add(1, 'minute');
+        this.updateTime();
+        // Date
+    },
+    updateTime : function(){
+        this.hud.stardateLabel.setText(moment(this.starDate).format('MMM Do'));        
     },
     skipTime : function(amount,unit){
         this.starDate = moment(this.starDate).add(amount, unit);        
     },
     broadphaseCallback : function(body1, body2){
-/*
         if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
             var ship;
             if(body1.sprite.parentObject == this.player.ship){
@@ -249,9 +301,14 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
                 ship = body2.sprite.parentObject;                
                 thing = body1.sprite.parentObject
             }
+                        
+            if(ship.dockedToShip === thing) return true; // Ignore being docked.
             
-            var shakeAmount = (Math.abs(ship.speed-thing.speed)/1000)*thing.sprite.body.mass/100;
-            var damageAmount = shakeAmount*100
+            var shakeAmount = 0;
+            if(thing.sprite.body.mass>2){
+                shakeAmount = (Math.abs(ship.speed-thing.speed)/2000);            
+            }
+            var damageAmount = shakeAmount*200
             if(shakeAmount>.001){
                 if(shakeAmount>.01){
                     ship.crashSoft_sound();
@@ -264,9 +321,9 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
                 if(damageAmount>1) ship.inflictDamage(damageAmount);
             } else {
                 // No shake
+                ship.crashThud_sound();
             }
         }    
-*/
         return true;
     },
 
@@ -279,17 +336,19 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     },
     
     update : function(){
-        // Update all registered objects
-        this.gameObjects.forEach(function(gameObject) {
-            gameObject.update();
-        });
-        
-        // Move stars
-        this.stars.tilePosition.x = -this.game.camera.x*0.8;
-        this.stars.tilePosition.y = -this.game.camera.y*0.8;
-        
-        // Update minimap
-        this.hud.update();
+        if(this.loaded){
+            // Update all registered objects
+            this.gameObjects.forEach(function(gameObject) {
+                gameObject.update();
+            });
+            
+            // Move stars
+            this.stars.tilePosition.x = -this.game.camera.x*0.8;
+            this.stars.tilePosition.y = -this.game.camera.y*0.8;
+            
+            // Update minimap
+            this.hud.update();
+        }
     },
     fullScreen : function(){
         if (this.game.scale.isFullScreen) {
@@ -302,7 +361,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         if(this.logValue!=undefined){
             this.game.debug.text(this.logValue, 32, 32) 
         }
-        this.game.debug.text(game.time.fps +' fps', 32, 32) 
+        //this.game.debug.text(game.time.fps +' fps', 32, 32) 
         //this.game.debug.body(this.player.sprite);
         //this.game.debug.bodyInfo(this.player.sprite,32,32);
 

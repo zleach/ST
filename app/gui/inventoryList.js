@@ -6,6 +6,8 @@ class GuiInventoryList extends Phaser.Group {
         this._title = '';
         this._items = [];
         this._focus = false;
+        this._allowFilter = false;
+        this._listWidth = 250;
 
         this.clickSound = game.add.audio('gui_click_soft');
         this.txSound = game.add.audio('gui_click');
@@ -15,7 +17,6 @@ class GuiInventoryList extends Phaser.Group {
         this.itemsPerPage = 8;
 
         this.itemCursorHeight = 32;
-        this.listWidth = 240;
         this.listHeight = this.itemCursorHeight*(this.itemsPerPage+1);
         this.headerHeight = 30;
 
@@ -44,6 +45,15 @@ class GuiInventoryList extends Phaser.Group {
 
         // Cursor
         this.itemCursor = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.setupCursors();
+        
+        // Lables
+        this.labels = this.game.add.group();
+        this.add(this.labels);
+
+        this.layout();
+    }
+    setupCursors(){
         this.itemCursorLeftPolygon = new Phaser.Polygon(
             0,0,
             -8,this.itemCursorHeight/2, 
@@ -59,12 +69,21 @@ class GuiInventoryList extends Phaser.Group {
             this.listWidth,this.itemCursorHeight,
             0,this.itemCursorHeight,
         );
-
-        // Lables
-        this.labels = this.game.add.group();
-        this.add(this.labels);
-
+        this.itemCursorFlatPolygon = new Phaser.Polygon(
+            0,0,
+            this.listWidth,0, 
+            this.listWidth,this.itemCursorHeight,
+            0,this.itemCursorHeight,
+        );
+    }
+    set listWidth(listWidth){
+        this._listWidth = listWidth;
+        this.setupCursors();
         this.layout();
+    }
+
+    get listWidth(){
+        return this._listWidth;
     }
 
     set focus(focus){ 
@@ -86,6 +105,15 @@ class GuiInventoryList extends Phaser.Group {
 
     get title(){
         return this._title;
+    }
+
+    set allowFilter(allowFilter){
+        this._allowFilter = allowFilter
+        this.layout();
+    }
+
+    get allowFilter(){
+        return this._allowFilter;
     }
 
     set items(items){
@@ -157,6 +185,11 @@ class GuiInventoryList extends Phaser.Group {
         }
     }
 
+    get amountOfSelectedItem(){
+        return this._groupedItems[this.selectedItem.key].length;
+    }
+
+
     get colorForSelectedItem(){
         if(this.selectedItem) return RARITY_COLOR[this.selectedItem.rarity];
     }
@@ -204,6 +237,9 @@ class GuiInventoryList extends Phaser.Group {
         if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.right){
             this.itemCursor.drawPolygon(this.itemCursorRightPolygon);
         }
+        if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.flat){
+            this.itemCursor.drawPolygon(this.itemCursorFlatPolygon);
+        }
         this.itemCursor.endFill();
         this.itemCursor.visible = true;
     
@@ -228,8 +264,13 @@ class GuiInventoryList extends Phaser.Group {
             this.headerHeight,
         )
         this.titleBg.endFill();
-        this.titleLabel.setText(this._title);
-        
+
+        // Title Label
+        if(!this.allowFilter){
+            this.titleLabel.setText(this._title);
+        } else {
+            this.titleLabel.setText(`${String.fromCharCode(0x2039)} ${this._title} ${String.fromCharCode(0x203a)}`);            
+        }
         
         // Items
         this.labels.removeAll(true);
@@ -264,17 +305,23 @@ class GuiInventoryList extends Phaser.Group {
         // Items
         for (var i = indexStart; i < indexEnd; i++) {
             if(this.items[i]!=undefined){
-                var group = this.items[i]
-                var item = group[0];
-                var text = item.name
-                if(group.length>1){
-                    text += ` (${group.length})`;
+                var text = this.items[i][0].name
+
+                if(this.items[i][0].isEquippable) {                    
+                    if(this.items[i][0].equipped) {
+                        text = `${String.fromCharCode(0x25cf)} ${this.items[i][0].name}`;
+                    } else {
+                        text = `${String.fromCharCode(0x25cb)} ${this.items[i][0].name}`                    
+                    }
+                }
+
+                if(this.items[i].length>1){
+                    text += ` (${this.items[i].length})`;
                 }
                 
                 var arrow = false;
         
                 // Arrows
-
                 if(index==this.itemsPerPage-1){
                     text = String.fromCharCode(0x2193);
                     arrow = true;
@@ -288,7 +335,7 @@ class GuiInventoryList extends Phaser.Group {
                 var itemLabel = this.phaserGame.add.text(
                     16,this.itemCursorHeight*(index) + this.headerHeight + 8, 
                     text, 
-                    { font: `15px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
                     this
                 )
                 this.labels.add(itemLabel);
@@ -296,10 +343,10 @@ class GuiInventoryList extends Phaser.Group {
                 if(index==this.selectedItemIndex && this.focus){
                     itemLabel.addColor("#000000", 0)
                 } else {
-                    if(!arrow) itemLabel.tint = RARITY_COLOR[item.rarity];
+                    if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
                 }
                 
-                if(!arrow) itemLabel.tint = RARITY_COLOR[item.rarity];
+                if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
                 itemLabel.resolution = 2;
                 index++;
             }

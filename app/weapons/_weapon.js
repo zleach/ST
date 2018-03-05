@@ -1,10 +1,15 @@
 class Weapon extends Equipment {
-    constructor(game,parentObject) {
-        super(game);
-        this.parentObject = parentObject;
-        this.energyConsumption = 0;
-        
+    constructor(game,options) {
+        super(game,options);
+
         this.isWeapon = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','damage','energyConsumption','range'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Weapon Type','Damage','Energy Consumption','Range'];
+    }
+
+    fire(){
+        // Fallback
     }
 
     update(){

@@ -1,4 +1,6 @@
-app/items/items.json
+app/game.js
+app/__equipment.json
+app/__items.json
 lib/lodash.js
 lib/tiny-color.js
 lib/numeral.js
@@ -10,8 +12,11 @@ app/_inventoryObject.js
 app/gameObjects/_gameObject.js
 app/systems/_system.js
 app/equipment/_equipment.js
+app/equipment/_consumable.js
 app/equipment/reactor.js
 app/equipment/batteries.js
+app/equipment/BasicFuelTank.js
+app/equipment/RepairKit.js
 app/weapons/_weapon.js
 app/ships/_ship.js
 app/engines/_engine.js
@@ -29,7 +34,7 @@ app/items/fuel.js
 app/ships/basicMiner.js
 app/ships/fuelTanker.js
 app/ships/shuttle.js
-app/weapons/basicMiningLaser.js
+app/weapons/focusedBeam.js
 app/weapons/basicBlaster.js
 app/planets/_planet.js
 app/planets/basicPlanet.js
@@ -39,11 +44,12 @@ app/player.js
 app/hud.js
 app/minimap.js
 app/progressBar.js
-app/game.js
 app/gui/_guiScreen.js
 app/gui/arrival.js
+app/gui/inventory.js
 app/gui/exchange.js
 app/gui/button.js
+app/gui/tabItem.js
 app/gui/twoLineButton.js
 app/gui/notification.js
 app/gui/inventoryList.js

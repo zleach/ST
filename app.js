@@ -5,11 +5,13 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Wed Feb 28 21:13:44 PST 2018  */
+/* Last merge : Mon Mar 5 02:08:39 PST 2018  */
 
 /* Merging order :
 
-- app/items/items.json
+- app/game.js
+- app/__equipment.json
+- app/__items.json
 - lib/lodash.js
 - lib/tiny-color.js
 - lib/numeral.js
@@ -21,8 +23,11 @@
 - app/gameObjects/_gameObject.js
 - app/systems/_system.js
 - app/equipment/_equipment.js
+- app/equipment/_consumable.js
 - app/equipment/reactor.js
 - app/equipment/batteries.js
+- app/equipment/BasicFuelTank.js
+- app/equipment/RepairKit.js
 - app/weapons/_weapon.js
 - app/ships/_ship.js
 - app/engines/_engine.js
@@ -40,7 +45,7 @@
 - app/ships/basicMiner.js
 - app/ships/fuelTanker.js
 - app/ships/shuttle.js
-- app/weapons/basicMiningLaser.js
+- app/weapons/focusedBeam.js
 - app/weapons/basicBlaster.js
 - app/planets/_planet.js
 - app/planets/basicPlanet.js
@@ -50,11 +55,12 @@
 - app/hud.js
 - app/minimap.js
 - app/progressBar.js
-- app/game.js
 - app/gui/_guiScreen.js
 - app/gui/arrival.js
+- app/gui/inventory.js
 - app/gui/exchange.js
 - app/gui/button.js
+- app/gui/tabItem.js
 - app/gui/twoLineButton.js
 - app/gui/notification.js
 - app/gui/inventoryList.js
@@ -64,15 +70,496 @@
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/items/items.json begins */
+/* Merging js: app/game.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-var ITEMS = [{
+const screenWidth = 1600/2
+const screenHeight = 1000/2
+
+var ITEMS = [];
+
+var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
+    gameObjects : [],
+    preload : function(){
+        this.time.advancedTiming = true
+
+        //this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+        this.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
+        //this.game.renderer.renderSession.roundPixels = true;
+
+        Phaser.Canvas.setImageRenderingCrisp(this.game.canvas);
+        PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST        
+    },
+    create : function(){
+        this.loaded = false;
+        this.load.onLoadStart.add(this.loadStart, this);
+        this.load.onFileComplete.add(this.fileComplete, this);
+        this.load.onLoadComplete.add(this.loadComplete, this);
+
+        this.loadText = this.add.text(0, 0, 'Loading...', { font: `12px Fira Code`, fill: '#FFFFFF', boundsAlignH: "center", boundsAlignV: "middle"});
+        this.loadText.setTextBounds(0, 0, screenWidth, screenHeight);
+        
+        this.init();
+    },
+    loadStart : function(){
+	    this.loadText.setText("Loading...");
+    },
+    fileComplete : function(progress, cacheKey, success, totalLoaded, totalFiles) {
+    	this.loadText.setText("Loading: " + progress + "%");
+    },
+    loadComplete:function() {
+        this.setup();
+        this.loaded = true;
+    },
+    init : function(){
+        // Planets
+        this.load.image('planet-1', 'assets/planet-1.png');
+        this.load.image('moon-1', 'assets/moon-1.png');
+    
+        // Misc
+        this.load.image('bullet', 'default_assets/bullets/bullet11.png');
+        this.load.image('null', 'assets/FFFFFF-0.png');
+        this.load.image('blasterBullet', 'default_assets/bullets/bullet13.png');
+        this.load.image('laser', 'default_assets/bullets/bullet05.png');
+        this.load.image('laser-sparkle', 'default_assets/particles/red.png');
+        this.load.image('stars', 'assets/stars_new.gif');
+        this.load.image('blue_flame', 'assets/engines/blue_flame.png');
+        this.load.image('rcs_flame', 'assets/engines/rcs.png');
+        this.load.image('cloud', 'default_assets/particles/cloud.png');
+        this.load.image('1x1', 'default_assets/particlestorm/particles/1x1.png');
+        this.load.image('white', 'default_assets/particlestorm/particles/white.png');
+        this.load.image('white-smooth', 'assets/white-smooth.png');
+        this.load.image('smoke-trail', 'default_assets/particlestorm/particles/white-smoke.png');
+        this.load.image('dot', 'assets/map-dot.png');
+        this.load.image('minimap-ship', 'assets/minimap-ship.png');
+        this.load.image('dock-arrow', 'assets/dock-indicator.png');
+        this.load.image('nav-arrow', 'assets/nav-arrow.png');
+
+        // Alarm
+        this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
+        this.load.audio('master_alarm', 'assets/audio/alarm.mp3');
+
+        // O2
+        this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
+        this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
+
+        // Planet Stuff
+        this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
+        
+        // Roids
+        this.load.image('asteroid-flake-1', 'assets/asteroid-flake-a.png');
+        this.load.image('asteroid-flake-2', 'assets/asteroid-flake-b.png');
+        this.load.image('asteroid-flake-3', 'assets/asteroid-flake-c.png');
+        this.load.image('asteroid-large', 'assets/asteroid-large.png');
+        this.load.image('asteroid-medium', 'assets/asteroid-medium.png');
+        this.load.image('asteroid-small', 'assets/asteroid-small.png');
+        this.load.image('asteroid-tiny', 'assets/asteroid-flake-a.png');
+
+        // Ships
+        this.load.image('mining_ship', 'assets/ships/miner.png');
+        this.load.image('fuelTanker', 'assets/ships/fuelTanker.png');
+        this.load.image('fuelTanker2', 'assets/ships/fuelTanker2.png');
+        this.load.image('shuttle', 'assets/ships/shuttle.png');
+        this.load.spritesheet('buoy', 'assets/ships/buoy.png', 21, 55);
+
+        this.load.bitmapFont(
+            'pixelmix_8',
+            'assets/fonts/pixelmix1.png',
+            'assets/fonts/pixelmix1.fnt'
+        );
+        
+        // Hud
+        this.load.image('minimap-bg', 'assets/minimap-bg.png');
+        this.load.image('minimap-dot', 'assets/map-dot.png');
+        this.load.image('minimap-mask', 'assets/minimap-mask.png');
+
+        // Audio
+        this.load.audio('crash-1', 'assets/audio/crash-1.mp3');
+        this.load.audio('crash-2', 'assets/audio/crash-2.mp3');
+        this.load.audio('crash-3', 'assets/audio/crash-3.mp3');
+        this.load.audio('crash-4', 'assets/audio/crash-4.mp3');
+        this.load.audio('crash-5', 'assets/audio/crash-5.mp3');
+        this.load.audio('crash-light-1', 'assets/audio/crash-light-1.mp3');
+        this.load.audio('crash-light-2', 'assets/audio/crash-light-2.mp3');
+        this.load.audio('rock-crash-1', 'assets/audio/rock-crash-1.mp3');
+        this.load.audio('rock-crash-2', 'assets/audio/rock-crash-2.mp3');
+        this.load.audio('rock-crash-3', 'assets/audio/rock-crash-3.mp3');
+        this.load.audio('rock-crash-4', 'assets/audio/rock-crash-4.mp3');
+        this.load.audio('rock-crash-5', 'assets/audio/rock-crash-5.mp3');
+        this.load.audio('rock-crash-6', 'assets/audio/rock-crash-6.mp3');
+        this.load.audio('crash-thud-1', 'assets/audio/crash-thud-1.mp3');
+        this.load.audio('crash-thud-2', 'assets/audio/crash-thud-2.mp3');
+        this.load.audio('crunch-1', 'assets/audio/crunch-1.mp3');
+
+        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
+        this.load.audio('rcs-loop', 'assets/audio/rcs-loop-2.mp3');
+        this.load.audio('hiss-1', 'assets/audio/hiss-1.mp3');
+        this.load.audio('hiss-2', 'assets/audio/hiss-2.mp3');
+        this.load.audio('hiss-3', 'assets/audio/hiss-3.mp3');
+        this.load.audio('hiss-4', 'assets/audio/hiss-4.mp3');
+        this.load.audio('hiss-5', 'assets/audio/hiss-5.mp3');
+
+        this.load.audio('pickup-1', 'assets/audio/pickup-1.mp3');
+        this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
+        this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
+        this.load.audio('gui_collapse', 'assets/audio/Collapse.m4a');
+        this.load.audio('gui_expand', 'assets/audio/Expand.m4a');
+        this.load.audio('beep-beep', 'assets/audio/Error 1.m4a');
+        this.load.audio('blorp', 'assets/audio/Error 4.m4a');
+        this.load.audio('success', 'assets/audio/Success 3.m4a');
+        this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
+        this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
+
+        this.load.audio('dock-connect', 'assets/audio/dock-connect.mp3');
+        this.load.audio('dock-release', 'assets/audio/dock-release.mp3');
+        this.load.audio('power-up', 'assets/audio/power-up.mp3');
+        this.load.audio('power-down', 'assets/audio/power-down.mp3');
+
+        this.load.audio('equip', 'assets/audio/equip.mp3');
+        this.load.audio('unequip', 'assets/audio/unequip.mp3');
+        this.load.audio('repair-light', 'assets/audio/repair-light.mp3');
+
+        this.load.audio('mining-laser', 'assets/audio/mining-laser.mp3');
+        
+        this.load.start();
+    },
+    setup : function(){                
+        this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
+
+        this.game.physics.startSystem(Phaser.Physics.P2JS);
+        this.game.physics.p2.restitution = 0.05;
+        this.game.physics.p2.setPostBroadphaseCallback(this.broadphaseCallback, this);
+        this.game.world.setBounds(0, 0, 1000000, 1000000);
+        
+        this.ps = this.game.plugins.add(Phaser.ParticleStorm);
+        this.game.physics.p2.setImpactEvents(true);
+        
+        // Sounds
+        this.soundFX = {};
+        this.soundFX.click = game.add.audio('gui_click_soft');
+
+        //  Tiled scrolling background
+        this.bgGroup = this.game.add.group();
+        
+        this.stars = this.game.add.tileSprite(0,0, screenWidth, screenHeight, 'stars');
+        this.stars.fixedToCamera = true;
+
+        this.economy = new Economy(this);
+        this.system = new StarSystem(this);
+
+        this.planets = this.game.add.group();
+        this.asteroids = this.game.add.group();
+        this.ships = this.game.add.group();
+
+        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX,this.game.world.centerY);
+        var planet = new BasicPlanet(this,this.game.world.centerX,this.game.world.centerY);
+        var moon = new BasicMoon(this,this.game.world.centerX+7000,this.game.world.centerY+1000);
+
+        var ft = new FuelTanker(this,this.game.world.centerX+200,this.game.world.centerY-200);
+        ft.sprite.body.angle = 270;
+        //ft.navigationMode = NAVIGATION_MODE.followWaypoints;
+
+        this.game.world.bringToTop(this.asteroids);
+        this.game.world.bringToTop(this.ships);
+        this.player = new Player(this);
+        
+        // Camera
+        this.game.camera.follow(this.player.sprite);
+        var deadzonePadding = 100;
+        this.game.camera.deadzone = new Phaser.Rectangle(
+            deadzonePadding,
+            deadzonePadding,
+            screenWidth-350,
+            screenHeight-deadzonePadding*2
+        );
+
+        this.game.camera.focusOnXY(this.game.world.centerX,this.game.world.centerY);
+        
+        // FullSCreen
+        var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
+        fKey.onDown.add(this.fullScreen, this);
+        
+        // HUD
+        this.hudGroup = this.game.add.group();
+        this.hud = new HUD(this);
+        this.hud.showSystemInfo();
+        
+        // GUI
+        this.guiGroup = this.game.add.group();
+        this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
+        this.inventoryScreen = new InventoryScreen(this,this.guiGroup);
+        
+        // DEBUG ////////
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        planet.addItemsToInventory(1, InventoryObject.make('small_fuel_tank',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('coffee',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+        planet.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+
+
+/*
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('potatoes'));
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
+*/
+
+        // Weapons
+        var miningLaser = InventoryObject.make('mining_laser_1',this);
+            miningLaser.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,miningLaser);
+
+        // Engine
+        var engine = InventoryObject.make('basic_engine',this);
+            engine.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,engine);
+        this.player.ship.refuel();
+
+        // Reactor
+        var reactor = InventoryObject.make('prospector_reactor',this);
+            reactor.equipTo(this.player.ship);
+        this.player.ship.addItemsToInventory(1,reactor);
+        this.player.ship.recharge();        
+
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+
+
+/*
+        this.arrivalScreen.destination = planet;
+        this.arrivalScreen.show();
+*/
+        // Date
+        this.starDate = moment("22841207", "YYYYMMDD");
+        game.time.events.loop(Phaser.Timer.SECOND * 5, this.tickTime, this);
+        this.updateTime();
+
+        // Very top layer
+        this.notificationGroup = this.game.add.group(); 
+        this.notificationGroup.fixedToCamera = true;       
+    },
+    
+    register : function(object){
+        this.gameObjects.push(object);
+    },
+    unregister : function(object){
+        var index = this.gameObjects.indexOf(object);
+        if(index !== -1) {
+          this.gameObjects.splice(index, 1);
+        }
+    },
+    tickTime : function(){
+        // Tick Tock
+        this.starDate = moment(this.starDate).add(1, 'minute');
+        this.updateTime();
+        // Date
+    },
+    updateTime : function(){
+        this.hud.stardateLabel.setText(moment(this.starDate).format('MMM Do'));        
+    },
+    skipTime : function(amount,unit){
+        this.starDate = moment(this.starDate).add(amount, unit);        
+    },
+    broadphaseCallback : function(body1, body2){
+        if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
+            var ship;
+            if(body1.sprite.parentObject == this.player.ship){
+                ship = body1.sprite.parentObject;
+                thing = body2.sprite.parentObject
+            } else {
+                ship = body2.sprite.parentObject;                
+                thing = body1.sprite.parentObject
+            }
+                        
+            if(ship.dockedToShip === thing) return true; // Ignore being docked.
+            
+            var shakeAmount = 0;
+            if(thing.sprite.body.mass>2){
+                shakeAmount = (Math.abs(ship.speed-thing.speed)/2000);            
+            }
+            var damageAmount = shakeAmount*200
+            if(shakeAmount>.001){
+                if(shakeAmount>.01){
+                    ship.crashSoft_sound();
+                    game.camera.shake(.01, 100);
+                } else {
+                    ship.crash_sound();
+                    game.camera.shake(shakeAmount, 100);                    
+                }
+                
+                if(damageAmount>1) ship.inflictDamage(damageAmount);
+            } else {
+                // No shake
+                ship.crashThud_sound();
+            }
+        }    
+        return true;
+    },
+
+    log(){
+        this.logValue = '';
+        var args = Array.prototype.slice.call(arguments);
+        args.forEach(function(element) {
+            this.logValue = this.logValue + '[' + element + ']' 
+        }, this);
+    },
+    
+    update : function(){
+        if(this.loaded){
+            // Update all registered objects
+            this.gameObjects.forEach(function(gameObject) {
+                gameObject.update();
+            });
+            
+            // Move stars
+            this.stars.tilePosition.x = -this.game.camera.x*0.8;
+            this.stars.tilePosition.y = -this.game.camera.y*0.8;
+            
+            // Update minimap
+            this.hud.update();
+        }
+    },
+    fullScreen : function(){
+        if (this.game.scale.isFullScreen) {
+            this.game.scale.stopFullScreen();
+        } else {
+            this.game.scale.startFullScreen(false);
+        }
+    },
+    render : function(){
+        if(this.logValue!=undefined){
+            this.game.debug.text(this.logValue, 32, 32) 
+        }
+        //this.game.debug.text(game.time.fps +' fps', 32, 32) 
+        //this.game.debug.body(this.player.sprite);
+        //this.game.debug.bodyInfo(this.player.sprite,32,32);
+
+/*
+        this.player.weapons.forEach(function(weapon) {
+            weapon.weapon.debug(32,32,true);
+        }, this);
+*/
+
+/*
+        this.asteroids.forEach(function(asteroid) {
+            this.game.debug.body(asteroid);
+        }, this);
+*/
+
+/*
+        this.ships.forEach(function(ship) {
+            this.game.debug.body(ship);
+            //ship.angle += 5;
+        }, this);
+*/
+    },
+});
+
+Number.prototype.between = function(a, b, inclusive) {
+  var min = Math.min.apply(Math, [a, b]),
+    max = Math.max.apply(Math, [a, b]);
+  return inclusive ? this >= min && this <= max : this > min && this < max;
+};
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/__equipment.json begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+ITEMS.push(...[
+    {
+        "_class" : "FocusedBeamWeapon",
+		"_slot": "weapon",
+		"key": "mining_laser_1",
+		"name": "Mining Laser",
+		"type": "Focused Beam",
+        "description" : "A clunky old class IV mining laser. An essential tool for any miner. This one has seen better days...",
+		"rarity": "common",
+		"storageClass": "equipment",
+		"baseValue": 130,
+		"mass": 40,
+		"damage" : 1,
+		"energyConsumption" : 3,
+		"range" : 120,
+	},
+    {
+        "_class" : "BasicEngine",
+		"_slot": "engine",
+		"key": "basic_engine",
+		"name": "R-1B Rocket Engine",
+		"type": "Liquid-fuel engine",
+        "description" : "The '1B is a workhorse among outer rim pilots. Reliable, simple with modest power. If you take care of her, she'll probably outlive you.",
+		"storageClass": "equipment",
+		"baseValue": 220,
+		"mass": 100,
+        "thrust" : 100,
+        "maxSpeed" : 150,
+        "spoolUpSpeed" : .08,
+        "spoolDownSpeed" : .04,
+        "fuelConsumption" : .7,
+	},
+    {
+        "_class" : "Reactor",
+		"_slot": "equipment",
+		"key": "prospector_reactor",
+		"name": "CP1 Reactor",
+		"type": "Fusion",
+        "description" : "Also known as the \"Prospector's Friend\", the CP1 is tuned specifically for focused beam mining lasers. If you're looking for gold, don't leave home without one of these.",
+		"storageClass": "equipment",
+		"baseValue": 180,
+		"mass": 280,
+        "chargeRate" : 1,
+        "capacity" : 1000,
+        "readableChargeRate" : "Slow",
+        "bonus" : [
+            { 
+                "damage" : .25,
+                "class" : "FocusedBeamWeapon",
+            }
+        ]
+	},
+    {
+        "_class" : "BasicFuelTank",
+		"_slot": "equipment",
+		"key": "small_fuel_tank",
+		"name": "Small Fuel Tank",
+		"type": "Liquid Fuel",
+        "description" : "The Spacesys F1000 external fuel tank adds a modest 1,000 units of fuel to your propulsion system, while the lightweight composite keeps the installation weight low.",
+		"storageClass": "equipment",
+		"baseValue": 180,
+		"mass": 40,
+        "fuelCapacity" : 1000,
+	},
+    {
+        "_class" : "RepairKit",
+		"_slot": "equipment",
+		"key": "light_repair_kit",
+		"name": "Light Hull Repair Kit",
+        "description" : "A gently used kit containing hull tape, foil and sealant. The absolute minimum to get you home in a pinch.",
+		"storageClass": "equipment",
+		"baseValue": 100,
+		"mass": 10,
+        "repairAmount" : 30,
+	},
+]);
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/__items.json begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+ITEMS.push(...[{
 		"key": "meteoric_iron",
 		"name": "Meteoric Iron",
 		"type": "Mineral",
-        "description" : "The dark mineral is a prized posession of 'belt miners. Apart from minor amounts of telluric iron, meteoric iron is the only naturally occurring native metal of the element iron on the Earth's surface.",
+        "description" : "This dark mineral is a prized posession of 'belt miners. Apart from minor amounts of telluric iron, meteoric iron is the only naturally occurring native metal of the element iron on the Earth's surface.",
 		"rarity": "uncommon",
 		"storageClass": "bulk",
 		"baseValue": 32,
@@ -82,7 +569,7 @@ var ITEMS = [{
 		"key": "raw_paladium",
 		"name": "Raw Paladium",
 		"type": "Mineral",
-        "description" : "William Hyde Wollaston noted the discovery of a this noble metal in July 1802 in his lab-book and named it palladium in August of the same year. Wollaston purified enough of the material and offered it, without naming the discoverer, in a small shop in Soho in April 1803.",
+        "description" : "A bright coppery and very hard ore. The interconnects of most modern hyperdrive systems rely in this and other rare mineral based alloys.",
 		"rarity": "rare",
 		"storageClass": "bulk",
 		"baseValue": 65,
@@ -91,8 +578,8 @@ var ITEMS = [{
 	{
 		"key": "asteroid_flake",
 		"name": "Asteroid Flake",
-		"type": "Mineral",
-        "description" : "A blackish grey flake, found after mining most asteroids.",
+		"type": "Mineral",  
+        "description" : "A blackish grey flake, found after mining most asteroids. If you didn't know any better, you'd think it was worthless dust.",
 		"rarity": "common",
 		"storageClass": "bulk",
 		"baseValue": 12,
@@ -111,103 +598,14 @@ var ITEMS = [{
 	{
 		"key": "coffee",
 		"name": "Coffee",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
+        "description" : "Coffee keeps the galaxy running. These beans are the seeds of berries from the Coffea plant. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
 		"type": "Commodity",
-		"rarity": "common",
+		"rarity": "uncommon",
 		"storageClass": "bulk",
-		"baseValue": 870,
+		"baseValue": 1270,
 		"mass": 100
 	},
-	{
-		"key": "aluminium",
-		"name": "Aluminium",
-		"type": "Metal",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 90,
-		"mass": 10
-	},
-	{
-		"key": "rice",
-		"name": "rice",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "milk",
-		"name": "milk",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "cats",
-		"name": "cats",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "dogs",
-		"name": "dogs",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "horses",
-		"name": "horses",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "parts",
-		"name": "pars",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "guns",
-		"name": "guns",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "common",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-	{
-		"key": "ammo",
-		"name": "Ammo",
-        "description" : "Coffee beans are the seeds of berries from the Coffea plant. The genus Coffea is native to tropical Africa (specifically having its origin on Earth in Ethiopia and Sudan) and Madagascar, the Comoros, Mauritius, and Réunion in the Indian Ocean. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
-		"type": "Commodity",
-		"rarity": "exotic",
-		"storageClass": "bulk",
-		"baseValue": 870,
-		"mass": 100
-	},
-]
+]);
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/lodash.js begins */
@@ -17565,6 +17963,7 @@ const CARGO_STORAGE_CLASS = {
     passengers : 'passengers',
     gas : 'gas',
     liquid : 'liquid',
+    equipment : 'equipment',
 }
 
 const CARGO_STORAGE_CLASS_NAMES = {
@@ -17572,6 +17971,7 @@ const CARGO_STORAGE_CLASS_NAMES = {
     passengers : 'Passenger',
     gas : 'Gas',
     liquid : 'Liquid',
+    equipment : 'Equipment',
 }
 
 
@@ -17677,30 +18077,39 @@ const INVENTORY_LIST_CURSOR_STYLE = {
 
 // Things you can pickup and sell.
 class InventoryObject {
-    constructor(game,options = false) {
+    constructor(game,options) {
         this.game = game;
-
+        
         this.name = 'Unknown Object';
         this.baseValue = 0;
         this.type = 'Unknown'
         this.mass = 0;
         this.rarity = RARITY.common;
+
+        this.infoFields = ['baseValue','mass','rarity','storageClass'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','Container'];
+
+        if(options.data) this.initWithData(options.data);
+    }
     
-        if(options) this.initWithData(options);
-    }    
-    
-    initWithData(options){
-        for(var prop in options) this[prop] = options[prop]
+    initWithData(data){
+        for(var prop in data) this[prop] = data[prop]
     }
 
-    static make(key,options = {}){
+    static make(key,game){
         var data = ITEMS.filter(function(e) {
             return e.key == key;
         })[0];
-        
+                
         if(!data) return false; // No Key found
         
-        return new InventoryObject(game,data);
+        if(data._class){
+            // Specific Subclass
+            return eval("new " + data._class + "(game,{data : data})");
+        } else {
+            // Generic
+            return new InventoryObject(game,{data:data});
+        }        
     }
 
     get buyValue(){
@@ -17721,7 +18130,7 @@ class InventoryObject {
 
     get readableMass(){
         return `${numeral(this.mass).format('0,0')} kg`
-    }    
+    }        
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -17754,6 +18163,8 @@ class GameObject {
         this.inventory = [];
         this.itemsAccumulating = false;
         this.itemsAccumulator = [];     
+
+        this.dingSound = game.add.audio('pickup-1');
     }
     
     setupSprite(sprite){
@@ -17890,6 +18301,8 @@ class GameObject {
 
             game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, itemText);
         }.bind(this));
+        
+        this.dingSound.play();
     }
 
     // Inventory
@@ -17935,13 +18348,18 @@ class GameObject {
     removeItemsFromInventory(items){
         var removedItems = [];
         for (let item of items) {
-            var index = this.inventory.indexOf(item);
-            if (index > -1) {
-                this.removedItems.push(item);
-                this.inventory.splice(index, 1);
-            }
+            removedItems.push(item);
+            this.removeItemFromInventory(item);
         }
         return removedItems;
+    }
+
+    removeItemFromInventory(item){
+        var index = this.inventory.indexOf(item);
+        if (index > -1) {
+            this.inventory.splice(index, 1);
+        }
+        return true;
     }
 
     // Cargo
@@ -17952,6 +18370,7 @@ class GameObject {
         this.freeSpace[CARGO_STORAGE_CLASS.passengers] = this.specs.storage.passengers;
         this.freeSpace[CARGO_STORAGE_CLASS.gas] = this.specs.storage.gas;
         this.freeSpace[CARGO_STORAGE_CLASS.liquid] = this.specs.storage.liquid;
+        this.freeSpace[CARGO_STORAGE_CLASS.equipment] = this.specs.storage.equipment;
     }
     
     // Lifecycle
@@ -18017,21 +18436,88 @@ class StarSystem extends GameObject{
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class Equipment extends GameObject {
-    constructor(game,parentObject) {
-        super(game);
-        this.parentObject = parentObject;
+class Equipment extends InventoryObject {
+    constructor(game,options) {
+        super(game,options);
+
+        this.game.register(this); // Equipment must be registered
+        this.parentObject = options.parentObject;
+
+        this.isEquippable = true;
+        this._equipped = false;
         
-        this.equiped = false;
+        this.energyConsumption = 0;
+        this.storageClass = CARGO_STORAGE_CLASS.equipment;
+
+        this.equipSound = game.add.audio('equip');
+        this.unequipSound = game.add.audio('unequip');
     }
     
-    wearAndTear(){
-        
+    set equipped(equipped){
+        this._equipped = equipped;        
+    }
+    
+    get equipped(){
+        return this._equipped;
+    }
+    
+    equipTo(parentObject){
+        if(parentObject){
+            this.equipSound.play();
+            this.parentObject = parentObject;
+            this.equipped = true;
+    
+            if(this.isWeapon) {
+                this.parentObject.equipWeaponInSlot(this,0);
+            } else if(this.isEngine) {
+                this.parentObject.equipEngineInSlot(this,0);
+            } else {
+                this.parentObject.equipEquipmentInSlot(this,0);
+            }
+
+        }
+    }
+    
+    unequip(){        
+        if(this.parentObject){
+            this.unequipSound.play();
+
+            if(this.isWeapon) {
+                this.parentObject.unequipWeapon(this);
+            } else if(this.isEngine) {
+                this.parentObject.unequipEngine(this);
+            } else {
+                this.parentObject.unequipEquipment(this);
+            }
+        }
     }
     
     update(){
-        super.update();
+        
     }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/_consumable.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Consumable extends InventoryObject {
+    constructor(game,options) {
+        super(game,options);
+
+        this.parentObject = this.game.player.ship;
+
+        this.isConsumable = true;
+        
+        this.equipSound = game.add.audio('equip');
+        this.unequipSound = game.add.audio('unequip');
+    }
+
+    consume(){
+        this.parentObject.removeItemFromInventory(this);
+    }
+    
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -18040,17 +18526,42 @@ class Equipment extends GameObject {
 
 
 class Reactor extends Equipment {
-    constructor(game,parentObject) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
+        this.chargeRate = options.data.chargeRate;
+        this.capacity = options.data.capacity;
+
+        this.isReactor = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','capacity','readableChargeRate'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Reactor Type','Capacity','Recharge Rate'];
+
+        this.powerUpSound = game.add.audio('power-up')
+        this.powerDownSound = game.add.audio('power-down')
+    }
+
+    set equipped(equipped){
+        this._equipped = equipped;
         
-        this.name = "Reactor"
-        this.status = "OK"
-        this.chargeRate = .1;
+        if(this.parentObject){
+             if(equipped) this.parentObject.maxEnergy += this.capacity;
+             if(!equipped) this.parentObject.maxEnergy -= this.capacity;
+        }
+        
+        if(equipped){
+            this.powerUpSound.play();
+        } else {
+            this.powerDownSound.play();            
+        }
+    }
+
+    get equipped(){
+        return this._equipped;
     }
 
     update(){
         super.update();
-        this.parentObject.charge(this.chargeRate);
+        if(this.parentObject) this.parentObject.charge(this.chargeRate);
     }
 }
 
@@ -18075,17 +18586,101 @@ class Batteries extends Equipment {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/BasicFuelTank.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class BasicFuelTank extends Equipment {
+    constructor(game,options) {
+        super(game,options);
+        this.fuelCapacity = options.data.fuelCapacity;
+
+        this.isFuelTank = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','fuelCapacity'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Capacity'];
+    }
+
+    set equipped(equipped){
+        this._equipped = equipped;
+        
+        
+        if(this.parentObject){
+            console.log(this.parentObject.maxFuel);
+            
+            if(equipped) this.parentObject.maxFuel += this.fuelCapacity;
+            if(!equipped) this.parentObject.maxFuel -= this.fuelCapacity;
+                          
+            console.log(this.parentObject.maxFuel);
+        }
+        
+
+/*
+        TODO:
+        if(equipped){
+            this.powerUpSound.play();
+        } else {
+            this.powerDownSound.play();            
+        }
+*/
+    }
+
+    get equipped(){
+        return this._equipped;
+    }
+
+    update(){
+        super.update();
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/RepairKit.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class RepairKit extends Consumable {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.repairAmount = options.data.repairAmount;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','repairAmount'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Recovery'];
+    
+        this.consumeSound = game.add.audio('repair-light')
+    }
+    
+    consume(){
+        super.consume();
+        this.consumeSound.play();
+        
+        this.parentObject.health += this.repairAmount;
+
+        if(this.parentObject.health>=this.parentObject.maxHealth) {
+            this.parentObject.health = this.parentObject.maxHealth // Don't allow exceeding max health
+        }
+    }
+
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/weapons/_weapon.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 class Weapon extends Equipment {
-    constructor(game,parentObject) {
-        super(game);
-        this.parentObject = parentObject;
-        this.energyConsumption = 0;
-        
+    constructor(game,options) {
+        super(game,options);
+
         this.isWeapon = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','damage','energyConsumption','range'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Weapon Type','Damage','Energy Consumption','Range'];
+    }
+
+    fire(){
+        // Fallback
     }
 
     update(){
@@ -18146,6 +18741,8 @@ class Ship extends GameObject {
             }
         }
         
+        this.isShip = true;
+        
         this.xStart = x;
         this.yStart = y;
 
@@ -18155,9 +18752,10 @@ class Ship extends GameObject {
 
         this.fuelQuantity = 0;
         this.energyQuantity = 0;
+        this.maxEnergy = 0;
         this.oxygenQuantity = 3000;
         this.oxygenMax = 3000;
-        this.hullBreachAtHealthPercentage = .2;
+        this.hullBreachAtHealthPercentage = .40;
         this.hullBreached = false;
         this.O2Critical = false;
 
@@ -18175,8 +18773,11 @@ class Ship extends GameObject {
         this.navigationIndex = -1;
 
         // Sounds
-/*
+        this.infoSound = game.add.audio('beep-beep');
         this.gasLeakSound = game.add.audio('gas-leak');
+        this.dockConnectSound = game.add.audio('dock-connect');
+        this.dockReleaseSound = game.add.audio('dock-release');
+        this.navTargetChangedSound = game.add.audio('blorp');
         this.crashSounds = [
             game.add.audio('crash-1'),
             game.add.audio('crash-2'),
@@ -18189,7 +18790,11 @@ class Ship extends GameObject {
             game.add.audio('crash-light-1'),
             game.add.audio('crash-light-2'),
         ]        
-*/
+
+        this.crashThudSounds = [
+            game.add.audio('crash-thud-1'),
+            game.add.audio('crash-thud-2'),
+        ]        
     }
     
     setupSprite(sprite){
@@ -18228,6 +18833,9 @@ class Ship extends GameObject {
         // Health
         this.health = this.specs.health;
         this.maxHealth = this.specs.health;
+        
+        // Fuel
+        this.maxFuel = this.specs.maxFuel
         
         // Info
         this.name = this.specs.name;
@@ -18324,8 +18932,6 @@ class Ship extends GameObject {
     }
 
     equipWeaponInSlot(weapon,slot){
-        weapon.equiped = true;
-        
         this.weapons.push(weapon);
         
         weapon.weapon.trackSprite(
@@ -18337,13 +18943,38 @@ class Ship extends GameObject {
         );
     }
 
+    unequipWeapon(weapon){
+        weapon.equipped = false;
+
+        var index = this.weapons.indexOf(weapon);
+        if (index > -1) {
+            this.weapons.splice(index, 1);
+        }
+    }
+
     // Engines
     equipEngineInSlot(engine,slot){
         // Equip
-        engine.equiped = true;
         this.engines.push(engine);
+
+        engine.parentObject = this;
         engine.slot = slot;
         
+        this.calculateMaxSpeed(); 
+    }
+    
+    unequipEngine(engine){
+        engine.equipped = false;
+        
+        var index = this.engines.indexOf(engine);
+        if (index > -1) {
+            this.engines.splice(index, 1);
+        }
+        
+        this.calculateMaxSpeed();
+    }
+
+    calculateMaxSpeed(){
         // Calculate new max speed (average of engine max speeds)
         var maxSpeed = 0;
         for (let engine of this.engines) {
@@ -18351,6 +18982,7 @@ class Ship extends GameObject {
         }
         this.maxSpeed = maxSpeed/10 // No idea.
     }
+    
     
     setupRCSThrusters(){
         if(this.specs.RCS != undefined){
@@ -18362,7 +18994,10 @@ class Ship extends GameObject {
     }    
     
     addThruster(thruster,layout){
-        this.thrusters[thruster] = new Thruster(this.game,this,layout)
+        this.thrusters[thruster] = new Thruster(this.game,{
+            parentObject : this,
+            layout : layout,
+        })
         
         // Hande retro thrusters
         if(layout.retro !=undefined){
@@ -18398,8 +19033,16 @@ class Ship extends GameObject {
     
     // Equipment
     equipEquipmentInSlot(equipment,slot){
-        equipment.equiped = true;
         this.equipment.push(equipment);
+    }
+
+    unequipEquipment(equipment){
+        equipment.equipped = false;
+        
+        var index = this.equipment.indexOf(equipment);
+        if (index > -1) {
+            this.equipment.splice(index, 1);
+        }
     }
 
     
@@ -18625,6 +19268,8 @@ class Ship extends GameObject {
         if(this.navigationIndex>this.navigatableObjects.length-1){
             this.navigationIndex = -1;   
         }
+
+        this.navTargetChangedSound.play();
         
         this.setNavigationTargetToCurrentNavigationTargetIndex();
     }
@@ -18694,7 +19339,7 @@ class Ship extends GameObject {
     
     // Fuel Mgmt
     refuel(){
-        this.fuelQuantity = this.specs.maxFuel;
+        this.fuelQuantity = this.maxFuel;
         this.lowFuelLightShown = false;
     }
     
@@ -18722,7 +19367,7 @@ class Ship extends GameObject {
     }
     
     get fuelPercentage(){
-        return Math.round((this.fuelQuantity/this.specs.maxFuel)*100)        
+        return Math.round((this.fuelQuantity/this.maxFuel)*100)        
     }
 
     get hasFuel(){
@@ -18735,16 +19380,16 @@ class Ship extends GameObject {
     
     // Energy Management
     recharge(){
-        this.energyQuantity = this.specs.maxEnergy;
+        this.energyQuantity = this.maxEnergy;
     }
     
     charge(amount){
-        if(this.energyQuantity <= this.specs.maxEnergy){
+        if(this.energyQuantity <= this.maxEnergy){
             this.energyQuantity += amount;
         }
         
-        if(this.energyQuantity>=this.specs.maxEnergy){
-            this.energyQuantity = this.specs.maxEnergy;
+        if(this.energyQuantity>=this.maxEnergy){
+            this.energyQuantity = this.maxEnergy;
         }
     }
             
@@ -18757,7 +19402,7 @@ class Ship extends GameObject {
     }
     
     get energyPercentage(){
-        var value = Math.round((this.energyQuantity/this.specs.maxEnergy)*100);
+        var value = Math.round((this.energyQuantity/this.maxEnergy)*100);
         return Math.max(value,0);
     }
         
@@ -18905,9 +19550,12 @@ class Ship extends GameObject {
     }
     
     dockingComplete(){
+        
         var target = this.target;
         var dockedShip = this.dockedShip;
         var portNumber = this.portNumber; // What docking port am i at?
+
+        this.target.dockConnectSound.play();
         
         target.sprite.body.loadPolygon(null,target.specs.polygon);       
         target.sprite.body.dynamic = true
@@ -18930,6 +19578,7 @@ class Ship extends GameObject {
 
     releaseDock(){
         if(this.hardDocked && this.isDocked){
+            this.dockReleaseSound.play();
             game.physics.p2.removeConstraint(this.dockingConstraint);
             
     	    var emitter = this.game.add.emitter(0,0,100);
@@ -18964,6 +19613,8 @@ class Ship extends GameObject {
     // Info
     showInfoIfNeeded(){
         if(this.shouldShowInfo && !this.infoShowing){
+            this.infoSound.play();
+
             this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
             //this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
             
@@ -19142,7 +19793,18 @@ class Ship extends GameObject {
         if(!isPlayingAnySound){
             this.crashLightSounds[this.game.rnd.integerInRange(0,this.crashLightSounds.length-1)].play();
         }       
+    }
+    crashThud_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashThudSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
         
+        if(!isPlayingAnySound){
+            this.crashThudSounds[this.game.rnd.integerInRange(0,this.crashThudSounds.length-1)].play();
+        }       
     }
 
     
@@ -19204,20 +19866,27 @@ class Ship extends GameObject {
 
 
 class Engine extends Equipment {
-    constructor(game,parentObject) {
-        super(game,parentObject);
-
-        this.currentSpool = 0;
+    constructor(game,options) {
+        super(game,options);
 
         this.fuelConsumption = 1;
-
         this.thrust = 100;
         this.spoolUpSpeed = 1;
         this.spoolDownSpeed = .04;
+
+        this.currentSpool = 0;
+        this.isEngine = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','thrust','fuelConsumption'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Engine Type','Thrust','Fuel Consumption'];
     }
 
     set slot(slot){
         var slotAnchor = this.parentObject.specs.engineSlots[slot].anchor;
+        
+        // Setup Flames
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
+        this.flames.blendMode = PIXI.blendModes.ADD;
         this.flames.angle = this.parentObject.specs.engineSlots[slot].angle;
         this.flames.anchor.set(slotAnchor.x,slotAnchor.y);
     }
@@ -19258,31 +19927,28 @@ class Engine extends Equipment {
 
 
 class BasicEngine extends Engine {
-    constructor(game,parentObject) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
 
-        this.thrust = 200;
-        this.maxSpeed = 150;
-        this.spoolUpSpeed =.08;
-        this.spoolDownSpeed = .04;
-        this.fuelConsumption = .7;
+        this.thrust = options.data.thrust;
+        this.maxSpeed = options.data.maxSpeed;
+        this.spoolUpSpeed = options.data.spoolUpSpeed;
+        this.spoolDownSpeed = options.data.spoolDownSpeed;
+        this.fuelConsumption = options.data.fuelConsumption;
 
-        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
-        this.flames.blendMode = PIXI.blendModes.ADD;
-
-        //this.sound = game.add.audio('basic-engine');
+        this.sound = game.add.audio('basic-engine');
     }
     accelerate(){
         super.accelerate();
-        //if(!this.sound.isPlaying) this.sound.play();
+        if(!this.sound.isPlaying) this.sound.play();
         
-        //this.sound.volume = this.flames.alpha;
+        this.sound.volume = this.flames.alpha;
     }
     deaccelerate(){
         super.deaccelerate();
-        //this.sound.volume = this.flames.alpha;
+        this.sound.volume = this.flames.alpha;
         
-        //if(this.sound.volume==0 && this.sound.isPlaying) this.sound.stop();
+        if(this.sound.volume==0 && this.sound.isPlaying) this.sound.stop();
     }
 
 }
@@ -19293,8 +19959,11 @@ class BasicEngine extends Engine {
 
 
 class SmallEngine extends Engine {
-    constructor(game,parentObject) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
+
+        this.name = 'Small Engine';
+        this.key = 'small_engine';
 
         this.thrust = 130;
         this.maxSpeed = 150;
@@ -19314,8 +19983,8 @@ class SmallEngine extends Engine {
 
 
 class Thruster extends Engine {
-    constructor(game,parentObject,layout) {
-        super(game,parentObject);
+    constructor(game,options) {
+        super(game,options);
 
         this.engineType = ENGINE_TYPES.reactionControlThruster;
         this.thrust = 0;
@@ -19324,12 +19993,12 @@ class Thruster extends Engine {
         this.spoolUpSpeed = .3;
         this.spoolDownSpeed = .6;
 
-        this.layout = layout;
+        this.layout = options.layout;
 
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'rcs_flame'));
-        this.flames.x = layout.x-this.parentObject.sprite.width/2;
-        this.flames.y = layout.y-this.parentObject.sprite.height/2;
-        this.flames.angle = layout.angle;
+        this.flames.x = this.layout.x-this.parentObject.sprite.width/2;
+        this.flames.y = this.layout.y-this.parentObject.sprite.height/2;
+        this.flames.angle = this.layout.angle;
         this.flames.scale.set(.9);
         this.flames.anchor.set(0,0);
         this.flames.blendMode = PIXI.blendModes.ADD;    
@@ -19349,8 +20018,7 @@ class Thruster extends Engine {
         this.emitter.addToWorld();
 
         this.game.ps.addData('smoke', smoke);
-
-        this.sound = game.add.audio('rcs-loop');
+        this.soundCountdown = 10;
     }
     accelerate(){
         super.accelerate();
@@ -19358,12 +20026,8 @@ class Thruster extends Engine {
     }
     deaccelerate(){
         super.deaccelerate();
-        //this.sound.fadeOut(100);
     }    
     puff(){
-        //this.sound.volume = .2;
-        //if(!this.sound.isPlaying) this.sound.loopFull();
-
         var px = this.flames.worldPosition.x + game.camera.x;
         var py = this.flames.worldPosition.y + game.camera.y;
 
@@ -19381,9 +20045,7 @@ class Pickup extends GameObject {
         super(game);
      
         this.group = group        
-        this.magneticDistance = 150;
-    
-        this.contents = new InventoryObject(this.game);
+        this.magneticDistance = 150;    
     }
 
     pickedUpBy(object){
@@ -19455,12 +20117,12 @@ class FlakePickup extends Pickup {
         // Item
         var chance = game.rnd.realInRange(0,1);
         if(chance<RARITY_MINING_CHANCE.rare){
-            this.contents = InventoryObject.make('raw_paladium');            
+            this.contents = InventoryObject.make('raw_paladium',this.game);            
         } else if(chance<RARITY_MINING_CHANCE.uncommon){
-            this.contents = InventoryObject.make('meteoric_iron');            
+            this.contents = InventoryObject.make('meteoric_iron',this.game);            
         } else {
-            this.contents = InventoryObject.make('asteroid_flake');            
-        }            
+            this.contents = InventoryObject.make('asteroid_flake',this.game);            
+        }
     }
 
     processCollision(pickup,player){
@@ -19493,7 +20155,8 @@ class Asteroid extends GameObject {
         super(game);
      
         this.group = group
-           
+        this.emitFlakes = false;
+        
         if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
         if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
         if(size==undefined) size = 'large';
@@ -19553,16 +20216,32 @@ class Asteroid extends GameObject {
 
         this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
         this.sprite.anchor.set(0.5);
+
+        this.hitEmitter = this.game.add.emitter(0, 0, 100);
+        this.hitEmitter.makeParticles('asteroid-flake-3');
+        this.hitEmitter.minParticleScale = .5;
+        this.hitEmitter.maxParticleScale = 1;
+        this.hitEmitter.gravity = 0;
+        this.hitEmitter.particleBringToTop = true;
+        
+        this.explodeSounds = [
+            game.add.audio('rock-crash-1'),
+            game.add.audio('rock-crash-2'),
+            game.add.audio('rock-crash-3'),
+            game.add.audio('rock-crash-4'),
+            game.add.audio('rock-crash-5'),
+            game.add.audio('rock-crash-6'),
+        ]
+        this.damageSound = game.add.audio('crunch-1');
+        this.soundCountdown = 10;
     }
 
     hit(bullet){
-	    var emitter = this.game.add.emitter(bullet.x, bullet.y, 100);
-        emitter.makeParticles('asteroid-flake-3');
-        emitter.minParticleScale = .5;
-        emitter.maxParticleScale = 1;
-        emitter.gravity = 0;
-        emitter.explode(200, 1);
-        this.game.time.events.add(500, this.destroyEmitter, emitter);        
+	    this.hitEmitter.x = bullet.x;
+	    this.hitEmitter.y = bullet.y;	
+	    this.emitFlakes = true;
+	    this.soundCountdown = 10;
+	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
     }
         
     kill(){
@@ -19594,24 +20273,32 @@ class Asteroid extends GameObject {
         } else if(this.size=='tiny'){
             this.destroy();
         }
+        this.damageSound.stop();
     } 
        
     explode(){
 	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
 	    this.game.asteroids.add(emitter);
-        emitter.makeParticles('asteroid-flake-1');
+        emitter.makeParticles('asteroid-flake-1',0,7);
         emitter.gravity = 0;
         emitter.maxRotation = 100;
         emitter.minRotation = 30;
         emitter.minParticleScale = .5;
         emitter.maxParticleScale = 1;
-        emitter.explode(3500, game.rnd.integerInRange(5, 10));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);        
+        emitter.explode(6000, game.rnd.integerInRange(3, 7));
+        this.game.time.events.add(5000, this.destroyEmitter, emitter);
+        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
     }
     
     // Rendering
     update() {
         super.update();
+        
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
         
         // Spin
         this.sprite.body.angularVelocity = this.roationSpeed;                
@@ -19647,11 +20334,6 @@ class AsteroidField extends GameObject {
             } else {
                 var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
             }
-        }
-        for (var i = 0; i < this.asteroidsCount*3; i++) { 
-            var xPos = game.rnd.integerInRange(x-size, x+size);
-            var yPos = game.rnd.integerInRange(y-size, y+size);
-            var asteroid = new Asteroid(this.game,this.asteroids,'tiny',xPos,yPos);
         }
 
         new Buoy(this.game,xPos,yPos);
@@ -19750,7 +20432,7 @@ class BasicMiner extends Ship {
         this.specs = {
             name : 'MV Fair Rosamond',
             description : 'Cobalt Class Mining Vessel',
-            health: 100,
+            health: 130,
             turnDecay: .03,
             turnAccel: .1,
             leftRightThrust: 100,
@@ -19758,7 +20440,7 @@ class BasicMiner extends Ship {
             reverseThrust: 100,
             maxReverse: 90,
             maxFuel : 2200,
-            maxEnergy: 100,
+            maxEnergy: 0,
             mass: 2, // Tons
             equipmentSlots : 4,
             centerOfGravity : {
@@ -19786,13 +20468,6 @@ class BasicMiner extends Ship {
                 offsetY : -8,
             },
             weaponSlots : [
-                {
-                    position : {
-                        x: 0,
-                        y: 0
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                },
                 {
                     position : {
                         x: 9,
@@ -19851,40 +20526,21 @@ class BasicMiner extends Ship {
                 inUse: false,
             },
             storage : {
-                bulk : 300,
+                equipment : 500,
+                bulk : 800,
             }
         }
 
         // Sprites
-        
-        
         this.sprite = this.game.add.sprite(x,y, 'mining_ship');
         this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
 
         this.setupSprite(this.sprite);
-
-        // Weapons
-        var miningLaser = new BasicMiningLaser(this.game,this);
-        this.equipWeaponInSlot(miningLaser,1);
-
-        //var blaster = new BasicBlaster(this.game,this);
-        //this.equipWeaponInSlot(blaster,1);
-
-        // Engine
-        var engine = new BasicEngine(this.game,this);
-        this.equipEngineInSlot(engine,0);
-        this.refuel();
-
-        // Reactor
-        var reactor = new Reactor(this.game,this);
-        this.equipEquipmentInSlot(reactor,0);
-        this.recharge();
         
         // Cargo
         this.emptyCargoHold();
     }
 }
-
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/ships/fuelTanker.js begins */
@@ -20031,6 +20687,7 @@ class FuelTanker extends Ship {
         //this.equipWeaponInSlot(blaster,1);
 
         // Engine
+/*
         var engine = new BasicEngine(this.game,this);
         this.equipEngineInSlot(engine,0);
         this.refuel();
@@ -20039,6 +20696,7 @@ class FuelTanker extends Ship {
         var reactor = new Reactor(this.game,this);
         this.equipEquipmentInSlot(reactor,0);
         this.recharge();
+*/
         
         // Cargo
         this.emptyCargoHold();
@@ -20166,22 +20824,18 @@ class Shuttle extends Ship {
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/weapons/basicMiningLaser.js begins */
+/* Merging js: app/weapons/focusedBeam.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class BasicMiningLaser extends Weapon {
-    constructor(game,parentObject) {
-        super(game,parentObject);
-
-        this.name = 'Mining Laser';
-        this.status = 'OK';
-
+class FocusedBeamWeapon extends Weapon {
+    constructor(game,options) {
+        super(game,options);
+        
         this.baseBulletSpeed = 400;
-
         this.weapon = game.add.weapon(40, 'laser-sparkle');
         this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-        this.weapon.bulletLifespan = 150;
+        this.weapon.bulletLifespan = options.data.range;
         this.weapon.bulletSpeed = this.baseBulletSpeed;
         this.weapon.fireRate = 20;
         this.weapon.bulletAngleVariance = 1.5;
@@ -20190,10 +20844,10 @@ class BasicMiningLaser extends Weapon {
         this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
         this.weapon.bullets.setAll('scale.x', 0.3);
         this.weapon.bullets.setAll('scale.y', 0.1);
-        this.weapon.bullets.setAll('damage',1.2);
+        this.weapon.bullets.setAll('damage',options.data.damage);
         this.weapon.bullets.setAll('smoothed',false);
-        this.weapon.setBulletBodyOffset(6, 6, 50, 30);
-        
+        this.weapon.setBulletBodyOffset(6, 6, 50, 30);        
+        this.weapon.onFire.add(this.fire, this);
         // Should be on the ships
         this.game.ships.addChild(this.weapon.bullets)
         
@@ -20202,11 +20856,47 @@ class BasicMiningLaser extends Weapon {
             bullet.postUpdate = this.postUpdate;
         },this);
 
-        this.energyConsumption = .3;
+        this.energyConsumption = options.data.energyConsumption;
+
+        this.sound = game.add.audio('mining-laser')
+        this.sound.addMarker('begin',0,0.15);
+        this.sound.addMarker('loop',0.15,0.573);
+        this.sound.addMarker('end',1.123,0.45);
+        this.soundCountdown = 10;
+        this.coolingDown = false;
+        this.sound.onStop.add(this.soundStopped, this);
+    }
+    soundStopped(sound,marker){
+        if(marker=='begin'){
+            this.sound.play('loop',0,1,true);
+        }
+        if(marker=='end'){
+            this.sound.pause();
+            this.coolingDown = false;
+        }
+    }    
+    
+    fire(){
+        super.fire();
+	    this.soundCountdown = 10;
+        if(!this.sound.isPlaying) this.sound.play('begin');
+    }
+    
+    doneFiring(){
+        if(!this.coolingDown && this.sound.isPlaying) {
+            this.sound.play('end');
+            this.coolingDown = true;
+        }
     }
     
     update(){
-        this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
+        if(this.soundCountdown==0){
+            this.doneFiring();
+        } else {
+            this.soundCountdown--;
+        }
+
+        if(this.parentObject) this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
     }
 }
 
@@ -20265,6 +20955,7 @@ class Planet extends GameObject{
         }
 
         this.itemMarkup = 1.1 // Multuplier
+        this.infoSound = game.add.audio('beep-beep');
     }
 
     setupSprite(){
@@ -20296,7 +20987,9 @@ class Planet extends GameObject{
     }
     
     showInfoIfNeeded(){
-        if(this.shouldShowInfo && !this.infoShowing){
+        if(this.shouldShowInfo && !this.infoShowing){ 
+            this.infoSound.play();
+                   
             this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
             this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
             
@@ -20469,7 +21162,23 @@ class Player extends GameObject {
 
         // Keys
         this.controlMode = CONTROL_MODE.play;
-        
+
+        // RCS
+        this.rcsSoundCountdown = 1;
+        this.rcsSound = game.add.audio('rcs-loop');
+        this.rcsSound.onFadeComplete.add(this.rcsSoundFadeComplete, this);
+
+        this.allowHissSound = true;
+        this.allowHissSoundForReverse = true;
+        this.hissSounds = [
+            game.add.audio('hiss-1'),
+            game.add.audio('hiss-2'),
+            game.add.audio('hiss-3'),
+            game.add.audio('hiss-4'),
+            game.add.audio('hiss-5')
+        ]
+
+
         this.cursors = this.game.input.keyboard.createCursorKeys();
         this.fireButton = this.game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);  
         
@@ -20496,6 +21205,13 @@ class Player extends GameObject {
         jKey.onUp.add(function(){
             if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
         }, this);
+
+        // Inventory
+        var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
+        iKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
+        }, this);
+
     }
     
     get credits(){
@@ -20522,7 +21238,7 @@ class Player extends GameObject {
 
 
     autoRefuel(){
-        var fuelNeeded = this.ship.specs.maxFuel - this.ship.fuelQuantity;
+        var fuelNeeded = this.ship.maxFuel - this.ship.fuelQuantity;
         this.game.economy.buyFuel(fuelNeeded);
     }
     
@@ -20540,35 +21256,76 @@ class Player extends GameObject {
         this.ship.sprite.body.setZeroRotation();
         this.ship.sprite.body.setZeroForce();
     }
-        
+    
+    rcsSoundFadeComplete(){
+        this.rcsSound.stop();
+    }
+    
+    hiss(){
+        if(this.allowHissSound) {
+            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
+        }        
+        this.allowHissSound = false;
+    }
+    
+    reverseHiss(){
+        if(this.allowHissSoundForReverse) {
+            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
+        }
+        this.allowHissSoundForReverse = false;
+    }
+    
     update() {
         super.update();
-                
+
+        if(this.rcsSoundCountdown>=0){
+            if(this.rcsSoundCountdown==0){
+                this.rcsSound.fadeOut(30);
+            } else {
+                this.rcsSoundCountdown--;
+            }
+        }
+
         // Normal "Play" control mode"
-        if(this.controlMode == CONTROL_MODE.play){
+        if(this.controlMode == CONTROL_MODE.play && !this.ship.isDocked){
             // Accel
             if (this.cursors.up.isDown) {
                 this.ship.accelerate();
             } else if(this.cursors.down.isDown) {
+                this.reverseHiss();
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
                 this.ship.goInReverse();
             } else {
+                this.allowHissSoundForReverse = true;
                 this.ship.deaccelerate();
             }
         
             // Turning / Strafing
             if (this.cursors.left.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
+
                 if(this.cursors.left.shiftKey){
                     this.ship.moveLeft();
                 } else {
                     this.ship.turnLeft();
                 }
             } else if (this.cursors.right.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
+
                 if(this.cursors.right.shiftKey){
                     this.ship.moveRight();
                 } else {
                     this.ship.turnRight();
                 }
             } else {
+                this.allowHissSound = true;
                 this.ship.deaccelerateTurning();
             }
             
@@ -20602,12 +21359,18 @@ class HUD {
 
         this.masterAlarmSound = game.add.audio('master_alarm');
 
+        // Updaters
+        game.time.events.loop(Phaser.Timer.SECOND * .25, this.slowUpdate, this);
+        game.time.events.loop(Phaser.Timer.SECOND * 1, this.verySlowUpdate, this);
+
+        // Sidebar
+        this.sidebarWidth = 140;
         this.sidebar = this.group.add(new Phaser.Graphics(this.game.game,0,0));
         this.sidebar.beginFill(0x111111);
         this.sidebar.drawRect(
             x-20,
             0,
-            200,
+            this.sidebarWidth,
             this.game.camera.height,
             
         )
@@ -20643,32 +21406,7 @@ class HUD {
         
         // Navigation
         this.navigationGroup = this.game.add.group()
-/*
-        this.navBackground = this.navigationGroup.add(new Phaser.Graphics(this.game.game,0,0));
-        this.navBackground.beginFill(backgroundColor);
-        this.navBackground.drawRoundedRect(
-            20,
-            20,
-            this.minimap.width,
-            53,
-            borderRadius
-        )
-        this.background.endFill();
-*/
         this.group.add(this.navigationGroup)
-        
-/*
-        this.navLabel = new Phaser.BitmapText(
-            this.game.game, 
-            20,
-            20,
-            'pixelmix_8',
-            'NAVIGATION',
-            5
-        );  
-        this.navLabel.tint = 0x948f9c;
-        this.navigationGroup.add(this.navLabel)
-*/
 
         this.navDestDisplay = new Phaser.BitmapText(
             this.game.game, 
@@ -20727,11 +21465,10 @@ class HUD {
         this.navigationGroup.add(this.navDistanceDisplay)
 
         // EFI
-        this.fuelProgressBar = new ProgressBar(this.game,this,'FUEL',x-8,y+8);
-        this.game.register(this.fuelProgressBar)
+        this.healthProgressBar = new ProgressBar(this.game,this,'HULL',x-8,y+8);
+        this.fuelProgressBar = new ProgressBar(this.game,this,'FUEL',x-8,y+43);
+        this.energyProgressBar = new ProgressBar(this.game,this,'ENERGY',x-8,y+78);
 
-        this.energyProgressBar = new ProgressBar(this.game,this,'ENERGY',x-8,y+43);
-        this.game.register(this.energyProgressBar)
 
         // Credits
         this.creditsText = new Phaser.BitmapText(
@@ -20754,16 +21491,6 @@ class HUD {
         );  
         this.creditsLabel.tint = 0x948f9c;
         this.group.add(this.creditsLabel)
-/*
-        this.background.beginFill(backgroundColor);
-        this.background.drawRoundedRect(
-            x-padding,
-            this.creditsText.y-padding,
-            width+padding*2,
-            lineHeight+padding+4,
-            borderRadius)
-        this.background.endFill();
-*/
 
         // Cargo
         this.cargoText = {};
@@ -20771,9 +21498,9 @@ class HUD {
         this.cargoLabel = new Phaser.BitmapText(
             this.game.game, 
             x-8,
-            y+105,
+            y+142,
             'pixelmix_8',
-            'CARGO',
+            'CARGO (kg)',
             5
         );  
         this.cargoLabel.tint = 0x948f9c;
@@ -20809,6 +21536,7 @@ class HUD {
         this.equipmentText = {};
         var eIndex = 0;
         var equipmentHeight = 0;
+/*
         this.equipmentLabel = new Phaser.BitmapText(
             this.game.game, 
             x-8,
@@ -20819,39 +21547,38 @@ class HUD {
         );  
         this.equipmentLabel.tint = 0x948f9c;
         this.group.add(this.equipmentLabel)
+*/
         var equipmentList = this.game.player.ship.equipment.concat(this.game.player.ship.weapons);        
+/*
         for (let equipment of equipmentList) {
             var name = equipment.name;
-            if(equipment.isWeapon && equipment.equiped){
-                name = `> ${name}`
+            if(equipment.equipped){
+                var equipmentNameLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    (this.equipmentLabel.y+padding)+(lineHeight*eIndex)+padding,
+                    'pixelmix_8',
+                    name,
+                    5
+                );
+                this.group.add(equipmentNameLabel);
+                equipmentNameLabel.anchor.set(0,0);
+    
+                var equipmentStatusLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x+108,
+                    equipmentNameLabel.y,
+                    'pixelmix_8',
+                    equipment.status,
+                    5
+                );
+                equipmentStatusLabel.tint = 0x948f9c;
+                this.group.add(equipmentStatusLabel);
+                equipmentStatusLabel.anchor.set(1,0);
             }
-
-            var equipmentNameLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x-8,
-                (this.equipmentLabel.y+padding)+(lineHeight*eIndex)+padding,
-                'pixelmix_8',
-                name,
-                5
-            );
-            this.group.add(equipmentNameLabel);
-            equipmentNameLabel.anchor.set(0,0);
-
-            var equipmentStatusLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x+108,
-                equipmentNameLabel.y,
-                'pixelmix_8',
-                equipment.status,
-                5
-            );
-            equipmentStatusLabel.tint = 0x948f9c;
-            this.group.add(equipmentStatusLabel);
-            equipmentStatusLabel.anchor.set(1,0);
-
-
             eIndex++;
         }
+*/
 
         // Master Alarm
         this.masterAlarmSprite = this.game.add.sprite(this.game.camera.width-200,10, 'master-alarm');
@@ -20876,23 +21603,22 @@ class HUD {
         this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
         this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
-/*
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
-            var equipmentType = this.game.player.ship.specs.storage[key];
-    
-            var equipmentTypeLabel = new Phaser.BitmapText(
-                this.game.game, 
-                x-8,
-                this.equipmentText[key].y,
-                'pixelmix_8',
-                key.charAt(0).toUpperCase() + key.slice(1),
-                5
-            );
-            equipmentTypeLabel.tint = 0x948f9c;
-            this.group.add(equipmentTypeLabel);
-            equipmentHeight = (index*lineHeight)+padding*4;
+            if(this.equipmentText[key]){
+                var equipmentType = this.game.player.ship.specs.storage[key];    
+                var equipmentTypeLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    this.equipmentText[key].y,
+                    'pixelmix_8',
+                    key.charAt(0).toUpperCase() + key.slice(1),
+                    5
+                );
+                equipmentTypeLabel.tint = 0x948f9c;
+                this.group.add(equipmentTypeLabel);
+                equipmentHeight = (index*lineHeight)+padding*4;
+            }
         }.bind(this));
-*/
 
 
         // MESSAGES
@@ -20935,6 +21661,9 @@ class HUD {
         this.blinkyMessageText.anchor.x = .5;
         this.blinkyMessageText.fixedToCamera = true;
         this.blinkyMessageText.tint = 0xe74c3c;
+
+        this.verySlowUpdate();
+        this.slowUpdate();
     }
     
     title(message,submessage){
@@ -21013,39 +21742,31 @@ class HUD {
     }
     
     updateNavigationDisplay(){
-        var player = this.game.player.ship;
-        var target = player.navigationTarget;
-        if(target==null){
-            this.navDestDisplay.setText('Navigation Off');
-            this.navigationGroup.visible = false;
-            this.navigationArrow.visible = false;
-        } else {
-            this.navDestDisplay.setText(`> ${target.name} (${target.description})`);
-            this.navETADisplay.setText(`${this.game.player.ship.formattedTimeToCurrentNavigationTarget}`);
-            this.navDistanceDisplay.setText(`${this.game.player.ship.formattedDistanceToCurrentNavigationTarget}`);        
-            this.navigationGroup.visible = true;
-                        
-            if(player.distanceToCurrentNavigationTarget>150){
-                this.navigationArrow.visible = true;
-                
-                this.navigationArrow.angle = player.angleToCurrentNavigationTarget;
-                this.navigationArrow.x = this.game.player.ship.sprite.x - this.game.camera.x;
-                this.navigationArrow.y = this.game.player.ship.sprite.y - this.game.camera.y;                
+        if(this.navDestDisplay!=undefined){
+            var player = this.game.player.ship;
+            var target = player.navigationTarget;
+            if(target==null){
+                this.navDestDisplay.setText('Navigation Off');
+                this.navigationGroup.visible = false;
+                this.navigationArrow.visible = false;
             } else {
-                
-                this.game.add.tween(this.navigationArrow).to({
-                    angle: 90,
-                    x: target.sprite.x - this.game.camera.x,
-                    y: ((target.sprite.y - target.sprite.height/2) - this.game.camera.y)-100,
-                }, 300, "Quart.easeOut", true);
-/*
-                this.game.add.tween(this.navigationArrow.anchor).to({
-                    x: .5,
-                    y: .5,
-                }, 300, "Quart.easeOut", true);
-*/
-                
-               // this.navigationArrow.anchor.set(1,.5);
+                this.navDestDisplay.setText(`> ${target.name} (${target.description})`);
+                this.navETADisplay.setText(`${this.game.player.ship.formattedTimeToCurrentNavigationTarget}`);
+                this.navDistanceDisplay.setText(`${this.game.player.ship.formattedDistanceToCurrentNavigationTarget}`);        
+                this.navigationGroup.visible = true;
+                            
+                if(player.distanceToCurrentNavigationTarget>150){
+                    this.navigationArrow.visible = true;
+                    this.navigationArrow.angle = player.angleToCurrentNavigationTarget;
+                    this.navigationArrow.x = this.game.player.ship.sprite.x - this.game.camera.x;
+                    this.navigationArrow.y = this.game.player.ship.sprite.y - this.game.camera.y;                
+                } else {        
+                    this.game.add.tween(this.navigationArrow).to({
+                        angle: 90,
+                        x: target.sprite.x - this.game.camera.x,
+                        y: ((target.sprite.y - target.sprite.height/2) - this.game.camera.y)-100,
+                    }, 300, "Quart.easeOut", true);
+                }
             }
         }
     }
@@ -21088,23 +21809,11 @@ class HUD {
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
-    update() {
-        // Date
-        this.stardateLabel.setText(moment(this.game.starDate).format('MMM Do'));
-
-        // Map
+    slowUpdate(){
         this.minimap.update();
+    }
 
-        // Navigation
-        this.updateNavigationDisplay();
-        
-        // EFI
-        this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
-        this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
-
-        // O2
-        this.o2Percent = this.game.player.ship.o2Percent;
-        
+    verySlowUpdate(){
         // Credits
         this.creditsText.setText(`${this.game.player.credits}`);
 
@@ -21112,10 +21821,34 @@ class HUD {
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
             var usedSpace = this.game.player.ship.usedSpaceForStorageClass(key);
             var maxSpace = this.game.player.ship.maxSpaceForStorageClass(key);
-            
             this.cargoText[key].setText(`${usedSpace}/${maxSpace}`);
         }.bind(this));
+    }
+    
+    update() {
+        // Navigation
+        this.updateNavigationDisplay();
 
+        // EFI
+        if(this.healthValue_cache!=this.game.player.ship.health || this.healthMaxValue_cache!=this.game.player.ship.maxHealth){
+            this.healthProgressBar.value = this.game.player.ship.health;
+            this.healthProgressBar.max = this.game.player.ship.maxHealth;
+        }
+        this.healthValue_cache = this.healthProgressBar.value
+        this.healthMaxValue_cache = this.healthProgressBar.max
+
+        
+        if(this.fuelPercentage_cache!=this.game.player.ship.fuelPercentage)
+            this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
+        
+        if(this.energyPercentage_cache!=this.game.player.ship.energyPercentage)        
+            this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
+        
+        this.fuelPercentage_cache = this.fuelProgressBar.valuePercent;
+        this.energyPercentage_cache = this.energyProgressBar.valuePercent;
+
+        // O2
+        this.o2Percent = this.game.player.ship.o2Percent;
     }
 }
 
@@ -21200,6 +21933,12 @@ class ProgressBar {
         this.hud = hud;
 
         this.valuePercent = 0;
+        this._valuePercent = 0;
+        this.value = null;
+        this._value = null;
+        this.max = 0;
+        this._max = 0;
+        this.displayTotal = false;
         this.title = title;
 
         this.barBitmapData = this.phaserGame.add.bitmapData(116);
@@ -21231,365 +21970,61 @@ class ProgressBar {
         );
         this.amountDisplay.tint = 0xFFFFFF;
         this.amountDisplay.anchor.set(1,0);
-        this.hud.group.add(this.amountDisplay)
-        
+        this.hud.group.add(this.amountDisplay)   
     }
-    update(){
-        this.barBitmapData.clear();
-        this.barBitmapData.ctx.fillStyle = '#504d54';
-        this.barBitmapData.rect(0,0,116,10);
 
-        this.barBitmapData.ctx.fillStyle = '#EEEEEE';
-        this.barBitmapData.rect(0,0,Math.round(this.valuePercent*1.16),10);
-
-        this.amountDisplay.setText(this.valuePercent+"%");
-
-        this.barBitmapData.dirty = true;        
+    set valuePercent(valuePercent){
+        this._valuePercent = valuePercent;
+        this.draw();
+    }
     
+    get valuePercent(){
+        return this._valuePercent;
+    }
+
+    set value(value){
+        this._value = value;
+        this.draw();
+    }
+    
+    get value(){
+        return this._value;
+    }
+
+    set max(max){
+        this._max = max;
+        this.draw();
+    }
+    
+    get max(){
+        return this._max;
+    }
+
+    draw(){
+        if(this.barBitmapData!=undefined){
+            this.barBitmapData.clear();
+            this.barBitmapData.ctx.fillStyle = '#504d54';
+            this.barBitmapData.rect(0,0,116,10);
+            if(this.value){
+                this.barBitmapData.ctx.fillStyle = '#EEEEEE';
+                this.barBitmapData.rect(0,0,Math.round(((this.value/this.max)*100)*1.16),10);
+                this.amountDisplay.setText(`${Math.round(this.value)}/${Math.round(this.max)}`); 
+            } else {
+                if(isNaN(this.valuePercent)) this.valuePercent = 0;
+                this.barBitmapData.ctx.fillStyle = '#EEEEEE';
+                this.barBitmapData.rect(0,0,Math.round(this.valuePercent*1.16),10);
+                this.amountDisplay.setText(this.valuePercent+"%");
+            }
+    
+            this.barBitmapData.dirty = true;                    
+        }
+    }
+
+    update(){    
     
     }
     
 }
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/game.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-const screenWidth = 1600/2
-const screenHeight = 1000/2
-
-var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
-    gameObjects : [],
-    preload : function(){
-        this.time.advancedTiming = true
-
-        //this.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
-        this.scale.fullScreenScaleMode = Phaser.ScaleManager.SHOW_ALL;
-        //this.game.renderer.renderSession.roundPixels = true;
-
-        Phaser.Canvas.setImageRenderingCrisp(this.game.canvas);
-        PIXI.scaleModes.DEFAULT = PIXI.scaleModes.NEAREST
-        
-        //this.load.shader('stars', 'assets/stars.frag');
-
-        this.load.image('planet-1', 'assets/planet-1.png');
-        this.load.image('moon-1', 'assets/moon-1.png');
-    
-        this.load.image('bullet', 'default_assets/bullets/bullet11.png');
-        this.load.image('null', 'assets/FFFFFF-0.png');
-        this.load.image('blasterBullet', 'default_assets/bullets/bullet13.png');
-        this.load.image('laser', 'default_assets/bullets/bullet05.png');
-        this.load.image('laser-sparkle', 'default_assets/particles/red.png');
-        this.load.image('stars', 'assets/stars_new.gif');
-        this.load.image('blue_flame', 'assets/engines/blue_flame.png');
-        this.load.image('rcs_flame', 'assets/engines/rcs.png');
-        this.load.image('cloud', 'default_assets/particles/cloud.png');
-        this.load.image('1x1', 'default_assets/particlestorm/particles/1x1.png');
-        this.load.image('white', 'default_assets/particlestorm/particles/white.png');
-        this.load.image('white-smooth', 'assets/white-smooth.png');
-        this.load.image('smoke-trail', 'default_assets/particlestorm/particles/white-smoke.png');
-        this.load.image('dot', 'assets/map-dot.png');
-        this.load.image('minimap-ship', 'assets/minimap-ship.png');
-        this.load.image('dock-arrow', 'assets/dock-indicator.png');
-        this.load.image('nav-arrow', 'assets/nav-arrow.png');
-
-        // Alarm
-        this.load.spritesheet('master-alarm', 'assets/master-alarm.png', 50, 50);
-        this.load.audio('master_alarm', 'assets/audio/alarm.wav');
-
-        // O2
-        this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
-        this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
-
-        // Planet Stuff
-        this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
-        
-    
-        // Roids
-        this.load.image('asteroid-flake-1', 'assets/asteroid-flake-a.png');
-        this.load.image('asteroid-flake-2', 'assets/asteroid-flake-b.png');
-        this.load.image('asteroid-flake-3', 'assets/asteroid-flake-c.png');
-        this.load.image('asteroid-large', 'assets/asteroid-large.png');
-        this.load.image('asteroid-medium', 'assets/asteroid-medium.png');
-        this.load.image('asteroid-small', 'assets/asteroid-small.png');
-        this.load.image('asteroid-tiny', 'assets/asteroid-flake-a.png');
-
-        // Ships
-        this.load.image('mining_ship', 'assets/ships/miner.png');
-        this.load.image('fuelTanker', 'assets/ships/fuelTanker.png');
-        this.load.image('fuelTanker2', 'assets/ships/fuelTanker2.png');
-        this.load.image('shuttle', 'assets/ships/shuttle.png');
-        this.load.spritesheet('buoy', 'assets/ships/buoy.png', 21, 55);
-
-        this.load.bitmapFont(
-            'pixelmix_5',
-            'assets/fonts/pixelmix0.png',
-            'assets/fonts/pixelmix0.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_8',
-            'assets/fonts/pixelmix1.png',
-            'assets/fonts/pixelmix1.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_10',
-            'assets/fonts/pixelmix2.png',
-            'assets/fonts/pixelmix2.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_11',
-            'assets/fonts/pixelmix3.png',
-            'assets/fonts/pixelmix3.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_12',
-            'assets/fonts/pixelmix_12.png',
-            'assets/fonts/pixelmix_12.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_14',
-            'assets/fonts/pixelmix4.png',
-            'assets/fonts/pixelmix4.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_15',
-            'assets/fonts/pixelmix5.png',
-            'assets/fonts/pixelmix5.fnt'
-        );
-        this.load.bitmapFont(
-            'pixelmix_20',
-            'assets/fonts/pixelmix6.png',
-            'assets/fonts/pixelmix6.fnt'
-        );
-        
-        // Hud
-        this.load.image('minimap-bg', 'assets/minimap-bg.png');
-        this.load.image('minimap-dot', 'assets/map-dot.png');
-        this.load.image('minimap-mask', 'assets/minimap-mask.png');
-
-        // Audio
-/*
-        this.load.audio('crash-1', 'assets/audio/crash-1.mp3');
-        this.load.audio('crash-2', 'assets/audio/crash-2.mp3');
-        this.load.audio('crash-3', 'assets/audio/crash-3.mp3');
-        this.load.audio('crash-4', 'assets/audio/crash-4.mp3');
-        this.load.audio('crash-5', 'assets/audio/crash-5.mp3');
-        this.load.audio('crash-light-1', 'assets/audio/crash-light-1.mp3');
-        this.load.audio('crash-light-2', 'assets/audio/crash-light-2.mp3');
-*/
-
-        this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
-        this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
-        this.load.audio('success', 'assets/audio/Success 3.m4a');
-/*
-        this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
-        this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
-        this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
-        this.load.audio('rcs-loop', 'assets/audio/rcs-loop.wav');
-*/
-    },
-    register : function(object){
-        this.gameObjects.push(object);
-    },
-    unregister : function(object){
-        var index = this.gameObjects.indexOf(object);
-        if(index !== -1) {
-          this.gameObjects.splice(index, 1);
-        }
-    },
-    create : function(){
-        this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
-
-        this.game.physics.startSystem(Phaser.Physics.P2JS);
-        this.game.physics.p2.restitution = 0.05;
-        this.game.physics.p2.setPostBroadphaseCallback(this.broadphaseCallback, this);
-        this.game.world.setBounds(0, 0, 1000000, 1000000);
-        
-        this.ps = this.game.plugins.add(Phaser.ParticleStorm);
-        this.game.physics.p2.setImpactEvents(true);
-        
-        // Sounds
-        this.game.soundFX = {};
-        this.game.soundFX.click = game.add.audio('gui_click_soft');
-                
-        //  Tiled scrolling background
-        this.bgGroup = this.game.add.group();
-        
-        this.stars = this.game.add.tileSprite(0,0, screenWidth, screenHeight, 'stars');
-        this.stars.fixedToCamera = true;
-
-        this.economy = new Economy(this);
-        this.system = new StarSystem(this);
-
-        this.planets = this.game.add.group();
-        this.asteroids = this.game.add.group();
-        this.ships = this.game.add.group();
-
-        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX,this.game.world.centerY);
-        var planet = new BasicPlanet(this,this.game.world.centerX,this.game.world.centerY);
-        var moon = new BasicMoon(this,this.game.world.centerX+7000,this.game.world.centerY+1000);
-
-        var ft = new FuelTanker(this,this.game.world.centerX+200,this.game.world.centerY-200);
-        ft.sprite.body.angle = 270;
-        //ft.navigationMode = NAVIGATION_MODE.followWaypoints;
-
-        this.game.world.bringToTop(this.asteroids);
-        this.game.world.bringToTop(this.ships);
-        this.player = new Player(this);
-
-        // Date
-        this.starDate = moment("22841207", "YYYYMMDD");
-        game.time.events.loop(Phaser.Timer.SECOND * 5, this.tickTime, this);
-        
-        // Camera
-        this.game.camera.follow(this.player.sprite);
-        
-        var deadzonePadding = 100;
-        
-        this.game.camera.deadzone = new Phaser.Rectangle(
-            deadzonePadding,
-            deadzonePadding,
-            screenWidth-350,
-            screenHeight-deadzonePadding*2
-        );
-
-        this.game.camera.focusOnXY(this.game.world.centerX,this.game.world.centerY);
-        var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
-        fKey.onDown.add(this.fullScreen, this);
-        
-        // HUD
-        this.hudGroup = this.game.add.group();
-        this.hud = new HUD(this);
-        this.hud.showSystemInfo();
-                
-        
-        // GUI
-        this.guiGroup = this.game.add.group();
-        this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
-        
-        // DEBUG ////////
-        planet.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
-        planet.addItemsToInventory(1, InventoryObject.make('meteoric_iron'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        planet.addItemsToInventory(1, InventoryObject.make('potatoes'));
-        
-/*
-        this.arrivalScreen.destination = planet;
-        this.arrivalScreen.show();
-*/
-        //
-
-        // Very top layer
-        this.notificationGroup = this.game.add.group(); 
-        this.notificationGroup.fixedToCamera = true;       
-    },
-    tickTime : function(){
-        // Tick Tock
-        this.starDate = moment(this.starDate).add(1, 'minute');
-    },
-    skipTime : function(amount,unit){
-        this.starDate = moment(this.starDate).add(amount, unit);        
-    },
-    broadphaseCallback : function(body1, body2){
-/*
-        if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
-            var ship;
-            if(body1.sprite.parentObject == this.player.ship){
-                ship = body1.sprite.parentObject;
-                thing = body2.sprite.parentObject
-            } else {
-                ship = body2.sprite.parentObject;                
-                thing = body1.sprite.parentObject
-            }
-            
-            var shakeAmount = (Math.abs(ship.speed-thing.speed)/1000)*thing.sprite.body.mass/100;
-            var damageAmount = shakeAmount*100
-            if(shakeAmount>.001){
-                if(shakeAmount>.01){
-                    ship.crashSoft_sound();
-                    game.camera.shake(.01, 100);
-                } else {
-                    ship.crash_sound();
-                    game.camera.shake(shakeAmount, 100);                    
-                }
-                
-                if(damageAmount>1) ship.inflictDamage(damageAmount);
-            } else {
-                // No shake
-            }
-        }    
-*/
-        return true;
-    },
-
-    log(){
-        this.logValue = '';
-        var args = Array.prototype.slice.call(arguments);
-        args.forEach(function(element) {
-            this.logValue = this.logValue + '[' + element + ']' 
-        }, this);
-    },
-    
-    update : function(){
-        // Update all registered objects
-        this.gameObjects.forEach(function(gameObject) {
-            gameObject.update();
-        });
-        
-        // Move stars
-        this.stars.tilePosition.x = -this.game.camera.x*0.8;
-        this.stars.tilePosition.y = -this.game.camera.y*0.8;
-        
-        // Update minimap
-        this.hud.update();
-    },
-    fullScreen : function(){
-        if (this.game.scale.isFullScreen) {
-            this.game.scale.stopFullScreen();
-        } else {
-            this.game.scale.startFullScreen(false);
-        }
-    },
-    render : function(){
-        if(this.logValue!=undefined){
-            this.game.debug.text(this.logValue, 32, 32) 
-        }
-        this.game.debug.text(game.time.fps +' fps', 32, 32) 
-        //this.game.debug.body(this.player.sprite);
-        //this.game.debug.bodyInfo(this.player.sprite,32,32);
-
-/*
-        this.player.weapons.forEach(function(weapon) {
-            weapon.weapon.debug(32,32,true);
-        }, this);
-*/
-
-/*
-        this.asteroids.forEach(function(asteroid) {
-            this.game.debug.body(asteroid);
-        }, this);
-*/
-
-/*
-        this.ships.forEach(function(ship) {
-            this.game.debug.body(ship);
-            //ship.angle += 5;
-        }, this);
-*/
-    },
-});
-
-Number.prototype.between = function(a, b, inclusive) {
-  var min = Math.min.apply(Math, [a, b]),
-    max = Math.max.apply(Math, [a, b]);
-  return inclusive ? this >= min && this <= max : this > min && this < max;
-};
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/gui/_guiScreen.js begins */
@@ -21611,6 +22046,9 @@ class GuiScreen {
         
         this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom; // Default
         
+        this.collapseSound = game.add.audio('gui_collapse');
+        this.expandSound = game.add.audio('gui_expand');
+        
         this.styles = {
             borderRadius: 5,
             darkGrey: 0x282731,
@@ -21619,8 +22057,8 @@ class GuiScreen {
             veryLightGrey : 0x948f9c,
             red: 0xc03b2b,
             green: 0x1aae5c,
-            baseText : { font: `${15+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
-            smallWhiteText : { font: `${15+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
+            baseText : { font: `${14+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
+            smallWhiteText : { font: `${13+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
             smallGreyText : { font: `italic ${13+this.fontSizeOffset}px ${this.fontFamilyLarge}`, fill: '#948f9c', align: 'left'},
             title : { font: `${18}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
         }
@@ -21633,12 +22071,13 @@ class GuiScreen {
 
         switch(this.transitionStyle) {
             case SCREEN_TRANSITION_STYLE.fromBottom:
+                this.expandSound.play();
                 this.screen.y = this.game.camera.height;
-                var transition = this.game.add.tween(this.screen.position).to({y: 0}, 600, Phaser.Easing.Back.InOut, true);
+                var transition = this.game.add.tween(this.screen.position).to({y: 0}, 500, Phaser.Easing.Back.InOut, true);
                 break;
             case SCREEN_TRANSITION_STYLE.fromRight:
                 this.screen.x = this.game.camera.width;
-                var transition = this.game.add.tween(this.screen.position).to({x: 0}, 600, "Quart.easeOut", true);
+                var transition = this.game.add.tween(this.screen.position).to({x: 0}, 500, "Quart.easeOut", true);
                 break;
             default:
                 // None
@@ -21654,10 +22093,11 @@ class GuiScreen {
     hide(){
         switch(this.transitionStyle) {
             case SCREEN_TRANSITION_STYLE.fromBottom:
-                var transition = this.game.add.tween(this.screen.position).to({y: this.game.camera.height}, 600, Phaser.Easing.Back.InOut, true);
+                this.collapseSound.play();
+                var transition = this.game.add.tween(this.screen.position).to({y: this.game.camera.height}, 500, Phaser.Easing.Back.InOut, true);
                 break;
             case SCREEN_TRANSITION_STYLE.fromRight:
-                var transition = this.game.add.tween(this.screen.position).to({x: this.game.camera.width}, 600, "Quart.easeOut", true);
+                var transition = this.game.add.tween(this.screen.position).to({x: this.game.camera.width}, 500, "Quart.easeOut", true);
                 break;
             default:
                 // None
@@ -21723,6 +22163,7 @@ class ArrivalScreen extends GuiScreen {
         this.wrapper = group;
         this.wrapper.add(this.screen);
         this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
 
         this.controlGroup = this.game.add.group();
         this.screen.add(this.controlGroup);
@@ -21733,6 +22174,7 @@ class ArrivalScreen extends GuiScreen {
         escKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
         }, this);
+
         var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
         lKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
@@ -21747,7 +22189,7 @@ class ArrivalScreen extends GuiScreen {
         // Background
         this.bg.clear();
         this.bg.beginFill(this.styles.darkGrey);
-        this.bg.drawRoundedRect(0,0,
+        this.bg.drawRect(0,0,
             this.game.camera.width,
             this.game.camera.height*2,
             0
@@ -21947,6 +22389,8 @@ class ArrivalScreen extends GuiScreen {
     
     show(){
         super.show();
+
+        this.wrapper.visible = true;
         
         // Arrival Specific 
         this.game.player.stop();                
@@ -22003,6 +22447,366 @@ class ArrivalScreen extends GuiScreen {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/inventory.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class InventoryScreen extends GuiScreen {
+    constructor(game,group) {
+        super(game,group);
+
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom;
+        
+        this.setupScreen();
+                
+        this.wrapper = group;
+        this.wrapper.add(this.screen);
+        this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
+
+        this.helpTexts = {
+            default : '(UP/DOWN) Select Item   (DELETE) Jettison',
+            equipment : '(UP/DOWN) Select Item   (DELETE) Jettison   (E) Equip/Unequip',
+            consumable : '(UP/DOWN) Select Item   (DELETE) Jettison   (SPACE) Use',
+        }
+
+    }
+    
+    setupKeys(){
+        this.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);       
+        this.downKeyOnUp = function(){
+            this.myList.selectNextItem();
+            this.update();
+        }
+        this.downKey.onUp.add(this.downKeyOnUp, this);
+
+        this.upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        this.upKeyOnUp = function(){
+            this.myList.selectPreviousItem();
+            this.update();
+        }
+        this.upKey.onUp.add(this.upKeyOnUp, this);
+
+        this.escKey = game.input.keyboard.addKey(Phaser.Keyboard.ESC);
+        this.escKeyOnUp = function(){
+            this.hide();
+        }
+        this.escKey.onUp.add(this.escKeyOnUp, this);
+
+        this.iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
+        this.iKeyOnUp = function(){
+            this.hide();
+        }
+        this.iKey.onUp.add(this.iKeyOnUp, this);
+
+        this.eKey = game.input.keyboard.addKey(Phaser.Keyboard.E);
+        this.eKeyOnUp = function(){
+            this.toggleEquipForSelectedItem();
+        }
+        this.eKey.onUp.add(this.eKeyOnUp, this);
+
+        this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.spaceKeyOnUp = function(){
+            this.consumeSelectedItem();
+        }
+        this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
+    }
+    
+    setupScreen(){
+        this.screenWidth = this.game.camera.width-this.game.hud.sidebarWidth;
+
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.tabBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.bottomBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(0x111111);
+        this.bg.drawRect(0,0,
+            this.screenWidth,
+            this.game.camera.height*2,
+            0
+        )
+        this.bg.endFill();
+        
+        // Tab Bar
+        this.tabBarHeight = 45;
+        this.tabBar.clear();
+        this.tabBar.beginFill(0x111111);
+        this.tabBar.drawRect(0,0,
+            this.screenWidth,
+            this.tabBarHeight,
+        )
+        this.bottomBar.endFill();
+
+        // Tabs
+        this.shipTab = new TabItem(this.game,'ship-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.shipTab.buttonX = 0;
+        this.shipTab.buttonY = 0;
+        this.shipTab.text = "Ship";
+        this.screen.add(this.shipTab);
+        
+        this.inventoryTab = new TabItem(this.game,'inv-tab');
+        this.inventoryTab.buttonX = this.shipTab.buttonWidth + 1;
+        this.inventoryTab.buttonY = 0;
+        this.inventoryTab.text = "Inventory";
+        this.inventoryTab.active = true;
+        this.screen.add(this.inventoryTab);
+
+        this.mapTab = new TabItem(this.game,'map-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.mapTab.buttonX = this.inventoryTab.buttonX + this.inventoryTab.buttonWidth + 1;
+        this.mapTab.buttonY = 0;
+        this.mapTab.text = "Map";
+        this.screen.add(this.mapTab);
+
+        this.statsTab = new TabItem(this.game,'stats-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.statsTab.buttonX = this.mapTab.buttonX + this.mapTab.buttonWidth + 1;
+        this.statsTab.buttonY = 0;
+        this.statsTab.text = "Stats";
+        this.screen.add(this.statsTab);
+
+
+
+
+        // Bottom Bar
+        this.bottomBarHeight = 38;
+        this.bottomBar.clear();
+        this.bottomBar.beginFill(this.styles.darkGrey);
+        this.bottomBar.drawRect(0,this.game.camera.height-this.bottomBarHeight,
+            this.screenWidth,
+            this.bottomBarHeight+100, // Overlap for animation
+        )
+        this.bottomBar.endFill();
+
+        this.helpText = this.game.add.text(
+            16,this.game.camera.height - 26, 
+            '', 
+            { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+
+        // Lists
+        this.myList = new GuiInventoryList(this.game,this.screen);
+        this.myList.title = 'All Items'
+        this.myList.x = 0;
+        this.myList.y = this.tabBarHeight;
+        this.myList.listWidth = this.screenWidth/2;
+        this.myList.listHeight = this.game.camera.height-this.bottomBarHeight-this.tabBarHeight;
+        this.myList.itemCursorStyle = INVENTORY_LIST_CURSOR_STYLE.flat;
+        this.myList.focus = true;
+        this.myList.itemsPerPage = 12;
+        this.myList.allowFilter = true;
+        this.screen.add(this.myList);
+
+        // Item Info
+        // Background
+        this.infoMargin = 16;
+        this.infoWidth = (this.screenWidth/2)-1;
+
+        this.itemInfoBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.itemInfoTitleBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.infoTitleLabel = this.game.add.text(
+            0,0, 
+            'Item', 
+            { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+            this.screen
+        )
+        this.infoTitleLabel.resolution = 2;
+
+        this.infoDescription = this.game.add.text(
+            0,0, 
+            '', 
+            { font: `12px Fira Code`, fill: '#FFFFFF', align: 'left', }, 
+            this.screen
+        );
+        this.infoDescription.setStyle({ font: `12px Fira Code`, fill: '#FFFFFF', align: 'left', wordWrap: true, wordWrapWidth: this.infoWidth-(this.infoMargin*2) })
+        this.infoDescription.lineSpacing = -4;
+        this.infoDescription.resolution = this.textResolution;        
+        
+        // Props
+        this.propsGroup = this.game.add.group();
+        this.screen.add(this.propsGroup);
+    
+        this.update();
+    }
+    
+    layout(){        
+        this.cleanup();
+    }
+
+    update(){
+        this.updateItemInfo();        
+    }
+
+    updateItemInfo(){                        
+        var infoX = this.myList.x + this.myList.listWidth+1;
+        var infoY = 45;
+
+        // Properites
+        this.itemInfoBg.clear();
+        this.itemInfoTitleBg.clear();
+        var infoBgHeight = 100;
+        this.propsGroup.removeAll(true);
+
+        if(this.myList.selectedItem){
+            // HelpTexts
+            this.helpText.setText(this.helpTexts.default);
+            if(this.myList.selectedItem.isEquippable) this.helpText.setText(this.helpTexts.equipment);
+            if(this.myList.selectedItem.isConsumable) this.helpText.setText(this.helpTexts.consumable);
+
+            // Description
+            if(this.myList.selectedItem.description!=undefined){
+                this.infoDescription.x = infoX+this.infoMargin;
+                this.infoDescription.y = infoY + 40;
+                this.infoDescription.setText(this.myList.selectedItem.description)
+            } else {
+                this.infoDescription.setText('');                
+            }
+
+            var props = this.myList.selectedItem.infoFields
+            var labels = this.myList.selectedItem.infoFieldLabels
+
+            var propIndex = 0;
+            var propLineHeight = 20;
+            for (let prop of props) {
+                var propY = (propIndex*propLineHeight)+infoY+40+this.infoDescription.height+16;
+                
+                var propTitle = this.game.add.text(
+                    infoX+16,propY, 
+                    labels[propIndex], 
+                    { font: `13px ${FONT}`, fill: '#929292', align: 'left'},
+                    this.propsGroup
+                )
+                propTitle.resolution = 2;
+    
+                var value = this.myList.selectedItem[props[propIndex]];
+                if(props[propIndex]=='baseValue') value = CREDIT_PREFIX.short + numeral(value).format(`0,0[.]00`);
+                if(props[propIndex]=='rarity') value = RARITY_NAMES[this.myList.selectedItem[props[propIndex]]];
+                if(props[propIndex]=='storageClass') value = CARGO_STORAGE_CLASS_NAMES[this.myList.selectedItem[props[propIndex]]];
+                if(props[propIndex]=='mass') value = this.myList.selectedItem.readableMass;
+                if(props[propIndex]=='energyConsumption') value = `${numeral(value).format('0,0')} kW`;
+                if(props[propIndex]=='fuelConsumption') value = `${numeral(value).format('0,0.0')} units/sec`;
+                if(props[propIndex]=='thrust') value = `${numeral(value).format('0,0')} kN`;
+                if(props[propIndex]=='range') value = `${numeral(value).format('0,0')} m`;
+                if(props[propIndex]=='capacity') value = `${numeral(value).format('0,0')} kWh`;
+                if(props[propIndex]=='fuelCapacity') value = `${numeral(value).format('0,0')} units`;
+    
+                var propValue = this.game.add.text(
+                    infoX+this.infoWidth-16,propY,
+                    value, 
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'right'},
+                    this.propsGroup
+                )
+                if(props[propIndex]=='rarity') propValue.tint = RARITY_COLOR[this.myList.selectedItem[props[propIndex]]];
+                propValue.anchor.set(1,0);
+                propValue.resolution = 2;
+                
+                propIndex++;
+            };
+            infoBgHeight = this.game.camera.height - 83;            
+            this.infoTitleLabel.x = infoX+16;
+            this.infoTitleLabel.y = infoY+8;
+            this.infoTitleLabel.visible = true;
+            this.infoTitleLabel.setText(this.myList.selectedItem.name);
+        } else {
+            // Item Empty
+            this.infoTitleLabel.visible = false;
+            this.infoDescription.setText('');
+            infoBgHeight = this.game.camera.height-83;
+        }
+
+        this.itemInfoBg.beginFill(0x3F3C46);
+        this.itemInfoBg.drawRect(infoX,infoY,
+            this.infoWidth,
+            infoBgHeight,
+            0
+        )
+        this.itemInfoBg.endFill();
+
+        this.itemInfoTitleBg.beginFill(0x4D4B56);
+        this.itemInfoTitleBg.drawRect(infoX,infoY,
+            this.itemInfoBg.width,
+            30,
+        )
+        this.itemInfoTitleBg.endFill(); 
+    }
+    
+    toggleEquipForSelectedItem(){
+        if(this.myList.selectedItem.isEquippable){
+            if(this.myList.selectedItem.equipped){
+               this.myList.selectedItem.unequip(); 
+            } else {
+               this.myList.selectedItem.equipTo(this.game.player.ship); 
+            }
+        }
+        this.myList.layout();
+    }
+    
+    consumeSelectedItem(){        
+        if(this.myList.selectedItem.isConsumable){
+           this.myList.selectedItem.consume(); 
+        }
+        this.refreshItems();
+        this.myList.layout();
+    }
+    
+    refreshItems(){
+        this.myList.items = this.game.player.ship.inventory;
+    }
+
+        
+    show(){
+        super.show();
+
+        this.refreshItems();
+        this.wrapper.visible = true;
+        this.setupKeys();
+        this.update();
+    }
+
+    didShow(){
+        super.didShow();        
+        this.game.player.controlMode = CONTROL_MODE.inventory;
+    }
+    
+    hide(){
+        super.hide();
+        this.cleanup();
+        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+            this.game.hud.showSystemInfo();
+        }, this);
+    }
+
+    didHide(){
+        super.didHide();
+    }
+    
+    cleanup(){
+        this.escKey.onUp.remove(this.escKeyOnUp, this);
+        this.upKey.onUp.remove(this.upKeyOnUp, this);
+        this.downKey.onUp.remove(this.downKeyOnUp, this);
+        this.iKey.onUp.remove(this.iKeyOnUp, this);
+        this.eKey.onUp.remove(this.eKeyOnUp, this);
+        this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
+    }    
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/gui/exchange.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -22021,6 +22825,11 @@ class ExchangeScreen extends GuiScreen {
         this.insetX = 32;
         this.insetBottom = 32;
         this.top = 94;
+
+        this.helpTexts = {
+            default : '(UP/DOWN) Select Item   (SPACEBAR) Buy/Sell Item   (TAB) Switch List   (RETURN) Accept',
+            shift : '(UP/DOWN) Select Item   (SHIFT+SPACEBAR) Buy/Sell All   (TAB) Switch List   (RETURN) Accept',
+        }
 
         // BG
         this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
@@ -22090,11 +22899,11 @@ class ExchangeScreen extends GuiScreen {
         // Help Text
         this.helpText = this.game.add.text(
             this.insetX,this.game.camera.height - this.insetBottom-16, 
-            '(UP/DOWN) Select Item   (SPACEBAR) Buy/Sell Item   (TAB) Switch List   (RETURN) Accept', 
+            this.helpTexts.default, 
             { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
             this.screen
         )
-        this.infoTitleLabel.resolution = 2;
+        this.helpText.resolution = 2;
 
 
         // Sale Amount
@@ -22318,6 +23127,13 @@ class ExchangeScreen extends GuiScreen {
         this.updateSaleAmount();
     }
     
+    transferAllOfSelectedItem(){
+        var amount = this.activeList.amountOfSelectedItem;
+        for (var i = 0; i < amount; i++) { 
+            this.transferSelectedItem();
+        }
+    }
+    
     transferSelectedItem(){
         var item = this.activeList.selectedItem; 
                
@@ -22391,6 +23207,7 @@ class ExchangeScreen extends GuiScreen {
         var destinationItems = [].concat.apply([], this.exchangeList.items);
         this.destination.emptyCargoHold();
         for (let item of destinationItems) {
+            item.equipped = false;
             this.destination.addItemsToInventory(1,item);
         }
         
@@ -22434,6 +23251,7 @@ class ExchangeScreen extends GuiScreen {
         this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
         this.tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
         this.enterKey = game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
+        this.shiftKey = game.input.keyboard.addKey(Phaser.Keyboard.SHIFT);
 
         this.downKeyOnUp = function(){
             this.activeList.selectNextItem();
@@ -22448,7 +23266,11 @@ class ExchangeScreen extends GuiScreen {
         this.upKey.onUp.add(this.upKeyOnUp, this);
 
         this.spaceKeyOnUp = function(){
-            this.transferSelectedItem();
+            if(this.spaceKey.shiftKey){
+                this.transferAllOfSelectedItem();
+            } else {
+                this.transferSelectedItem();
+            }
             this.update();
         }
         this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
@@ -22464,6 +23286,16 @@ class ExchangeScreen extends GuiScreen {
             this.update();
         }
         this.enterKey.onUp.add(this.enterKeyOnUp, this);
+
+        // Help Text Changes with shift key
+        this.shiftKeyOnDown = function(){
+            this.helpText.setText(this.helpTexts.shift)
+        }
+        this.shiftKey.onDown.add(this.shiftKeyOnDown, this);
+        this.shiftKeyOnUp = function(){
+            this.helpText.setText(this.helpTexts.default);
+        }
+        this.shiftKey.onUp.add(this.shiftKeyOnUp, this);
     }
         
     layout(){        
@@ -22499,6 +23331,9 @@ class ExchangeScreen extends GuiScreen {
         this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
         this.tabKey.onUp.remove(this.tabKeyOnUp, this);
         this.enterKey.onUp.remove(this.enterKeyOnUp, this);
+
+        this.shiftKey.onUp.remove(this.shiftKeyOnUp, this);
+        this.shiftKey.onDown.remove(this.shiftKeyOnDown, this);
    }
 }
 
@@ -22630,6 +23465,135 @@ class Button extends Phaser.Group {
             this.buttonWidth,
             this.buttonHeight,
             5
+        )
+        this.bg.endFill();  
+
+        this.sprite.width = this.buttonWidth;
+        this.sprite.height = this.buttonHeight;
+        this.sprite.x = this.buttonX;
+        this.sprite.y = this.buttonY;
+        
+        this.label.x = this.buttonX+this.buttonWidth/2;
+        this.label.y = this.buttonY+this.buttonHeight/2+this.lineHeight
+        this.label.setStyle(this.buttonTextStyle)
+        this.label.setText(this.text);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/tabItem.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class TabItem extends Phaser.Group {
+    constructor(game,key,callbacks,textStyle = null) {
+        super(game.game);
+        this.phaserGame = game.game;
+        this.callbacks = callbacks;
+            
+        this.bg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.label = this.phaserGame.add.text(
+            0,0, 
+            this._text, 
+            this.buttonTextStyle,
+            this
+        )
+        this.label.resolution = 2;
+        this.label.anchor.set(0.5)
+
+        this._text = '';
+        this._active = false;
+        this._buttonX = 0;
+        this._buttonY = 0;
+        this.color = 0x282731;
+        this.activeColor = 0x3F3C46;
+
+        this.buttonWidth = 100;
+        this.buttonHeight = 45;
+        this.lineHeight = 3;
+        this.padding = 8;
+
+        this.key = 'tab_item'+key;
+
+        this.buttonTextStyle = textStyle || { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'center'};
+
+        this.sprite = this.create(this.buttonX,this.buttonY,'null') 
+        this.sprite.inputEnabled = true;
+        this.sprite.events.onInputUp.add(this.onReleased, this);
+        this.sprite.events.onInputDown.add(this.onDown, this);
+        this.sprite.events.onInputOver.add(this.onOver, this);
+        this.sprite.events.onInputOut.add(this.onOut, this);
+    }
+    
+    onOver(){
+        this.over = true;   
+        this.layout();
+    }
+
+    onOut(){
+        this.over = false;
+        this.layout();
+    }
+    
+    onDown() {
+        if(this.callbacks.onDown) this.callbacks.onDown(this);
+    }
+
+    onReleased() {
+        if(this.callbacks.onReleased) this.callbacks.onReleased(this);
+    }
+    
+    set buttonX(x){
+        this._buttonX = x
+        this.layout();
+    }
+
+    set buttonY(y){
+        this._buttonY = y
+        this.layout();
+    }
+
+    get buttonX(){
+        return this._buttonX;
+    }
+
+    get buttonY(){
+        return this._buttonY;
+    }
+
+    set text(text){
+        this._text = text;
+        this.layout();
+    }
+    
+    get text(){
+        return this._text;
+    }
+
+    set active(active){
+        this._active = active;
+        this.layout();
+    }
+    
+    get active(){
+        return this._active;
+    }
+        
+    layout(){
+        this.bg.clear();
+        if(!this.active){
+            if(this.over){
+                this.bg.beginFill(this.activeColor);
+            } else {
+                this.bg.beginFill(this.color);
+            }            
+        } else {
+            this.bg.beginFill(this.activeColor);
+        }
+
+        this.bg.drawRect(this.buttonX,this.buttonY,
+            this.buttonWidth,
+            this.buttonHeight,
         )
         this.bg.endFill();  
 
@@ -22845,6 +23809,8 @@ class GuiInventoryList extends Phaser.Group {
         this._title = '';
         this._items = [];
         this._focus = false;
+        this._allowFilter = false;
+        this._listWidth = 250;
 
         this.clickSound = game.add.audio('gui_click_soft');
         this.txSound = game.add.audio('gui_click');
@@ -22854,7 +23820,6 @@ class GuiInventoryList extends Phaser.Group {
         this.itemsPerPage = 8;
 
         this.itemCursorHeight = 32;
-        this.listWidth = 240;
         this.listHeight = this.itemCursorHeight*(this.itemsPerPage+1);
         this.headerHeight = 30;
 
@@ -22883,6 +23848,15 @@ class GuiInventoryList extends Phaser.Group {
 
         // Cursor
         this.itemCursor = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.setupCursors();
+        
+        // Lables
+        this.labels = this.game.add.group();
+        this.add(this.labels);
+
+        this.layout();
+    }
+    setupCursors(){
         this.itemCursorLeftPolygon = new Phaser.Polygon(
             0,0,
             -8,this.itemCursorHeight/2, 
@@ -22898,12 +23872,21 @@ class GuiInventoryList extends Phaser.Group {
             this.listWidth,this.itemCursorHeight,
             0,this.itemCursorHeight,
         );
-
-        // Lables
-        this.labels = this.game.add.group();
-        this.add(this.labels);
-
+        this.itemCursorFlatPolygon = new Phaser.Polygon(
+            0,0,
+            this.listWidth,0, 
+            this.listWidth,this.itemCursorHeight,
+            0,this.itemCursorHeight,
+        );
+    }
+    set listWidth(listWidth){
+        this._listWidth = listWidth;
+        this.setupCursors();
         this.layout();
+    }
+
+    get listWidth(){
+        return this._listWidth;
     }
 
     set focus(focus){ 
@@ -22925,6 +23908,15 @@ class GuiInventoryList extends Phaser.Group {
 
     get title(){
         return this._title;
+    }
+
+    set allowFilter(allowFilter){
+        this._allowFilter = allowFilter
+        this.layout();
+    }
+
+    get allowFilter(){
+        return this._allowFilter;
     }
 
     set items(items){
@@ -22996,6 +23988,11 @@ class GuiInventoryList extends Phaser.Group {
         }
     }
 
+    get amountOfSelectedItem(){
+        return this._groupedItems[this.selectedItem.key].length;
+    }
+
+
     get colorForSelectedItem(){
         if(this.selectedItem) return RARITY_COLOR[this.selectedItem.rarity];
     }
@@ -23043,6 +24040,9 @@ class GuiInventoryList extends Phaser.Group {
         if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.right){
             this.itemCursor.drawPolygon(this.itemCursorRightPolygon);
         }
+        if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.flat){
+            this.itemCursor.drawPolygon(this.itemCursorFlatPolygon);
+        }
         this.itemCursor.endFill();
         this.itemCursor.visible = true;
     
@@ -23067,8 +24067,13 @@ class GuiInventoryList extends Phaser.Group {
             this.headerHeight,
         )
         this.titleBg.endFill();
-        this.titleLabel.setText(this._title);
-        
+
+        // Title Label
+        if(!this.allowFilter){
+            this.titleLabel.setText(this._title);
+        } else {
+            this.titleLabel.setText(`${String.fromCharCode(0x2039)} ${this._title} ${String.fromCharCode(0x203a)}`);            
+        }
         
         // Items
         this.labels.removeAll(true);
@@ -23103,17 +24108,23 @@ class GuiInventoryList extends Phaser.Group {
         // Items
         for (var i = indexStart; i < indexEnd; i++) {
             if(this.items[i]!=undefined){
-                var group = this.items[i]
-                var item = group[0];
-                var text = item.name
-                if(group.length>1){
-                    text += ` (${group.length})`;
+                var text = this.items[i][0].name
+
+                if(this.items[i][0].isEquippable) {                    
+                    if(this.items[i][0].equipped) {
+                        text = `${String.fromCharCode(0x25cf)} ${this.items[i][0].name}`;
+                    } else {
+                        text = `${String.fromCharCode(0x25cb)} ${this.items[i][0].name}`                    
+                    }
+                }
+
+                if(this.items[i].length>1){
+                    text += ` (${this.items[i].length})`;
                 }
                 
                 var arrow = false;
         
                 // Arrows
-
                 if(index==this.itemsPerPage-1){
                     text = String.fromCharCode(0x2193);
                     arrow = true;
@@ -23127,7 +24138,7 @@ class GuiInventoryList extends Phaser.Group {
                 var itemLabel = this.phaserGame.add.text(
                     16,this.itemCursorHeight*(index) + this.headerHeight + 8, 
                     text, 
-                    { font: `15px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
                     this
                 )
                 this.labels.add(itemLabel);
@@ -23135,10 +24146,10 @@ class GuiInventoryList extends Phaser.Group {
                 if(index==this.selectedItemIndex && this.focus){
                     itemLabel.addColor("#000000", 0)
                 } else {
-                    if(!arrow) itemLabel.tint = RARITY_COLOR[item.rarity];
+                    if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
                 }
                 
-                if(!arrow) itemLabel.tint = RARITY_COLOR[item.rarity];
+                if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
                 itemLabel.resolution = 2;
                 index++;
             }

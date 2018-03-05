@@ -22,6 +22,7 @@ class Planet extends GameObject{
         }
 
         this.itemMarkup = 1.1 // Multuplier
+        this.infoSound = game.add.audio('beep-beep');
     }
 
     setupSprite(){
@@ -53,7 +54,9 @@ class Planet extends GameObject{
     }
     
     showInfoIfNeeded(){
-        if(this.shouldShowInfo && !this.infoShowing){
+        if(this.shouldShowInfo && !this.infoShowing){ 
+            this.infoSound.play();
+                   
             this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
             this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
             
