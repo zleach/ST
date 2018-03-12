@@ -183,6 +183,16 @@ class InventoryScreen extends GuiScreen {
         )
         this.infoTitleLabel.resolution = 2;
 
+        this.infoSubtitleLabel = this.game.add.text(
+            0,0, 
+            'Item', 
+            { font: `13px ${FONT}`, fill: '#929292', align: 'right'},
+            this.screen
+        )
+        this.infoSubtitleLabel.anchor.set(1,0);
+        this.infoSubtitleLabel.resolution = 2;
+
+
         this.infoDescription = this.game.add.text(
             0,0, 
             '', 
@@ -260,6 +270,7 @@ class InventoryScreen extends GuiScreen {
                 if(props[propIndex]=='range') value = `${numeral(value).format('0,0')} m`;
                 if(props[propIndex]=='capacity') value = `${numeral(value).format('0,0')} kWh`;
                 if(props[propIndex]=='fuelCapacity') value = `${numeral(value).format('0,0')} units`;
+                if(props[propIndex]=='fuelAmount') value = `${numeral(value).format('0,0')} units`;
     
                 var propValue = this.game.add.text(
                     infoX+this.infoWidth-16,propY,
@@ -278,6 +289,15 @@ class InventoryScreen extends GuiScreen {
             this.infoTitleLabel.y = infoY+8;
             this.infoTitleLabel.visible = true;
             this.infoTitleLabel.setText(this.myList.selectedItem.name);
+
+            this.infoSubtitleLabel.x = infoX+this.infoWidth-16;
+            this.infoSubtitleLabel.y = this.infoTitleLabel.y;
+
+            if(this.myList.selectedItem.type!=undefined) this.infoSubtitleLabel.setText(this.myList.selectedItem.type);
+            if(this.myList.selectedItem.equipped) this.infoSubtitleLabel.setText('Equipped');
+            if(!this.myList.selectedItem.equipped) this.infoSubtitleLabel.setText('Unequipped');
+            if(this.myList.selectedItem.isConsumable) this.infoSubtitleLabel.setText('Consumable');
+            
         } else {
             // Item Empty
             this.infoTitleLabel.visible = false;
@@ -309,6 +329,7 @@ class InventoryScreen extends GuiScreen {
                this.myList.selectedItem.equipTo(this.game.player.ship); 
             }
         }
+        this.update();
         this.myList.layout();
     }
     

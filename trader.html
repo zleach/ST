@@ -4,6 +4,15 @@
         <script src="lib/phaser.js"></script>
         <script src="app.js"></script>
         <style>
+            @font-face {
+                font-family:'FontAwesome';
+                src:url('assets/fa-regular-400.ttf') format('truetype');
+            }
+            .fontLoader {
+                font-family: 'FontAwesome';
+                position: absolute;
+                left: -1000px;
+            }
             body {
                 margin: 0px;
                 padding: 0px;
@@ -15,6 +24,7 @@
         </style>
     </head>
     <body>
+        <div class="fontLoader">1</div>
         <div id="screen"></div>
     </body>
 </html>

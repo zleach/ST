@@ -29,6 +29,36 @@ ITEMS.push(...[{
 		"mass": 10
 	},
 	{
+		"key": "volatile_compounds",
+		"name": "Volatile Compounds",
+		"type": "Mineral",  
+        "description" : "This dense crystalline ice mixed with orgainic compounds shimmers in your hand.",
+		"rarity": "rare",
+		"storageClass": "bulk",
+		"baseValue": 433,
+		"mass": 18
+	},
+	{
+		"key": "ionized_gas",
+		"name": "Ionized Gases",
+		"type": "Gas",  
+        "description" : "Plasma and ionised gases have unique properties and display behaviors unlike those of the other states, and the transition between them is mostly a matter of nomenclature and subject to interpretation.",
+		"rarity": "common",
+		"storageClass": "gas",
+		"baseValue": 60,
+		"mass": 3
+	},
+	{
+		"key": "space_ice",
+		"name": "Space Ice",
+		"type": "Frozen Liquid",  
+        "description" : "Space ice does not simply grow and melt. During its lifespan, it is very dynamic. Due to the combined action of solar winds, temperature, and ionic temperature fluctuations, space ice expanses typically undergo a significant amount of deformation. Space ice is classified according to whether or not it is able to drift, and according to its age.",
+		"rarity": "common",
+		"storageClass": "bulk",
+		"baseValue": 25,
+		"mass": 8
+	},
+	{
 		"key": "potatoes",
 		"name": "Potatoes",
         "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply. Best when cut into strips and deep-fried.",

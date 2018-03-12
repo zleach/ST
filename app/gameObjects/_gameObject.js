@@ -1,5 +1,9 @@
 class GameObject {
-    constructor(game) {                
+    constructor(game) {
+        this._seed = 0;  
+        this._name = 'Unknown Object';
+        this.description = '';
+
         this.game = game;
         this.game.register(this);
     
@@ -24,11 +28,12 @@ class GameObject {
         this.itemsAccumulating = false;
         this.itemsAccumulator = [];     
 
-        this.dingSound = game.add.audio('pickup-1');
+        this.dingSound = game.add.audio('pickup-common-1');
+
+        this.rng = this.game.rng;
     }
     
     setupSprite(sprite){
-        // TODO
         this.maxHealth = this.health;
     }
     
@@ -262,6 +267,11 @@ class GameObject {
     } 
 
     // Misc
+    get name(){ return this._name; }
+    set name(name){
+        this._name = name;
+    }
+    
     get speed(){
         var body = this.sprite.body
         var vx, vy;
@@ -270,6 +280,30 @@ class GameObject {
         vy = body.data.velocity[1];
         
         return vx * vx + vy * vy;
+    }
+    
+    
+    // Hashing and whatnot
+    get hash(){
+        var fullHash = Math.abs(CryptoJS.MD5(this._seed + this.name).words[0]);
+        var hashString = fullHash.toString().slice(0,5);
+        return hashString;
+    }
+
+    determineItemFromArray(array){
+        return array[this.rng.nextInt(0, array.length-1)];
+    }
+
+    determineFloatBetween(min,max){
+        return this.rng.next(min, max);
+    }
+
+    determineIntegerBetween(min,max){
+        return this.rng.nextInt(min, max);
+    }
+
+    determinePercent(){
+        return this.rng.next();
     }
 
     update(){

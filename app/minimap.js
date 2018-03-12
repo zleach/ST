@@ -30,7 +30,7 @@ class Minimap {
     }
     update(){
         this.dotsBitmapData.clear();
-        this.game.gameObjects.forEach(function(gameObject) {
+        this.game.system.stellarObjects.forEach(function(gameObject) {
                 if(gameObject.sprite!=undefined){
                     var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
                     if(distance<(this.distanceFactor/this.scale)){

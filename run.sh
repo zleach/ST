@@ -1,1 +1,1 @@
-nodemon --watch app --exec echo
+nodemon --watch app --exec echo;

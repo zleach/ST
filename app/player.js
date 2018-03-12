@@ -7,7 +7,7 @@ class Player extends GameObject {
 
         this.name = 'Dash Riprock';
         
-        this._credits = 5000;
+        this._credits = 1000;
         
         // Settings
         this.settings = {};
@@ -65,6 +65,55 @@ class Player extends GameObject {
             if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
         }, this);
 
+        // Camera
+        var cKey = game.input.keyboard.addKey(Phaser.Keyboard.C);
+        cKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.toggleCameraMode();
+        }, this);
+
+    }
+
+    enterDarkness(nebula){
+        this.currentNebula = nebula;
+        
+        if(!this.inDarkness){
+            // Wait a bit to hit the lights
+            game.time.events.add(Phaser.Timer.SECOND * 2, function(){
+                this.game.hud.title(
+                    `${this.currentNebula.name}, ${this.game.system.name} System`,
+                    moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'),
+                );
+            }, this);
+
+            game.time.events.add(Phaser.Timer.SECOND * 3, function(){
+                this.game.planets.mask = this.ship.lightMask;
+                this.game.asteroids.mask = this.ship.lightMask;
+                this.game.stars.mask = this.ship.lightMask;
+                // Hack to show only player ship
+                this.ship.sprite.visible = false;
+                this.game.ships.setAll('mask', this.ship.lightMask,false,true);
+                this.ship.sprite.visible = true;
+                this.ship.lightMask.visible = true;    
+            
+            }, this);
+
+            this.inDarkness = true;
+        }
+    }
+
+    exitDarkness(nebula){
+        if(this.inDarkness){
+            game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+                this.game.planets.mask = null;
+                this.game.asteroids.mask = null;
+                this.game.stars.mask = null;
+                this.game.ships.mask = null;
+                this.ship.lightMask.visible = false;    
+            }, this);
+
+            this.currentNebula = null;
+            this.inDarkness = false;
+        }
     }
     
     get credits(){
@@ -127,10 +176,10 @@ class Player extends GameObject {
         }
         this.allowHissSoundForReverse = false;
     }
-    
+        
     update() {
         super.update();
-
+        
         if(this.rcsSoundCountdown>=0){
             if(this.rcsSoundCountdown==0){
                 this.rcsSound.fadeOut(30);

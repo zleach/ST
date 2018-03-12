@@ -19,7 +19,7 @@ class Engine extends Equipment {
         
         // Setup Flames
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
-        this.flames.blendMode = PIXI.blendModes.ADD;
+        //this.flames.blendMode = PIXI.blendModes.ADD; // Some bug that makes the sidebar blink.
         this.flames.angle = this.parentObject.specs.engineSlots[slot].angle;
         this.flames.anchor.set(slotAnchor.x,slotAnchor.y);
     }

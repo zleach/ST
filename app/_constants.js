@@ -14,13 +14,14 @@ function TIME_FORMAT(time) {
     } else {
         return minutes+':'+seconds;
     }
-    
-    
 }
 
 FONT = 'Fira Code';
 
-DISTANCE_FACTOR = 97;
+DISTANCE_FACTOR_PLANETS = 1000;
+DISTANCE_FACTOR_SHIPS = .2;
+
+AMBIENT_VOLUME = .95;
 
 // Convert from degrees to radians.
 Math.radians = function(degrees) {
@@ -144,6 +145,44 @@ const PLANET_SERVICES_DESC = {
     casino : 'Members only gambling',
     passengerTerminal : 'Find transport jobs',
 }
+
+const PLANET_SERVICES_REQUIREMENTS = [
+    {
+        service : 'refinery',
+        requirement : 'industry',
+        level : 6,
+    },
+    {
+        service : 'fuelDepot',
+        requirement : 'industry',
+        level : 3,
+    },
+    {
+        service : 'shipyard',
+        requirement : 'science',
+        level : 7,
+    },
+    {
+        service : 'market',
+        requirement : 'trade',
+        level : 5,
+    },
+    {
+        service : 'tavern',
+        requirement : 'culture',
+        level : 5,
+    },
+    {
+        service : 'casino',
+        requirement : 'culture',
+        level : 8,
+    },
+    {
+        service : 'passengerTerminal',
+        requirement : 'trade',
+        level : 7,
+    }
+];
 
 const WEAPON_TYPES = {
     miningLaser :    'miningLaser',

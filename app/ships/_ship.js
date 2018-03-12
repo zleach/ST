@@ -47,6 +47,23 @@ class Ship extends GameObject {
         this.navigationMode = NAVIGATION_MODE.free;
         this.navigationIndex = -1;
 
+        // Lights
+        var lightWidth = 820;
+        var lightHeight = 680;
+        this.maskPoly = new Phaser.Polygon(
+            0,0,
+            lightWidth,0,
+            lightWidth/2,lightHeight
+        );
+        
+        this.lightMask = game.add.graphics(0, 0);
+        this.lightMask.beginFill(0xFFFFFF);
+        this.lightMask.drawPolygon(this.maskPoly);
+        this.lightMask.endFill();
+        this.lightMask.position.x = (-lightWidth/2)-1;
+        this.lightMask.position.y = -lightHeight-18;
+        this.lightMask.visible = false;
+
         // Sounds
         this.infoSound = game.add.audio('beep-beep');
         this.gasLeakSound = game.add.audio('gas-leak');
@@ -83,12 +100,16 @@ class Ship extends GameObject {
         this.sprite.body.mass = this.specs.mass;
         this.sprite.parentObject = this;
         
+        // Lights
+        this.sprite.addChild(this.lightMask);
+
         if(this.specs.dockingConnector!=undefined){
             this.dockingConnector = this.sprite.addChild(this.game.make.sprite(0, 0, 'null'));
             this.dockingConnector.x = this.specs.dockingConnector.position.x;
             this.dockingConnector.y = this.specs.dockingConnector.position.y;
         }
 
+        // Docking
         if(this.specs.canBeDockedTo){
             this.dockingPort = this.sprite.addChild(this.game.make.sprite(0, 0, 'dock-arrow'));
             this.dockingPort.x = this.specs.dockingPorts[0].position.x;
@@ -119,7 +140,8 @@ class Ship extends GameObject {
         this.nameText = this.game.add.text(
             0,0,
             this.name, 
-            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
+            this.game.ships, 
         );
         this.nameText.alpha = 0;
 
@@ -127,6 +149,7 @@ class Ship extends GameObject {
             0,0, 
             this.description, 
             { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.ships, 
         );
         this.subText.alpha = 0;
 
@@ -134,6 +157,7 @@ class Ship extends GameObject {
             0,0,
             'Cleared to Dock', 
             { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.ships, 
         );
         this.landingMessage.alpha = 0;
 
@@ -157,7 +181,7 @@ class Ship extends GameObject {
         this.ventData = {
             lifespan: 8000,
             image: 'white-smooth',
-            blendMode: 'ADD',
+            //blendMode: 'ADD',
             vx: { min: -.4, max: .4 },
             vy: { min: -.4, max: .4 },
             alpha: { min: 0, max: .3 },
@@ -333,8 +357,6 @@ class Ship extends GameObject {
     }
     
     accelerate() {
-        this.playJettisonCargoAnimation();
-
         if(!this.isDocked){
             // Not Docked
             var totalThurst = 0;
@@ -559,7 +581,7 @@ class Ship extends GameObject {
     
     get navigatableObjects() {
         var objects = [];
-        this.game.gameObjects.forEach(function(gameObject) {
+        this.game.system.stellarObjects.forEach(function(gameObject) {
             if(gameObject.canNavigateTo && gameObject != this){
                 objects.push(gameObject);
             }
@@ -588,13 +610,22 @@ class Ship extends GameObject {
     }
 
     get formattedDistanceToCurrentNavigationTarget(){
-        var distance = this.distanceToCurrentNavigationTarget*DISTANCE_FACTOR;
-        if(distance<3000){
-            return 'Arrived';
-        } else if(distance<1000000){
-            return numeral(distance/1000).format("0,0")+' Mm';
-        } else {            
-            return numeral(distance/100000).format("0,0.0")+' Gm';
+        //console.log(this.navigationTarget);
+        var distance;
+        if(this.navigationTarget.isPlanet){
+            distance = this.distanceToCurrentNavigationTarget*DISTANCE_FACTOR_PLANETS;
+            if(distance<75000){
+                return 'Arrived';
+            } else {
+                return numeral(distance).format('0,0.0 a').toUpperCase()+'m';
+            }
+        } else {
+            distance = this.distanceToCurrentNavigationTarget*DISTANCE_FACTOR_SHIPS;
+            if(distance<10){
+                return 'Arrived';
+            } else {            
+                return numeral(distance).format('0,0.0 a').toUpperCase()+'m';
+            }
         }
     }
 
@@ -998,10 +1029,11 @@ class Ship extends GameObject {
 
     // Venting
     ventAtmosphere(){
-        var o2Density = (this.oxygenQuantity/this.oxygenMax)/2;
-        this.ventData.alpha = { min: 0, max: o2Density };
-        this.ventData.vx = { min: -o2Density, max: o2Density };
-        this.ventData.vy = { min: -o2Density, max: o2Density };
+        var o2Density = (this.oxygenQuantity/this.oxygenMax)*.05;
+        var o2Spread = (this.oxygenQuantity/this.oxygenMax)/2;
+        this.ventData.alpha = { min: 0, max: .05 };
+        this.ventData.vx = { min: -o2Spread, max: o2Spread };
+        this.ventData.vy = { min: -o2Spread, max: o2Spread };
         
         var x = this.sprite.worldPosition.x + this.game.camera.x;
         var y = this.sprite.worldPosition.y + this.game.camera.y;

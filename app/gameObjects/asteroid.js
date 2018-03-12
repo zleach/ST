@@ -141,7 +141,14 @@ class Asteroid extends GameObject {
     // Rendering
     update() {
         super.update();
-        
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+
+        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+            this.sprite.exists = true;
+        } else {
+            this.sprite.exists = false;
+        }
+
         if(this.soundCountdown==0){
             this.damageSound.stop();
         } else {

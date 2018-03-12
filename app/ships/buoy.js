@@ -4,7 +4,7 @@ class Buoy extends Planet {
         
         this.specs = {
             name : 'Navigation Buoy',
-            description : 'Hinksford Asteroid Field',
+            description : '',
         }
         
         this.sprite = this.game.add.sprite(x,y, 'buoy');
@@ -15,8 +15,8 @@ class Buoy extends Planet {
         this.showInfoDistance = 120;
         
         this.canLand = false;
+        this.isPlanet = false;
         
-
         this.setupSprite();
 
         var blink = this.sprite.animations.add('blink');

@@ -9,13 +9,12 @@ class HUD {
         var padding = 8;
         var width = 100;
         var borderRadius = 5;
-        var backgroundColor = 0x3f3c46;
-        this.background = this.group.add(new Phaser.Graphics(this.game.game,0,0));
 
         this.masterAlarmSound = game.add.audio('master_alarm');
+        this.titleNotificationSound = game.add.audio('title-notification');
 
         // Updaters
-        game.time.events.loop(Phaser.Timer.SECOND * .25, this.slowUpdate, this);
+        game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
         game.time.events.loop(Phaser.Timer.SECOND * 1, this.verySlowUpdate, this);
 
         // Sidebar
@@ -322,7 +321,9 @@ class HUD {
     }
     
     title(message,submessage){
-        var delay = 2000;
+        this.titleNotificationSound.play();
+
+        var delay = 2000;        
         
         this.message__title.x = 32;
         this.message__title.y = this.game.camera.height-50;
@@ -349,7 +350,7 @@ class HUD {
     message(message){
         var delay = 2000;
         var messageText = this.game.add.text(
-            this.game.camera.width/2,
+            (this.game.camera.width/2)-50,
             this.game.camera.height-100, 
             message, 
             { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 

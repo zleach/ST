@@ -1,16 +1,17 @@
 class AsteroidField extends GameObject {
-    constructor(game,size,x,y) {
+    constructor(game,options) {
         super(game);
-
+        
+        var size = options.size;
         if(size==undefined) size = 2000;
-        var densityLowerBound = 90;
-        var densityUpperBound = 90;
+        var densityLowerBound = 50;
+        var densityUpperBound = 60;
         
         this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
-        this.asteroids = this.game.add.physicsGroup(Phaser.Physics.ARCADE);
+        this.asteroids = this.game.asteroids;
         for (var i = 0; i < this.asteroidsCount; i++) { 
-            var xPos = game.rnd.integerInRange(x-size, x+size);
-            var yPos = game.rnd.integerInRange(y-size, y+size);
+            var xPos = game.rnd.integerInRange(options.x-size, options.x+size);
+            var yPos = game.rnd.integerInRange(options.y-size, options.y+size);
             
             var bigness = game.rnd.integerInRange(0,100);
 
@@ -21,14 +22,19 @@ class AsteroidField extends GameObject {
             } else {
                 var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
             }
+
+            // Add to system
+            options.system.stellarObjects.push(asteroid);
         }
 
-        new Buoy(this.game,xPos,yPos);
+        this.buoy = new Buoy(this.game,options.x,options.y);
+        this.buoy.description = `${Names.proper()} Asteroid Field`
+
+        options.system.stellarObjects.push(this.buoy);
     }
     
     update(){
         super.update();
         this.game.physics.arcade.collide(this.asteroids, this.asteroids);
-    }
-    
+    }    
 }

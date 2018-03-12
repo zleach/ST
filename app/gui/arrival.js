@@ -101,11 +101,11 @@ class ArrivalScreen extends GuiScreen {
                 this.hide();
             }.bind(this),
         },
-        { font: `${13+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'center'}
+        { font: `${13+this.fontSizeOffset}px ${FONT}`, fill: '#FFFFFF', align: 'center'}
         );
         this.exitButton.buttonX = this.game.camera.width - this.exitButton.buttonWidth - 36;
         this.exitButton.buttonY = 24;
-        this.exitButton.text = "EXIT (ESC)";
+        this.exitButton.text = "Takeoff (L)";
         this.exitButton.color = this.styles.red;
         this.screen.add(this.exitButton);
 
