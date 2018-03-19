@@ -20,6 +20,7 @@ FONT = 'Fira Code';
 
 DISTANCE_FACTOR_PLANETS = 1000;
 DISTANCE_FACTOR_SHIPS = .2;
+PIXEL_TO_LIGHTYEAR = .1;
 
 AMBIENT_VOLUME = .95;
 
@@ -32,6 +33,11 @@ Math.radians = function(degrees) {
 Math.degrees = function(radians) {
 	return radians * 180 / Math.PI;
 }
+
+Array.prototype.lastItem = function() {
+    return this[this.length-1];
+};
+
 
 function isEven(n) {
    return n % 2 == 0;
@@ -241,3 +247,107 @@ const INVENTORY_LIST_CURSOR_STYLE = {
     left : 'left',
     right : 'right',
 }
+
+const STELLAR_TYPES = [
+{
+    class : 'O5',
+    color : '#9db4ff',
+},
+{
+    class : 'B1',
+    color : '#a2b9ff',
+},
+{
+    class : 'B3',
+    color : '#a7bcff',
+},
+{
+    class : 'B5',
+    color : '#aabfff',
+},
+{
+    class : 'B8',
+    color : '#afc3ff',
+},
+{
+    class : 'A1',
+    color : '#baccff',
+},
+{
+    class : 'A3',
+    color : '#c0d1ff',
+},
+{
+    class : 'A5',
+    color : '#cad8ff',
+},
+{
+    class : 'F0',
+    color : '#e4e8ff',
+},
+{
+    class : 'F2',
+    color : '#edeeff',
+},
+{
+    class : 'F5',
+    color : '#fbf8ff',
+},
+{
+    class : 'F8',
+    color : '#fff9f9',
+},
+{
+    class : 'G2',
+    color : '#fff5ec',
+},
+{
+    class : 'G5',
+    color : '#fff4e8',
+},
+{
+    class : 'G8',
+    color : '#fff1df',
+},
+{
+    class : 'K0',
+    color : '#ffebd1',
+},
+{
+    class : 'K4',
+    color : '#ffd7ae',
+},
+{
+    class : 'K7',
+    color : '#ffc690',
+},
+{
+    class : 'M2',
+    color : '#ffbe7f',
+},
+{
+    class : 'M4',
+    color : '#ffbb7b',
+},
+{
+    class : 'M6',
+    color : '#ffbb7b',
+}    
+]
+
+const GREEK_ALPHABET = [
+    'Alpha',
+    'Beta',
+    'Gamma',
+    'Delta',
+    'Epsilon',
+    'Zeta',
+    'Eta',
+    'Theta',
+    'Omicron',
+    'Pi',
+    'Sigma',
+    'Tau',
+    'Upsilon',
+    'Omega',
+]

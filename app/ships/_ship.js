@@ -64,12 +64,20 @@ class Ship extends GameObject {
         this.lightMask.position.y = -lightHeight-18;
         this.lightMask.visible = false;
 
+        // Hyperdrive
+        this.hyperDriveDelay = 3600;
+
         // Sounds
         this.infoSound = game.add.audio('beep-beep');
         this.gasLeakSound = game.add.audio('gas-leak');
         this.dockConnectSound = game.add.audio('dock-connect');
         this.dockReleaseSound = game.add.audio('dock-release');
         this.navTargetChangedSound = game.add.audio('blorp');
+
+        this.ftlChargeSound = game.add.audio('ftl-charge');
+        this.ftlJumpSound = game.add.audio('ftl-jump');
+        this.jumpCompleteSound = game.add.audio('jump-complete');
+
         this.crashSounds = [
             game.add.audio('crash-1'),
             game.add.audio('crash-2'),
@@ -991,31 +999,17 @@ class Ship extends GameObject {
     
 
     // HyperDrive™
-    toggleHyperDrive(){
-        this.hyperDriveEngaged = !this.hyperDriveEngaged;
+    toggleHyperDrive(){        
+        if(!this.hyperDriveEngaged){
+            //this.game.lockCamera();
+            this.hyperDriveTimer = game.time.events.add(this.hyperDriveDelay, this.jump, this);
+            this.ftlChargeSound.play();
+            this.hyperDriveEngaged = true;
+        }
     }
-
-    engageHyperDrive(){
-        this.hyperDriveEngaged = true;
-        this.game.starBlurY.blur = 0;
-        this.game.starBlurX.blur = 0;
-    }
-
+    
     hyperDriveUpdate(){
-        var maxBlur = 50;
-
-        var vx = this.sprite.body.data.velocity[0];
-        var vy = this.sprite.body.data.velocity[1];
-        
-        this.game.starBlurX.blur = vx;
-        this.game.starBlurY.blur = vy;
-        
-        this.game.stars.filters = [this.game.starBlurY];
-
-        this.sprite.body.thrust(0);
-        
-        this.game.bgGroup.rotation=10;
-        
+        this.sprite.body.thrust(1000);
         this.hyperDriveEmitter.emit(
             'hyperDrive',
             this.sprite.worldPosition.x + this.game.camera.x,
@@ -1023,8 +1017,21 @@ class Ship extends GameObject {
         );        
     }
     
+    jump(){
+        this.ftlJumpSound.play();
+        game.camera.flash(0xFFFFFF, 500);
+        this.disengageHyperDrive();
+
+        this.game.mapScreen.map.navigationDestination.arrive();
+
+        game.time.events.add(800, function(){
+            this.jumpCompleteSound.play();
+        }, this);
+   }
+    
     disengageHyperDrive(){
-        this.hyperDriveEngaged = false;    
+        this.hyperDriveEngaged = false;
+        this.hyperDriveTimer = game.time.events.remove(this.hyperDriveDelay);
     }
 
     // Venting

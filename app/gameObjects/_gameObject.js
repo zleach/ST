@@ -1,6 +1,5 @@
 class GameObject {
     constructor(game) {
-        this._seed = 0;  
         this._name = 'Unknown Object';
         this.description = '';
 
@@ -304,6 +303,10 @@ class GameObject {
 
     determinePercent(){
         return this.rng.next();
+    }
+    
+    cleanup(){
+        
     }
 
     update(){

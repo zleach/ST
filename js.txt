@@ -14,6 +14,7 @@ lib/filter_blurY.js
 lib/hmac-md5.js
 lib/prando.js
 lib/markov.js
+lib/tombola.js
 app/_names.js
 app/_constants.js
 app/_inventoryObject.js
@@ -66,4 +67,6 @@ app/gui/tabItem.js
 app/gui/twoLineButton.js
 app/gui/notification.js
 app/gui/inventoryList.js
+app/gui/map.js
+app/gui/mapScreen.js
 app/economy/_economy.js

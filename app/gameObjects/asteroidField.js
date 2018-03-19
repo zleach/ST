@@ -32,6 +32,13 @@ class AsteroidField extends GameObject {
 
         options.system.stellarObjects.push(this.buoy);
     }
+
+    cleanup(){
+        this.asteroids.forEach(function(item) {
+            item.sprite.destroy();
+            item = null;            
+        });
+    }
     
     update(){
         super.update();

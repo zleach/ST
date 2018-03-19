@@ -141,7 +141,7 @@ class Planet extends GameObject{
             this.showInfoIfNeeded();
             
             // Paralax
-            if(this.isPlanet && this.wrapper){
+            if(this.isPlanet && this.wrapper && this.game.camera){
                 this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
                 this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);
             }

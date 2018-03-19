@@ -5,7 +5,7 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Mon Mar 12 00:56:58 PDT 2018  */
+/* Last merge : Mon Mar 19 05:00:49 PDT 2018  */
 
 /* Merging order :
 
@@ -25,6 +25,7 @@
 - lib/hmac-md5.js
 - lib/prando.js
 - lib/markov.js
+- lib/tombola.js
 - app/_names.js
 - app/_constants.js
 - app/_inventoryObject.js
@@ -77,6 +78,8 @@
 - app/gui/twoLineButton.js
 - app/gui/notification.js
 - app/gui/inventoryList.js
+- app/gui/map.js
+- app/gui/mapScreen.js
 - app/economy/_economy.js
 
 */
@@ -92,7 +95,7 @@ const screenHeight = 1000/2
 
 var ITEMS = [];
 
-var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
+var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
         this.time.advancedTiming = true
@@ -123,6 +126,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
     },
     loadComplete:function() {
         this.setup();
+	    this.loadText.visible = false;
         this.loaded = true;
     },
     init : function(){
@@ -175,6 +179,9 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         // O2
         this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
         this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
+        
+        // FTL
+        this.load.image('ftl-panel', 'assets/ftl-panel.png');
 
         // Planet Stuff
         this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
@@ -213,6 +220,12 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
             'assets/fonts/pixelmix1.png',
             'assets/fonts/pixelmix1.fnt'
         );
+
+        this.load.bitmapFont(
+            'pixelmix_8_leaded',
+            'assets/fonts/pixelmix1.png',
+            'assets/fonts/pixelmix1.fnt'
+        );
         
         // Hud
         this.load.image('minimap-bg', 'assets/minimap-bg.png');
@@ -246,7 +259,6 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.audio('ice-crash-6', 'assets/audio/ice-crash-6.mp3');
         this.load.audio('nebula-ambient-1', 'assets/audio/nebula-ambient-1.mp3');
 
-
         this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
         this.load.audio('rcs-loop', 'assets/audio/rcs-loop-2.mp3');
         this.load.audio('hiss-1', 'assets/audio/hiss-1.mp3');
@@ -255,17 +267,24 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.audio('hiss-4', 'assets/audio/hiss-4.mp3');
         this.load.audio('hiss-5', 'assets/audio/hiss-5.mp3');
 
+        this.load.audio('ftl-charge', 'assets/audio/ftl-charge.mp3');
+        this.load.audio('ftl-jump', 'assets/audio/ftl-jump.mp3');
+        this.load.audio('jump-complete', 'assets/audio/jump-complete.mp3');
+
         this.load.audio('pickup-common-1', 'assets/audio/pickup-common-1.mp3');
         this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
         this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
         this.load.audio('gui_collapse', 'assets/audio/Collapse.m4a');
         this.load.audio('gui_expand', 'assets/audio/Expand.m4a');
+        this.load.audio('panel-toggle', 'assets/audio/panel-toggle.mp3');
         this.load.audio('beep-beep', 'assets/audio/Error 1.m4a');
         this.load.audio('blorp', 'assets/audio/Error 4.m4a');
+        this.load.audio('cancel', 'assets/audio/Cancel 1.m4a');
         this.load.audio('success', 'assets/audio/Success 3.m4a');
         this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
         this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
         this.load.audio('title-notification', 'assets/audio/title-notification.mp3');
+        this.load.audio('invalid', 'assets/audio/Error 5.m4a');
 
         this.load.audio('dock-connect', 'assets/audio/dock-connect.mp3');
         this.load.audio('dock-release', 'assets/audio/dock-release.mp3');
@@ -283,12 +302,16 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.start();
     },
     setup : function(){
-        var seed = 77712;
+        var seed = 2;
         window.rng = new Prando(seed);
         this.rng = window.rng;
         this.names = new Names(this.rng);
-
+        this.galaxy = new Galaxy(this);
+        this.galaxy.build();
+        this.system = this.galaxy.starSystems[0];
+                
         this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
+        this.cache.getBitmapFont('pixelmix_8_leaded').font.lineHeight = 16;
 
         this.game.physics.startSystem(Phaser.Physics.P2JS);
         this.game.physics.p2.restitution = 0.05;
@@ -324,38 +347,24 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.ships = this.game.add.group();
 
         this.economy = new Economy(this);
-        this.galaxy = new Galaxy(this);
-
-
-/*
-        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX-3000,this.game.world.centerY+2500);
-        var nebula = new Nebula(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX+5500,this.game.world.centerY);
-        var nebula = new Nebula(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX+100,this.game.world.centerY);
-        this.testplanet = new BasicPlanet(this,this.game.world.centerX,this.game.world.centerY);
-        var moon = new BasicMoon(this,this.game.world.centerX+7000,this.game.world.centerY+1000);        
-
-        this.ft = new FuelTanker(this,this.game.world.centerX+200,this.game.world.centerY-200);
-        this.ft.sprite.body.angle = 270;
-*/
-
+        
         this.game.world.bringToTop(this.asteroids);
         this.game.world.bringToTop(this.ships);
         this.player = new Player(this);
-        this.galaxy.starSystems[0].arrive();
-        
+
         // FullSCreen
         var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
         fKey.onDown.add(this.fullScreen, this);
-        
+
         // HUD
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
-        this.hud.showSystemInfo();
         
         // GUI
         this.guiGroup = this.game.add.group();
         this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
         this.inventoryScreen = new InventoryScreen(this,this.guiGroup);
+        this.mapScreen = new MapScreen(this,this.guiGroup);
         
         // Weapons
         var miningLaser = InventoryObject.make('mining_laser_1',this);
@@ -382,12 +391,15 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.updateTime();
 
         // Camera
-        this.cameraFree = true;
+        this.cameraFree = false;
         this.setupCamera(silent = true);
 
         // Very top layer
         this.notificationGroup = this.game.add.group(); 
-        this.notificationGroup.fixedToCamera = true;    
+        this.notificationGroup.fixedToCamera = true;
+        
+        // Kick things off
+        this.galaxy.starSystems[0].arrive();
     },
     
     register : function(object){
@@ -460,25 +472,33 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.setupCamera();
     },
     
+    lockCamera : function(){
+        // Locked
+        this.game.camera.follow(this.player.sprite);            
+        this.game.camera.deadzone = null;
+        this.game.camera.targetOffset.x = 50;
+    },
+    
+    freeCamera : function(){
+        // Free
+        this.game.camera.follow(this.player.sprite);
+        var deadzonePadding = 100;
+        this.freeDeadzone = new Phaser.Rectangle(
+            deadzonePadding,
+            deadzonePadding,
+            screenWidth-350,
+            screenHeight-deadzonePadding*2
+        );  
+        this.game.camera.deadzone = this.freeDeadzone;
+        this.game.camera.focusOnXY(this.player.ship.sprite.x + 50,this.player.ship.sprite.y);
+    },
+    
     setupCamera : function(silent){
         if(this.cameraFree){
-            // Free
-            this.game.camera.follow(this.player.sprite);
-            var deadzonePadding = 100;
-            this.freeDeadzone = new Phaser.Rectangle(
-                deadzonePadding,
-                deadzonePadding,
-                screenWidth-350,
-                screenHeight-deadzonePadding*2
-            );  
-            this.game.camera.deadzone = this.freeDeadzone;
-            this.game.camera.focusOnXY(this.player.ship.sprite.x + 50,this.player.ship.sprite.y);
+            this.freeCamera();
             if(!silent) this.hud.message('Camera Mode: Free');
         } else {
-            // Locked
-            this.game.camera.follow(this.player.sprite);            
-            this.game.camera.deadzone = null;
-            this.game.camera.targetOffset.x = 50;
+            this.lockCamera();
             if(!silent) this.hud.message('Camera Mode: Locked');            
         }
 
@@ -491,13 +511,14 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
     
     update : function(){
         if(this.loaded){
-            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
-            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
-            
             // Update all registered objects
             this.gameObjects.forEach(function(gameObject) {
                 gameObject.update();
             });
+
+            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
+            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
+            
 
             // Move stars
             this.starsDistant.tilePosition.x = -this.game.camera.x*0.3;
@@ -1073,7 +1094,319 @@ var NAMES_STAR = [
     'Ardaos',
     'Cheitia',
     'Etitia',
-    'Engeytia'
+    'Engeytia',
+    'Acamar',
+    'Achernar',
+    'Achird',
+    'Acrab',
+    'Acrux',
+    'Acubens',
+    'Adhafera',
+    'Adhara',
+    'Adhil',
+    'Ain',
+    'Ainalrami',
+    'Aladfar',
+    'Albaldah',
+    'Albali',
+    'Albireo',
+    'Alchiba',
+    'Alcor',
+    'Alcyone',
+    'Aldebaran',
+    'Alderamin',
+    'Aldhanab',
+    'Aldhibah',
+    'Aldulfin',
+    'Alfirk',
+    'Algedi',
+    'Algenib',
+    'Algieba',
+    'Algol',
+    'Algorab',
+    'Alhena',
+    'Alioth',
+    'Aljanah',
+    'Alkaid',
+    'Alkalurops',
+    'Alkaphrah',
+    'Alkarab',
+    'Alkes',
+    'Almaaz',
+    'Almach',
+    'Alnair',
+    'Alnasl',
+    'Alnilam',
+    'Alnitak',
+    'Alniyat',
+    'Alphard',
+    'Alphecca',
+    'Alpheratz',
+    'Alrakis',
+    'Alrescha',
+    'Alsafi',
+    'Alsciaukat',
+    'Alsephina',
+    'Alshain',
+    'Alshat',
+    'Altair',
+    'Altais',
+    'Alterf',
+    'Aludra',
+    'Alula Australis',
+    'Alula Borealis',
+    'Alya',
+    'Alzirr',
+    'Ancha',
+    'Angetenar',
+    'Ankaa',
+    'Anser',
+    'Antares',
+    'Arcturus',
+    'Arkab Posterior',
+    'Arkab Prior',
+    'Arneb',
+    'Ascella',
+    'Asellus Australis',
+    'Asellus Borealis',
+    'Aspidiske',
+    'Asterope',
+    'Athebyne',
+    'Atik',
+    'Atlas',
+    'Atria',
+    'Avior',
+    'Azelfafage',
+    'Azha',
+    'Barnard\'s Star',
+    'Baten Kaitos',
+    'Beemim',
+    'Beid',
+    'Bellatrix',
+    'Betelgeuse',
+    'Bharani',
+    'Biham',
+    'Botein',
+    'Brachium',
+    'Canopus',
+    'Capella',
+    'Caph',
+    'Castor',
+    'Castula',
+    'Cebalrai',
+    'Celaeno',
+    'Cervantes',
+    'Chalawan',
+    'Chamukuy',
+    'Chara',
+    'Chertan',
+    'Copernicus',
+    'Cor Caroli',
+    'Cujam',
+    'Cursa',
+    'Dabih',
+    'Dalim',
+    'Deneb Algedi',
+    'Deneb',
+    'Denebola',
+    'Diadem',
+    'Diphda',
+    'Dschubba',
+    'Dubhe',
+    'Dziban',
+    'Edasich',
+    'Electra',
+    'Elnath',
+    'Eltanin',
+    'Enif',
+    'Errai',
+    'Fafnir',
+    'Fang',
+    'Fomalhaut',
+    'Fulu',
+    'Furud',
+    'Fuyue',
+    'Gacrux',
+    'Giausar',
+    'Gienah',
+    'Gomeisa',
+    'Grumium',
+    'Hadar',
+    'Haedus',
+    'Hamal',
+    'Hassaleh',
+    'Hatysa',
+    'Helvetios',
+    'Homam',
+    'Iklil',
+    'Intercrus',
+    'Izar',
+    'Jabbah',
+    'Jishui',
+    'Kaffaljidhma',
+    'Kang',
+    'Kaus Australis',
+    'Kaus Borealis',
+    'Kaus Media',
+    'Keid',
+    'Khambalia',
+    'Kitalpha',
+    'Kochab',
+    'Kornephoros',
+    'Kurhah',
+    'Lesath',
+    'Libertas',
+    'Lich',
+    'Lilii Borea',
+    'Maasym',
+    'Mahasim',
+    'Maia',
+    'Marfik',
+    'Markab',
+    'Markeb',
+    'Marsic',
+    'Matar',
+    'Mebsuta',
+    'Megrez',
+    'Meissa',
+    'Mekbuda',
+    'Meleph',
+    'Menkalinan',
+    'Menkar',
+    'Menkent',
+    'Menkib',
+    'Merak',
+    'Merga',
+    'Meridiana',
+    'Merope',
+    'Mesarthim',
+    'Miaplacidus',
+    'Mimosa',
+    'Minchir',
+    'Minelauva',
+    'Mintaka',
+    'Mira',
+    'Mirach',
+    'Miram',
+    'Mirfak',
+    'Mirzam',
+    'Misam',
+    'Mizar',
+    'Mothallah',
+    'Muliphein',
+    'Muphrid',
+    'Muscida',
+    'Musica',
+    'Naos',
+    'Nashira',
+    'Nekkar',
+    'Nembus',
+    'Nihal',
+    'Nunki',
+    'Nusakan',
+    'Ogma',
+    'Peacock',
+    'Phact',
+    'Phecda',
+    'Pherkad',
+    'Pipirima',
+    'Pleione',
+    'Polaris Australis',
+    'Polaris',
+    'Polis',
+    'Pollux',
+    'Porrima',
+    'Praecipua',
+    'Prima Hyadum',
+    'Procyon',
+    'Propus',
+    'Proxima Centauri',
+    'Ran',
+    'Rasalas',
+    'Rasalgethi',
+    'Rasalhague',
+    'Rastaban',
+    'Regulus',
+    'Revati',
+    'Rigel',
+    'Rigil Kentaurus',
+    'Rotanev',
+    'Ruchbah',
+    'Rukbat',
+    'Sabik',
+    'Saclateni',
+    'Sadachbia',
+    'Sadalbari',
+    'Sadalmelik',
+    'Sadalsuud',
+    'Sadr',
+    'Saiph',
+    'Salm',
+    'Sargas',
+    'Sarin',
+    'Sceptrum',
+    'Scheat',
+    'Schedar',
+    'Secunda Hyadum',
+    'Segin',
+    'Seginus',
+    'Sham',
+    'Shaula',
+    'Sheliak',
+    'Sheratan',
+    'Sirius',
+    'Situla',
+    'Skat',
+    'Spica',
+    'Sualocin',
+    'Subra',
+    'Suhail',
+    'Sulafat',
+    'Syrma',
+    'Tabit',
+    'Taiyangshou',
+    'Taiyi',
+    'Talitha',
+    'Tania Australis',
+    'Tania Borealis',
+    'Tarazed',
+    'Taygeta',
+    'Tegmine',
+    'Tejat',
+    'Terebellum',
+    'Theemin',
+    'Thuban',
+    'Tiaki',
+    'Tianguan',
+    'Tianyi',
+    'Titawin',
+    'Tonatiuh',
+    'Torcular',
+    'Tureis',
+    'Unukalhai',
+    'Unurgunite',
+    'Vega',
+    'Veritate',
+    'Vindemiatrix',
+    'Wasat',
+    'Wazn',
+    'Wezen',
+    'Xamidimura',
+    'Xuange',
+    'Yed Posterior',
+    'Yed Prior',
+    'Yildun',
+    'Zaniah',
+    'Zaurak',
+    'Zavijava',
+    'Zhang',
+    'Zibal',
+    'Zosma',
+    'Zubenelgenubi',
+    'Zubenelhakrabi',
+    'Zubeneschamali',
+    'Larawag',
+    'Ginan',
 ];
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -43205,6 +43538,502 @@ if (typeof module !== "undefined" && module !== null) {
 // generated by coffee-script 1.9.2
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: lib/tombola.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+//-------------------------------------------------------------------------------------------
+//  TOMBOLA SETUP
+//-------------------------------------------------------------------------------------------
+
+function Tombola() {
+}
+var tombola = new Tombola();
+
+
+//-------------------------------------------------------------------------------------------
+//  RANGE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number between 'min' and 'max' //
+
+Tombola.prototype.range = function(min,max) {
+    return Math.round(min + (Math.random() * (max - min))); // int
+};
+
+// Returns a random float number between 'min' and 'max' //
+
+Tombola.prototype.rangeFloat = function(min,max) {
+    return min + (Math.random() * (max - min)); // float
+};
+
+// Returns an array populated with random whole numbers between 'min' and 'max' //
+
+Tombola.prototype.rangeArray = function(min,max,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.range(min,max));
+    }
+    return a; // int array
+};
+
+// Returns an array populated with random float numbers between 'min' and 'max' //
+
+Tombola.prototype.rangeFloatArray = function(min,max,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.range(min,max));
+    }
+    return a; // float array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  DICE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number from simulated dice rolls //
+
+Tombola.prototype.dice = function(die,sides) {
+    die = Math.round(die);
+    sides = Math.round(sides);
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (1 + Math.floor(Math.random() * sides));
+    }
+    return t; // int
+};
+
+// Returns an array populated with random whole numbers from simulated dice rolls //
+
+Tombola.prototype.diceArray = function(die,sides,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.dice(die,sides));
+    }
+    return a; // int array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  FUDGE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole positive or negative number from simulated fudge dice rolls //
+// 'strength' of 1 and 'die' of 3 gives a possible range of -3 to 3 //
+
+Tombola.prototype.fudge = function(die,strength) {
+    die = Math.round(die);
+    strength = Math.round(strength) || 1;
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (-strength + Math.floor(Math.random() * ((strength * 2) + 1)));
+    }
+    return t; // int
+};
+
+// Returns a random float positive or negative number from simulated fudge dice rolls //
+// 'strength' of 0.1 and 'die' of 3 gives a possible range of -0.3 to 0.3 //
+
+Tombola.prototype.fudgeFloat = function(die,strength) {
+    die = Math.round(die);
+    strength = strength || 1;
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (-strength + (Math.random() * (strength * 2)));
+    }
+    return t; // float
+};
+
+// Returns an array populated with random whole positive or negative numbers from simulated fudge dice rolls //
+
+Tombola.prototype.fudgeArray = function(die,strength,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.fudge(die,strength));
+    }
+    return a; // int array
+};
+
+// Returns an array populated with random float positive or negative numbers from simulated fudge dice rolls //
+
+Tombola.prototype.fudgeFloatArray = function(die,strength,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.fudgeFloat(die,strength));
+    }
+    return a; // float array
+};
+
+//-------------------------------------------------------------------------------------------
+//  CHANCE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns true or false the results of a chance roll //
+// a 'chance' of 1 and 'possibility' of 5 means there's a 1 in 5 chance of returning true //
+
+Tombola.prototype.chance = function(chance,possibility) {
+    var n = Math.random() * possibility;
+    return (n < chance); // bool
+};
+
+// Returns an array populated with true or false results from chance rolls //
+
+Tombola.prototype.chanceArray = function(chance,possibility,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.chance(chance,possibility));
+    }
+    return a; // bool array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  PERCENT ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns true or false the results of a percent roll //
+// a 'percent' of 25 means there's a 25% chance of returning true //
+
+Tombola.prototype.percent = function(percent) {
+    var n = Math.random() * 100;
+    return (n < percent); // bool
+};
+
+// Returns an array populated with true or false results from percent rolls //
+
+Tombola.prototype.percentArray = function(percent,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.percent(percent));
+    }
+    return a; // bool array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  ITEM
+//-------------------------------------------------------------------------------------------
+
+// Returns a randomly selected item with equal probability //
+// 'items' is an array of items to be chosen from //
+
+Tombola.prototype.item = function(items) {
+    var l = items.length;
+    var n = Math.floor(Math.random() * l);
+    return items[n]; // item
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED NUMBER
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number with a weighted probability //
+// 'weights' is an array of probability weights, four weights would mean a number between 1 - 4 is generated //
+// 'weights' of [20,10,10] will return a number between 1 and 3, with 1 being twice as likely an outcome as either 2 or 3 //
+
+Tombola.prototype.weightedNumber = function(weights) {
+    var l = weights.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i];
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i];
+        if (n <= w) {
+            return i+1; // int
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED ITEM
+//-------------------------------------------------------------------------------------------
+
+// Returns a randomly selected item with a weighted probability //
+// 'items' is an array of items to be chosen from //
+// 'weights' is an array of probability weights, setting the probability of each item being selected e.g [5,20,1,0.1] //
+
+Tombola.prototype.weightedItem = function(items,weights) {
+    var l = items.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i] || 0;
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i] || 0;
+        if (n <= w) {
+            return items[i]; // item
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED FUNCTION
+//-------------------------------------------------------------------------------------------
+
+// Calls a randomly selected function with a weighted probability //
+// 'functions' is an array of functions to be chosen from //
+// 'weights' is an array of probability weights, setting the probability of each function being selected e.g [5,20,1,0.1] //
+
+Tombola.prototype.weightedFunction = function(functions,weights) {
+    var l = functions.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i] || 0;
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i] || 0;
+        if (n <= w) {
+            functions[i](); // function call
+            break;
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  CLUSTER
+//-------------------------------------------------------------------------------------------
+
+// Returns an array of whole numbers which are randomly clustered within a min/max range //
+// an evenly distributed cluster width is set with 'spread' //
+
+Tombola.prototype.cluster = function(quantity,min,max,spread) {
+    var c = this.range(min,max);
+    var a = [];
+    for (var i=0; i<quantity; i++) {
+        a.push(c + this.range(-spread,spread));
+    }
+    return a; // int array
+};
+
+// Returns an array of whole numbers which are randomly clustered within a min/max range //
+// uneven cluster width is set with 'die' and 'strength' (die x strength = max possible width) //
+// the distribution is more weighted around the center using fudge rolls, more die = greater center weight //
+
+Tombola.prototype.clusterFudge = function(quantity,min,max,die,strength) {
+    strength = strength || 1;
+    var c = this.range(min,max);
+    var a = [];
+    for (var i=0; i<quantity; i++) {
+        a.push(c + this.fudge(die,strength));
+    }
+    return a; // int array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  PERSISTENT DECK
+//-------------------------------------------------------------------------------------------
+
+// Creates a deck (hat/tombola) which can be drawn from, added to or shuffled //
+// 'contents' is an array of items to populate the deck with //
+
+
+Tombola.prototype.deck = function(contents) {
+    return new RandomDeck(contents);
+};
+
+
+function RandomDeck(contents) {
+    this.contents = contents || [];
+}
+
+// Returns an item from the deck, randomly or at a given index, and removes that item from the deck //
+RandomDeck.prototype.draw = function(index) {
+    if (this.contents.length>0) {
+        index = index || Math.floor(Math.random() * this.contents.length);
+        var item = this.contents[index];
+        this.contents.splice(index,1);
+        return item;
+    } else {
+        return null;
+    }
+};
+
+// Returns an item from the deck, randomly or at a given index, the item stays in the deck //
+RandomDeck.prototype.look = function(index) {
+    if (this.contents.length>0) {
+        index = index || Math.floor(Math.random() * this.contents.length);
+        return this.contents[index];
+    } else {
+        return null;
+    }
+};
+
+// Adds an item to the deck, randomly or at a given index //
+RandomDeck.prototype.insert = function(item, index) {
+    index = index || Math.round(Math.random() * this.contents.length);
+    this.contents.splice(index,0,item);
+};
+
+// Shuffles the deck order //
+RandomDeck.prototype.shuffle = function() {
+    var a = [];
+    var l = this.contents.length;
+    for (var i=0; i<l; i++) {
+        a.push(this.draw());
+    }
+    this.contents = a;
+};
+
+// Returns an array of all contents of the deck //
+RandomDeck.prototype.show = function() {
+    return this.contents;
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED DECK
+//-------------------------------------------------------------------------------------------
+
+// Creates a deck (hat/tombola) which can be drawn from, added to or shuffled //
+// 'contents' is an array of items to populate the deck with, 'weights' add weighting to
+// the chance, and 'instances' allows for multiple instances of each object. //
+
+
+Tombola.prototype.weightedDeck = function(contents, options) {
+    return new WeightedDeck(contents, options);
+};
+
+function WeightedDeck(contents, options) {
+    options = options || {};
+    this.contents = contents || [];
+    this.weights = options.weights || [];
+    this.instances = options.instances || [];
+
+    var i;
+    if (this.weights.length===0) {
+        for (i=0; i<contents.length; i++) {
+            this.weights.push(1);
+        }
+    }
+    if (this.instances.length===0) {
+        for (i=0; i<contents.length; i++) {
+            this.instances.push(1);
+        }
+    }
+}
+
+// Returns an item from the deck, randomly or at a given index, and removes that item from the deck //
+WeightedDeck.prototype.draw = function(index) {
+    if (this.contents.length>0) {
+
+        // no given index, do random weighting //
+        var l = this.contents.length;
+        if (!(index >=0 && index<l)) {
+            var totalWeight = 0;
+            for (var i=0; i<l; i++) {
+                totalWeight += this.weights[i] || 0;
+            }
+            var n = Math.random() * totalWeight;
+            var w = 0;
+            for (i=0; i<l; i++) {
+                w += this.weights[i] || 0;
+                if (n <= w) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        var item = this.contents[index];
+
+        // remove an instance //
+        this.instances[index] -= 1;
+        if (this.instances[index]<1) {
+            this.contents.splice(index,1);
+            this.weights.splice(index,1);
+            this.instances.splice(index,1);
+        }
+
+        return item;
+    } else {
+        return null;
+    }
+};
+
+// Returns an item from the deck, randomly or at a given index, the item stays in the deck //
+WeightedDeck.prototype.look = function(index) {
+    if (this.contents.length>0) {
+
+        // no given index, do random weighting //
+        var l = this.contents.length;
+        if (!(index >=0 && index<l)) {
+            var totalWeight = 0;
+            for (var i=0; i<l; i++) {
+                totalWeight += this.weights[i] || 0;
+            }
+            var n = Math.random() * totalWeight;
+            var w = 0;
+            for (i=0; i<l; i++) {
+                w += this.weights[i] || 0;
+                if (n <= w) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        return this.contents[index];
+    } else {
+        return null;
+    }
+};
+
+// Adds an item to the deck, randomly or at a given index //
+WeightedDeck.prototype.insert = function(item, options) {
+    options = options || {};
+    var index = options.index || Math.round(Math.random() * this.contents.length);
+    var weight = options.weight || 1;
+    var instances = options.instances || 1;
+    this.contents.splice(index,0,item);
+    this.weights.splice(index,0,weight);
+    this.instances.splice(index,0,instances);
+};
+
+// Shuffles the deck order //
+WeightedDeck.prototype.shuffle = function() {
+    var a = [];
+    var b = [];
+    var c = [];
+    var l = this.contents.length;
+    for (var i=0; i<l; i++) {
+        var index = Math.floor(Math.random() * this.contents.length);
+        a.push(this.contents[index]);
+        b.push(this.weights[index]);
+        c.push(this.instances[index]);
+        this.contents.splice(index,1);
+        this.weights.splice(index,1);
+        this.instances.splice(index,1);
+    }
+    this.contents = a;
+    this.weights = b;
+    this.instances = c;
+};
+
+// Returns an array of all contents of the deck //
+WeightedDeck.prototype.show = function() {
+    return this.contents;
+};
+
+
+// npm export //
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
+    module.exports = Tombola;
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/_names.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -43231,11 +44060,29 @@ class Names {
     
     static star(){
         var markovChain = new Markov;
-        markovChain.maxLength = rng.nextInt(3,14);
-        markovChain.n = rng.nextInt(3,4);
+        markovChain.n = rng.nextInt(5,5);
         markovChain.sequences = Names.parseWords(NAMES_STAR.join('\n'));
         markovChain.rng = rng;
-        return Names.capitalize(markovChain.generate().join(""));
+        
+        var name;
+        
+        if(rng.next()>.9){
+            markovChain.maxLength = rng.nextInt(3,6);
+            var word1 = Names.capitalize(markovChain.generate().join(""))
+            markovChain.maxLength = rng.nextInt(4,14);
+            var word2 = Names.capitalize(markovChain.generate().join(""))
+            name = `${word1} ${word2}`;            
+        } else {
+            markovChain.maxLength = rng.nextInt(3,14);
+            name = Names.capitalize(markovChain.generate().join(""));
+        }
+
+        if(rng.next()>.4){
+            var greekPrefix = GREEK_ALPHABET[rng.nextInt(0, GREEK_ALPHABET.length-1)]
+            name = `${greekPrefix} ${name}`;
+        }
+        
+        return name;
     }
 
     static proper(){
@@ -43270,6 +44117,7 @@ FONT = 'Fira Code';
 
 DISTANCE_FACTOR_PLANETS = 1000;
 DISTANCE_FACTOR_SHIPS = .2;
+PIXEL_TO_LIGHTYEAR = .1;
 
 AMBIENT_VOLUME = .95;
 
@@ -43282,6 +44130,11 @@ Math.radians = function(degrees) {
 Math.degrees = function(radians) {
 	return radians * 180 / Math.PI;
 }
+
+Array.prototype.lastItem = function() {
+    return this[this.length-1];
+};
+
 
 function isEven(n) {
    return n % 2 == 0;
@@ -43492,6 +44345,110 @@ const INVENTORY_LIST_CURSOR_STYLE = {
     right : 'right',
 }
 
+const STELLAR_TYPES = [
+{
+    class : 'O5',
+    color : '#9db4ff',
+},
+{
+    class : 'B1',
+    color : '#a2b9ff',
+},
+{
+    class : 'B3',
+    color : '#a7bcff',
+},
+{
+    class : 'B5',
+    color : '#aabfff',
+},
+{
+    class : 'B8',
+    color : '#afc3ff',
+},
+{
+    class : 'A1',
+    color : '#baccff',
+},
+{
+    class : 'A3',
+    color : '#c0d1ff',
+},
+{
+    class : 'A5',
+    color : '#cad8ff',
+},
+{
+    class : 'F0',
+    color : '#e4e8ff',
+},
+{
+    class : 'F2',
+    color : '#edeeff',
+},
+{
+    class : 'F5',
+    color : '#fbf8ff',
+},
+{
+    class : 'F8',
+    color : '#fff9f9',
+},
+{
+    class : 'G2',
+    color : '#fff5ec',
+},
+{
+    class : 'G5',
+    color : '#fff4e8',
+},
+{
+    class : 'G8',
+    color : '#fff1df',
+},
+{
+    class : 'K0',
+    color : '#ffebd1',
+},
+{
+    class : 'K4',
+    color : '#ffd7ae',
+},
+{
+    class : 'K7',
+    color : '#ffc690',
+},
+{
+    class : 'M2',
+    color : '#ffbe7f',
+},
+{
+    class : 'M4',
+    color : '#ffbb7b',
+},
+{
+    class : 'M6',
+    color : '#ffbb7b',
+}    
+]
+
+const GREEK_ALPHABET = [
+    'Alpha',
+    'Beta',
+    'Gamma',
+    'Delta',
+    'Epsilon',
+    'Zeta',
+    'Eta',
+    'Theta',
+    'Omicron',
+    'Pi',
+    'Sigma',
+    'Tau',
+    'Upsilon',
+    'Omega',
+]
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/_inventoryObject.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -43566,7 +44523,6 @@ class InventoryObject {
 
 class GameObject {
     constructor(game) {
-        this._seed = 0;  
         this._name = 'Unknown Object';
         this.description = '';
 
@@ -43871,6 +44827,10 @@ class GameObject {
     determinePercent(){
         return this.rng.next();
     }
+    
+    cleanup(){
+        
+    }
 
     update(){
         
@@ -43886,17 +44846,22 @@ class Galaxy extends GameObject{
     constructor(game) {
         super(game);
 
-        this.settings = {
-            starsAmount : 10,
-        }
+        this.name = Names.star();
 
+        this.settings = {
+            starsAmount : 45,
+            mapWidth : 1000,
+            mapHeight : 1000,
+        }    
+    }
+    
+    build(){
         this.starSystems = [];
         for (var i = 0; i < this.settings.starsAmount; i++) { 
             var system = new StarSystem(this.game);
             this.starSystems.push(system);
-        }        
+        }
     }
-
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -43909,8 +44874,10 @@ class StarSystem extends GameObject{
     constructor(game) {
         super(game);
         this.stellarObjects = [];
-
+        this.neighbors = [];
+        
         this.settings = {
+            minDistanceFromAnotherStar : 60,
             nebulaChance : .1,
             minRoids : 0,
             maxRoids : 2,
@@ -43937,9 +44904,10 @@ class StarSystem extends GameObject{
         
         // Details
         this.name = Names.star();
-        this.galacticX = 0;
-        this.galacticY = 0;
-        
+        this.type = this.determineItemFromArray(STELLAR_TYPES);
+        this.size = rng.next(2,5);
+        this.generatePosition();
+
         // Planets
         this.planetCount = this.game.rng.nextInt(this.settings.minPlanets, this.settings.maxPlanets);    
         var x = this.game.world.centerX;
@@ -43957,9 +44925,23 @@ class StarSystem extends GameObject{
         }
     }
     
-    arrive(){
-        this.game.system = this;
-        this.stellarObjects.push(this.game.player);
+    generatePosition(){
+        this.position = {
+            x : rng.nextInt(0, this.game.galaxy.settings.mapWidth),
+            y : rng.nextInt(0, this.game.galaxy.settings.mapHeight),
+        }
+        for(let system of this.game.galaxy.starSystems){
+            var distance = this.distanceToStarSystem(system);
+            if(distance<this.settings.minDistanceFromAnotherStar) this.generatePosition();
+        };
+    }
+    
+    arrive(){        
+        this.game.time.events.add(1000, function(){
+            this.game.hud.showSystemInfo();
+        }, this)
+
+        this.game.mapScreen.map.currentPath.pop();
 
         // Asteroids
         var x = 0;
@@ -43973,9 +44955,10 @@ class StarSystem extends GameObject{
                 x : x + this.game.world.centerX,
                 y : y + this.game.world.centerY,
                 system : this,
-            }));
+            }));            
         }
 
+/*
         // Nebula
         var x = 0;
         var y = 0;
@@ -43990,11 +44973,80 @@ class StarSystem extends GameObject{
                 system : this,
             }));
         }
+*/
         
         // Activate Everything
         for(let object of this.stellarObjects){
             if(object.sprite!=undefined) object.sprite.exists = true;
         }
+    }
+    
+    get closestStarSystem(){
+    	var star, x1, x2, y1, y2;
+    	var smallest = 1000000;
+    	var closest = null; //use instead of 0 as we're looking for null or an object (not a number)
+    	x1 = this.position.x;
+    	y1 = this.position.y;
+    	for (var i=0; i<this.game.galaxy.starSystems.length; i++) {
+    		star = this.game.galaxy.starSystems[i];
+    		if (star === this) continue;
+    		x2 = star.position.x;
+    		y2 = star.position.y;
+    		var adjacent = Math.abs(x1-x2); //abs always returns positive number
+    		var opposite = Math.abs(y1-y2); 
+    		var hypotenuse = Math.sqrt((adjacent**2) + (opposite**2));
+    		if (hypotenuse < smallest) {
+    			closest = star;
+    			smallest = hypotenuse;
+    		}
+    	}
+
+    	return closest;
+    }
+
+    systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem){
+        var angleToDestination = this.angleToStarSystem(destinationSystem); 
+        
+        // look for systems in range, that are close to that angle.
+        var jumpCandidates = [];
+        
+        // Systems in range
+        for (let system of this.game.galaxy.starSystems){
+            if(this.distanceToStarSystem(system)<=maxJumpDistance && system!=this){
+                jumpCandidates.push(system);
+            }            
+        }
+        
+        // Of the in range candidates, return the one closest to the angle of the destination system.
+        var bestMatch = jumpCandidates.reduce(function(prev, curr) {
+            var prevAngle = this.candidate.angleToStarSystem(prev);
+            var currAngle = this.candidate.angleToStarSystem(curr);
+            var destAngle = this.destAngle;            
+            return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
+        }.bind({
+            destAngle : angleToDestination,
+            candidate : this,
+        }));
+
+        return bestMatch;
+
+    }
+    
+    distanceToStarSystem(system){
+        var a = this.position.x - system.position.x
+        var b = this.position.y - system.position.y
+        return Math.sqrt( a*a + b*b );
+    }
+
+    angleToStarSystem(system){
+        return Math.atan2(
+            this.position.y - system.position.y,
+            this.position.x - system.position.x
+        ) * 180 / Math.PI;
+    }
+    
+    get isCurrentSystem(){
+        return this==this.game.system;
     }
 }
 
@@ -44386,12 +45438,20 @@ class Ship extends GameObject {
         this.lightMask.position.y = -lightHeight-18;
         this.lightMask.visible = false;
 
+        // Hyperdrive
+        this.hyperDriveDelay = 3600;
+
         // Sounds
         this.infoSound = game.add.audio('beep-beep');
         this.gasLeakSound = game.add.audio('gas-leak');
         this.dockConnectSound = game.add.audio('dock-connect');
         this.dockReleaseSound = game.add.audio('dock-release');
         this.navTargetChangedSound = game.add.audio('blorp');
+
+        this.ftlChargeSound = game.add.audio('ftl-charge');
+        this.ftlJumpSound = game.add.audio('ftl-jump');
+        this.jumpCompleteSound = game.add.audio('jump-complete');
+
         this.crashSounds = [
             game.add.audio('crash-1'),
             game.add.audio('crash-2'),
@@ -45313,31 +46373,17 @@ class Ship extends GameObject {
     
 
     // HyperDrive™
-    toggleHyperDrive(){
-        this.hyperDriveEngaged = !this.hyperDriveEngaged;
+    toggleHyperDrive(){        
+        if(!this.hyperDriveEngaged){
+            //this.game.lockCamera();
+            this.hyperDriveTimer = game.time.events.add(this.hyperDriveDelay, this.jump, this);
+            this.ftlChargeSound.play();
+            this.hyperDriveEngaged = true;
+        }
     }
-
-    engageHyperDrive(){
-        this.hyperDriveEngaged = true;
-        this.game.starBlurY.blur = 0;
-        this.game.starBlurX.blur = 0;
-    }
-
+    
     hyperDriveUpdate(){
-        var maxBlur = 50;
-
-        var vx = this.sprite.body.data.velocity[0];
-        var vy = this.sprite.body.data.velocity[1];
-        
-        this.game.starBlurX.blur = vx;
-        this.game.starBlurY.blur = vy;
-        
-        this.game.stars.filters = [this.game.starBlurY];
-
-        this.sprite.body.thrust(0);
-        
-        this.game.bgGroup.rotation=10;
-        
+        this.sprite.body.thrust(1000);
         this.hyperDriveEmitter.emit(
             'hyperDrive',
             this.sprite.worldPosition.x + this.game.camera.x,
@@ -45345,8 +46391,21 @@ class Ship extends GameObject {
         );        
     }
     
+    jump(){
+        this.ftlJumpSound.play();
+        game.camera.flash(0xFFFFFF, 500);
+        this.disengageHyperDrive();
+
+        this.game.mapScreen.map.navigationDestination.arrive();
+
+        game.time.events.add(800, function(){
+            this.jumpCompleteSound.play();
+        }, this);
+   }
+    
     disengageHyperDrive(){
-        this.hyperDriveEngaged = false;    
+        this.hyperDriveEngaged = false;
+        this.hyperDriveTimer = game.time.events.remove(this.hyperDriveDelay);
     }
 
     // Venting
@@ -46003,23 +47062,27 @@ class Asteroid extends GameObject {
     
     // Rendering
     update() {
-        super.update();
-        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-
-        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
-            this.sprite.exists = true;
-        } else {
-            this.sprite.exists = false;
+        if(this.sprite.exists){
+            super.update();
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+    
+            if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+                this.sprite.exists = true;
+            } else {
+                this.sprite.exists = false;
+            }
+    
+            if(this.soundCountdown==0){
+                this.damageSound.stop();
+            } else {
+                this.soundCountdown--;
+            }
+            
+            // Spin
+            if(this.sprite.exists){
+                this.sprite.body.angularVelocity = this.roationSpeed;                
+            }
         }
-
-        if(this.soundCountdown==0){
-            this.damageSound.stop();
-        } else {
-            this.soundCountdown--;
-        }
-        
-        // Spin
-        this.sprite.body.angularVelocity = this.roationSpeed;                
     }
 }
 
@@ -46062,6 +47125,13 @@ class AsteroidField extends GameObject {
         this.buoy.description = `${Names.proper()} Asteroid Field`
 
         options.system.stellarObjects.push(this.buoy);
+    }
+
+    cleanup(){
+        this.asteroids.forEach(function(item) {
+            item.sprite.destroy();
+            item = null;            
+        });
     }
     
     update(){
@@ -47112,7 +48182,7 @@ class Planet extends GameObject{
             this.showInfoIfNeeded();
             
             // Paralax
-            if(this.isPlanet && this.wrapper){
+            if(this.isPlanet && this.wrapper && this.game.camera){
                 this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
                 this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);
             }
@@ -47288,11 +48358,25 @@ class Player extends GameObject {
         jKey.onUp.add(function(){
             if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
         }, this);
+        var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
+        aKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.abortFTL();
+        }, this);
+        var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
+        hKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.toggleFTLPanel();
+        }, this);
 
         // Inventory
         var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
         iKey.onUp.add(function(){
             if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
+        }, this);
+
+        // Map
+        var mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        mKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.mapScreen.show();
         }, this);
 
         // Camera
@@ -47489,6 +48573,7 @@ class HUD {
 
         this.masterAlarmSound = game.add.audio('master_alarm');
         this.titleNotificationSound = game.add.audio('title-notification');
+        this.panelToggleSound = game.add.audio('panel-toggle');
 
         // Updaters
         game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
@@ -47734,6 +48819,53 @@ class HUD {
         this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
         this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
+        // FTL
+        this.ftlPanel = this.game.add.group();
+        this.group.add(this.ftlPanel);
+        this.ftlPanelBg = this.game.add.sprite(0,0, 'ftl-panel');
+        this.ftlPanel.add(this.ftlPanelBg);
+
+        this.ftlPanelText = new Phaser.BitmapText(
+            this.game.game, 
+            25,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        this.ftlPanelText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelText);
+
+        this.ftlPanelStatusText = new Phaser.BitmapText(
+            this.game.game, 
+            132,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        
+        this.ftlPanelStatusText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelStatusText);
+        this.ftlPanelStatusBlink = game.add.tween(this.ftlPanelStatusText).to(
+            { alpha:0 }, 1000, Phaser.Easing.Quadratic.InOut, false, 0, -1)
+        this.ftlPanelHelpText = new Phaser.BitmapText(
+            this.game.game, 
+            18,
+            135,
+            'pixelmix_8',
+            '(H) Hide',
+            5
+        );
+        this.ftlPanel.add(this.ftlPanelHelpText);
+
+        this.ftlPanelX = this.game.camera.width-150-this.ftlPanelBg.width;
+        this.ftlPanelY = this.game.camera.height-this.ftlPanelBg.height-10+200;
+        
+        this.ftlPanel.y = this.ftlPanelY;
+        this.ftlPanel.x = this.ftlPanelX;
+
+        // Storage
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
             if(this.equipmentText[key]){
                 var equipmentType = this.game.player.ship.specs.storage[key];    
@@ -47942,6 +49074,85 @@ class HUD {
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
+    toggleFTLPanel(){
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.showFTLPanel();
+        } else {
+            this.hideFTLPanel();
+        }
+    }
+    
+    showFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.panelToggleSound.play();
+            this.ftlPanel.visible = true;
+            var showPanelTween = game.add.tween(this.ftlPanel).to( {y: '-200'}, 400, "Quart.easeOut", true);
+        }
+    }
+
+    hideFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY-200){
+            this.panelToggleSound.play();
+            var hidePanelTween = game.add.tween(this.ftlPanel).to( {y: '+200'}, 400, "Quart.easeOut", true);
+            hidePanelTween.onComplete.add(function(){
+                this.ftlPanel.visible = false;
+            }, this);
+        }
+    }
+    
+    abortFTL(){
+        if(this.game.mapScreen.map.currentPath){
+            this.panelToggleSound.play();
+            this.game.mapScreen.map.currentPath = false;
+            this.game.mapScreen.map.navigationDestination = null;
+            this.updateFTLPanel(true);
+        }
+    }
+        
+    updateFTLPanel(force){
+        if(this.ftlPanel.y == this.ftlPanelY-200 || force){ // If is showing
+            var panelText = '';
+            var path = this.game.mapScreen.map.currentPath
+            if(!this.game.mapScreen.map.navigationDestination) path = false;
+                if(path.length>0 || path!=false){
+                    if(path.length==2) {
+                        var destination = path[path.length-1];
+                        var destinationName = destination.name.substring(0,12);
+                        var formattedDistance = numeral(this.game.system.distanceToStarSystem(destination)*PIXEL_TO_LIGHTYEAR).format('0,0.0a');                    
+                        panelText = `FTL DRIVE\nDESTINATION\n${destinationName} (${formattedDistance} ly)\n\nPRESS J TO JUMP`;
+                    } else {
+                        panelText = 'FTL DRIVE\nCOURSE SET\n';
+                        for (var i = 0; i < path.length; i++) {
+                            var system;
+                            if(path[i+1]!=undefined) {
+                                system = path[i+1];
+                            } else {
+                                system = false;
+                            }
+                            if(i<4 && system){
+                                panelText += `${i+1}. ${system.name.substring(0,18)}\n`;                            
+                            }
+                            if(i==5){
+                                panelText += `... ${path.length-i} more`;                            
+                            }
+                        }
+                    }
+
+                    this.ftlPanelHelpText.setText('(J) Jump  (A) Abort  (H) Hide')
+                } else {
+                    panelText = 'FTL DRIVE\n';
+                    panelText += `NO DESTINATION\n\nPRESS M TO VIEW MAP`;
+
+                    this.ftlPanelHelpText.setText('(H) Hide')
+                }
+            this.ftlPanelText.setText(panelText);
+            this.ftlPanelStatusText.setText('JUMPS (3/3)');
+            this.ftlPanelStatusText.x = 101;
+        }
+    }
+
     slowUpdate(){
         this.minimap.update();
     }
@@ -47956,6 +49167,12 @@ class HUD {
             var maxSpace = this.game.player.ship.maxSpaceForStorageClass(key);
             this.cargoText[key].setText(`${usedSpace}/${maxSpace}`);
         }.bind(this));
+
+        // FTL
+        this.updateFTLPanel();
+    
+        // System
+        this.systemLabel.setText(this.game.system.name);        
     }
     
     update() {
@@ -48720,9 +49937,6 @@ class InventoryScreen extends GuiScreen {
         this.statsTab.buttonY = 0;
         this.statsTab.text = "Stats";
         this.screen.add(this.statsTab);
-
-
-
 
         // Bottom Bar
         this.bottomBarHeight = 38;
@@ -50325,6 +51539,613 @@ class GuiInventoryList extends Phaser.Group {
                 index++;
             }
        }
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/map.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class GalacticMap extends GameObject{
+    constructor(game,options) {
+        super(game);
+        
+        this.x = options.x || 0;
+        this.y = options.y || 0;
+        this.width = options.width || screenWidth;
+        this.height = options.height || screenHeight;
+        this.isActive = false;
+        
+        // Navigation
+        this.starSystems = this.game.galaxy.starSystems;
+        this.currentPath = [];
+        this.navigationTarget = null;
+        this.navigationTargetCache = null;
+        this.navigationDestination = null;
+        this.navArrow = game.make.sprite(0, 0, 'nav-arrow');
+        this.navArrow.angle = 90;
+        this.navArrow.anchor.set(1,.5);
+        
+        // Zooming
+        this.mapZoom = 1;
+        this.mapZoomCache = 0;
+        this.mapZoomIncrement = .0025;
+        this.mapZoomStep = 0;
+        this.mapZoomMax = 2;
+        this.mapZoomMin = .5;
+        this.didZoom = false;
+        
+        // Scrolling
+        this.mapScrollIncrement = .5;
+        this.mapScrollDecay = 1.0;
+        this.mapScrollMax = 1;
+        this.mapScrollXStep = 0;
+        this.mapScrollYStep = 0;
+        this.mapScrollX = 0;
+        this.mapScrollY = 0;
+        this.mapScrollOffsetX = 0;
+        this.mapScrollOffsetY = 0;
+
+        // Sprite / Bitmap data
+        this.bmd = game.add.bitmapData(this.width, this.height);    
+        this.sprite = game.add.sprite(this.x, this.y, this.bmd);
+        if(options.group) options.group.add(this.sprite);
+
+        // Sounds
+        this.navTargetChangedSound = game.add.audio('blorp');
+        this.navDestinationAddedSound = game.add.audio('beep-beep');
+        this.navDestinationClearedSound = game.add.audio('cancel');
+        this.navTargetInvalidSound = game.add.audio('invalid');
+    }
+    
+    setupKeys(){
+        // Keys
+        this.cursors = this.game.input.keyboard.createCursorKeys();
+        this.plusKey = game.input.keyboard.addKey(Phaser.Keyboard.EQUALS);
+        this.minusKey = game.input.keyboard.addKey(Phaser.Keyboard.UNDERSCORE);
+        this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.spaceKey.onUp.add(this.setDestination,this);
+    }
+    
+    centerOnSystem(system){
+        this.mapScrollX = ((this.width/this.mapZoom)/2)-system.position.x;
+        this.mapScrollY = ((this.height/this.mapZoom)/2)-system.position.y;    
+    }
+    
+    findPathFromSystemToSystem(originSystem,destinationSystem){
+        var path = [originSystem];
+        var maxJumpDistance = 150;
+        var angleToDestination = originSystem.angleToStarSystem(destinationSystem);
+        var distanceToDestination = originSystem.distanceToStarSystem(destinationSystem);
+
+        var validatePath = function(){
+            if(path[path.length-1]!=destinationSystem) {
+                getNextJump();
+            }
+        }
+
+        var getNextJump = function(){
+            var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
+            if(path.includes(nextJump)) return null;
+            path.push(nextJump);
+            validatePath();
+        }
+
+        if(distanceToDestination<=maxJumpDistance){
+            // Destination is within one jump away. 
+            path.push(destinationSystem);
+        } else {
+            getNextJump();
+        }
+                
+        return path;        
+    }
+    
+    distanceOfPath(path){
+        var distance = 0;
+        var previousSystem = null;
+
+        for(let system of path){
+            if(previousSystem){
+                distance+= system.distanceToStarSystem(previousSystem);
+            }
+            previousSystem = system;
+        }        
+        
+        return distance;
+    }
+    
+    setDestination(){
+        // Makes current target the destination.
+        if(this.navigationDestination){
+            this.navigationDestination = null;
+            this.navDestinationClearedSound.play();
+        } else {            
+            this.navigationDestination = this.navigationTarget;
+            this.navDestinationAddedSound.play();
+        }
+    }
+    
+    drawMap(){      
+        this.bmd.ctx.clearRect(0,0,this.width,this.height);
+        var zoom = this.mapZoom;
+                
+                
+        // Title
+        this.bmd.ctx.font = `18px ${FONT}`;
+        this.bmd.ctx.strokeStyle='#000000'
+        this.bmd.ctx.fillStyle='#FFFFFF'
+        this.bmd.ctx.lineWidth = 3;
+        this.drawShadowText(`${this.game.galaxy.name} Galaxy`, (this.mapScrollX)*zoom, (this.mapScrollY-32)*zoom);
+        this.bmd.ctx.font = `12px ${FONT}`;
+        this.bmd.ctx.fillStyle='#AAAAAA'
+        this.drawShadowText(`Local Cluster - Major Star Systems`, (this.mapScrollX)*zoom, (this.mapScrollY-12)*zoom);
+        
+        // Lines
+        for(let system of this.starSystems){
+            // Save distnce for later
+            system.distanceFromMapCenter = Math.sqrt(
+                Math.pow(
+                    ((system.position.x+this.mapScrollX)*zoom)-this.width/2,
+                2) + 
+                Math.pow(
+                    ((system.position.y+this.mapScrollY)*zoom)-this.height/2,
+                2)
+            );
+
+            if(system.neighbors.length>0){
+                for(let neighbor of system.neighbors){
+                    if(neighbor!=null){
+                    	this.bmd.ctx.strokeStyle = "#ffffff";
+                    	this.bmd.ctx.lineWidth = 1;
+                    	this.bmd.ctx.beginPath();
+                    	this.bmd.ctx.moveTo((system.position.x+this.mapScrollX)*zoom, (system.position.y+this.mapScrollY)*zoom);
+                    	this.bmd.ctx.lineTo((neighbor.position.x+this.mapScrollX)*zoom,(neighbor.position.y+this.mapScrollY)*zoom);
+                    	this.bmd.ctx.stroke();
+                    }
+            	}
+            }
+        }
+
+        this.drawGridLines({
+            major : 100,
+            minor : 25,
+            color : '#333333',
+        })
+
+        for (var i = 0; i < this.currentPath.length; i++) {
+            if(i<this.currentPath.length-1){
+            	this.bmd.ctx.strokeStyle = "#1aae5c";
+            	this.bmd.ctx.lineWidth = 4;
+            	this.bmd.ctx.beginPath();
+            	this.bmd.ctx.moveTo((this.currentPath[i].position.x+this.mapScrollX)*zoom, (this.currentPath[i].position.y+this.mapScrollY)*zoom);
+            	this.bmd.ctx.lineTo((this.currentPath[i+1].position.x+this.mapScrollX)*zoom,(this.currentPath[i+1].position.y+this.mapScrollY)*zoom);
+            	this.bmd.ctx.stroke();
+            }
+        }
+
+        // Stars
+        for(let system of this.starSystems){                  
+            // Black Space
+            this.bmd.ctx.fillStyle='#000000'
+            this.bmd.ctx.beginPath();
+            this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
+            this.bmd.ctx.fill();
+
+            // Current System Highlight
+            if(system.isCurrentSystem || system==this.navigationDestination){
+                this.bmd.ctx.strokeStyle='#1aae5c';
+                this.bmd.ctx.lineWidth = 1.5;
+                this.bmd.ctx.beginPath();
+                this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
+                this.bmd.ctx.stroke();  
+            }
+
+            // Star
+            this.bmd.ctx.lineWidth = 1.5;
+            this.bmd.ctx.beginPath();
+            this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size,0,2*Math.PI);
+            if(system.planetCount>0) {
+                this.bmd.ctx.fillStyle = system.type.color;
+	            this.bmd.ctx.fill();
+            } else {
+                this.bmd.ctx.strokeStyle='#AAAAAA';
+	            this.bmd.ctx.stroke();
+            }
+            
+            // Navigation Arrow
+            if(system==this.navigationTarget) {
+                this.bmd.draw(this.navArrow, (system.position.x+this.mapScrollX)*zoom, (system.position.y+this.mapScrollY)*zoom-10 );
+            }
+        }
+
+        // Names/Labels
+        for(let system of this.starSystems){
+            var textMarginX = system.size+8;
+            var textMarginY = 3;
+            var lineSpacing = 15;
+            
+            var labelString = `${system.name}`
+            this.bmd.ctx.font = `12px ${FONT}`;
+            this.bmd.ctx.strokeStyle='#000000'
+            this.bmd.ctx.fillStyle='#FFFFFF'
+            this.bmd.ctx.lineWidth = 3;
+            
+            var labelX = ((system.position.x+this.mapScrollX)*zoom)+textMarginX;
+            var labelY = ((system.position.y+this.mapScrollY)*zoom)+textMarginY;
+
+            this.drawShadowText(labelString, labelX, labelY);
+            
+            // Subtext
+            this.bmd.ctx.font = `10px ${FONT}`;
+            if(system.isCurrentSystem){
+                this.bmd.ctx.fillStyle='#1aae5c'
+                this.drawShadowText('Current System', labelX, labelY+lineSpacing);
+            }
+            
+            if(this.currentPath){
+                if(system==this.currentPath.lastItem()){
+                    if(system==this.navigationDestination){
+                        this.bmd.ctx.fillStyle='#1aae5c'
+                    } else {
+                        this.bmd.ctx.fillStyle='#FFFFFF'
+                    }
+                    var formattedDistance = numeral(this.distanceToNavigationTarget*PIXEL_TO_LIGHTYEAR).format('0,0.0a');                    
+                    if(this.currentPath.length==2){
+                        var jumpText = 'Jump'
+                    } else {
+                        var jumpText = 'Jumps'
+                    }
+                    
+                    this.drawShadowText(`${this.currentPath.length-1} ${jumpText} / ${formattedDistance} ly`, labelX, labelY+lineSpacing);
+                } else if(system==this.navigationTarget) {
+                    this.bmd.ctx.fillStyle='#c03b2b'
+                    this.drawShadowText(`Out of Range`, labelX, labelY+lineSpacing);
+                    
+                }
+            }
+        }        
+    }
+
+    updateNavigation(){
+        if(!this.navigationDestination){
+            // 'Cursor' sort of...
+            // Find the star closest to the center of the screen
+            var lowest = Number.POSITIVE_INFINITY;
+            var tmp;
+            for (var i=this.starSystems.length-1; i>=0; i--) {
+                tmp = this.starSystems[i].distanceFromMapCenter;
+                if (tmp < lowest) {
+                    lowest = tmp;
+                    this.navigationTarget = this.starSystems[i];
+                }
+            }
+            if(this.game.system!=this.navigationTarget){
+                if(this.navigationTarget!=this.navigationTargetCache){
+                    this.currentPath = this.findPathFromSystemToSystem(this.game.system,this.navigationTarget);
+                    this.distanceToNavigationTarget = this.distanceOfPath(this.currentPath)
+                    
+                    if(this.currentPath.includes(this.navigationTarget)){
+                        this.navTargetChangedSound.play();
+                    } else {
+                        this.navTargetInvalidSound.play();
+                    }
+                }
+            } else {
+                this.currentPath = false;
+            }
+            this.navigationTargetCache = this.navigationTarget;
+        }
+    }
+    
+    
+    drawShadowText(text,x,y){
+        this.bmd.ctx.strokeText(text,x,y);
+        this.bmd.ctx.fillText(text,x,y);            
+    }
+    
+    drawGridLines(options){
+        var zoom = this.mapZoom;
+        var major = options.major || 100;
+        var minor = options.minor || 25;            
+    	this.bmd.ctx.strokeStyle = options.color || "#333333";
+    	
+        // Verticle
+        for (var x = 0; x <= this.game.galaxy.settings.mapWidth*zoom; x+=minor) {
+            if (x % major == 0) {
+                this.bmd.ctx.lineWidth = 2;
+            } else {
+                this.bmd.ctx.lineWidth = 1;                
+            }
+        	this.bmd.ctx.beginPath();
+        	this.bmd.ctx.moveTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)));
+        	this.bmd.ctx.lineTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)+(this.game.galaxy.settings.mapHeight*zoom)));
+            this.bmd.ctx.stroke();
+        }
+
+        // Horizontal
+        for (var y = 0; y <= this.game.galaxy.settings.mapHeight*zoom; y+=minor) {
+            if (y % major == 0) {
+                this.bmd.ctx.lineWidth = 2;
+            } else {
+                this.bmd.ctx.lineWidth = 1;                
+            }
+        	this.bmd.ctx.beginPath();
+        	this.bmd.ctx.moveTo(Math.round(((this.mapScrollX)*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
+        	this.bmd.ctx.lineTo(Math.round(((this.mapScrollX)*zoom)+(this.game.galaxy.settings.mapWidth*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
+            this.bmd.ctx.stroke();
+        }
+    }
+    
+    update(){
+        if(this.isActive){
+            this.updateNavigation();
+    
+            if (this.cursors.up.isDown) {
+                this.mapScrollYStep+=this.mapScrollIncrement;
+            } else if(this.cursors.down.isDown){
+                this.mapScrollYStep-=this.mapScrollIncrement;            
+            } else {
+                // Y
+                if(this.mapScrollYStep>0)this.mapScrollYStep-=this.mapScrollDecay;
+                if(this.mapScrollYStep<0)this.mapScrollYStep+=this.mapScrollDecay;
+                if(Math.abs(this.mapScrollYStep)<this.mapScrollDecay) this.mapScrollYStep=0;
+            }
+    
+            if (this.cursors.left.isDown) {
+                this.mapScrollXStep+=this.mapScrollIncrement;
+            } else if(this.cursors.right.isDown){
+                this.mapScrollXStep-=this.mapScrollIncrement;            
+            } else {
+                // X
+                if(this.mapScrollXStep>0)this.mapScrollXStep-=this.mapScrollDecay;
+                if(this.mapScrollXStep<0)this.mapScrollXStep+=this.mapScrollDecay;
+                if(Math.abs(this.mapScrollXStep)<this.mapScrollDecay) this.mapScrollXStep=0;
+            }
+    
+            if (this.plusKey.isDown && this.didZoom==false) {
+                if(this.mapZoom==.5){
+                    this.mapZoom = 1
+                    this.mapScrollX -= (this.width/2);
+                    this.mapScrollY -= (this.height/2);
+                } else if(this.mapZoom==1) {
+                    this.mapZoom = 2
+                    this.mapScrollX -= (this.width/4);
+                    this.mapScrollY -= (this.height/4);
+                }
+    
+                this.didZoom = true;
+    
+                game.time.events.add(Phaser.Timer.SECOND * .15, function(){
+                    this.didZoom = false;
+                }, this);
+    
+            } else if(this.minusKey.isDown && this.didZoom==false){
+                if(this.mapZoom==1){
+                    this.mapZoom = .5
+                    this.mapScrollX += (this.width/2);
+                    this.mapScrollY += (this.height/2);
+                } else if(this.mapZoom==2) {
+                    this.mapZoom = 1
+                    this.mapScrollX += (this.width/4);
+                    this.mapScrollY += (this.height/4);
+                }
+    
+                this.didZoom = true;
+    
+                game.time.events.add(Phaser.Timer.SECOND * .15, function(){
+                    this.didZoom = false;
+                }, this);
+    
+            } else {            
+                if(this.mapZoomStep>0)this.mapZoomStep-=this.mapZoomIncrement;            
+                if(this.mapZoomStep<0)this.mapZoomStep+=this.mapZoomIncrement;            
+    
+                if(this.mapZoomStep>0 && this.mapZoomStep<this.mapZoomIncrement)this.mapZoomStep=0;            
+                if(this.mapZoomStep<0 && this.mapZoomStep>this.mapZoomIncrement)this.mapZoomStep=0;
+            }
+            
+            this.mapScrollX += this.mapScrollXStep/this.mapZoom;
+            this.mapScrollY += this.mapScrollYStep/this.mapZoom;        
+            
+                    
+            if(this.mapZoom>this.mapZoomMax) {
+                this.mapZoom = this.mapZoomMax;
+                this.mapZoomStep = 0;
+            }
+    
+            if(this.mapZoom<this.mapZoomMin) {
+                this.mapZoom = this.mapZoomMin;
+                this.mapZoomStep = 0;
+            }
+                    
+            if(this.mapZoom>=this.mapZoomMin && this.mapZoom<=this.mapZoomMax && this.mapZoomStep!=this.mapZoomCache) {
+                this.mapZoom += this.mapZoomStep;
+                this.mapZoomCache = this.mapZoomStep;
+                
+                this.mapScrollX += this.mapScrollX*(this.mapZoom/2);
+            }
+            this.drawMap();
+        }
+    }
+    
+    cleanup(){
+        this.plusKey = null;
+        this.minusKey = null;
+        this.spaceKey.onUp.remove(this.setDestination, this);
+        this.spaceKey = null;
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/mapScreen.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class MapScreen extends GuiScreen {
+    constructor(game,group) {
+        super(game,group);
+
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom;
+        
+        this.setupScreen();
+                
+        this.wrapper = group;
+        this.wrapper.add(this.screen);
+        this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
+        
+        this.destination = null;
+        this.destinationCache = null;
+        
+        this.map = new GalacticMap(this.game,{
+            width : this.game.camera.width-this.game.hud.sidebarWidth,
+            height : screenHeight-46-38,
+            x : 0,
+            y : 46,
+            group : this.screen,
+        });
+    }
+    
+    setupKeys(){
+        this.mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        this.mKeyOnUp = function(){
+            this.hide();
+        }
+        this.mKey.onUp.add(this.mKeyOnUp, this);
+    }
+    
+    setupScreen(){
+        this.screenWidth = this.game.camera.width-this.game.hud.sidebarWidth;
+
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.tabBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.bottomBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(0x111111);
+        this.bg.drawRect(0,0,
+            this.screenWidth,
+            this.game.camera.height*2,
+            0
+        )
+        this.bg.endFill();
+
+        // Bottom Bar
+        this.bottomBarHeight = 38;
+        this.bottomBar.clear();
+        this.bottomBar.beginFill(this.styles.darkGrey);
+        this.bottomBar.drawRect(0,this.game.camera.height-this.bottomBarHeight,
+            this.screenWidth,
+            this.bottomBarHeight+100, // Overlap for animation
+        )
+        this.bottomBar.endFill();
+
+        this.helpText = this.game.add.text(
+            16,this.game.camera.height - 26, 
+            '(ARROWS) Move Map   (SPACE) Select Destination    (+/-) Zoom', 
+            { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+
+
+        // Tabs
+        this.shipTab = new TabItem(this.game,'ship-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.shipTab.buttonX = 0;
+        this.shipTab.buttonY = 0;
+        this.shipTab.text = "Ship";
+        this.screen.add(this.shipTab);
+        
+        this.inventoryTab = new TabItem(this.game,'inv-tab');
+        this.inventoryTab.buttonX = this.shipTab.buttonWidth + 1;
+        this.inventoryTab.buttonY = 0;
+        this.inventoryTab.text = "Inventory";
+        this.screen.add(this.inventoryTab);
+
+        this.mapTab = new TabItem(this.game,'map-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.mapTab.buttonX = this.inventoryTab.buttonX + this.inventoryTab.buttonWidth + 1;
+        this.mapTab.buttonY = 0;
+        this.mapTab.text = "Map";
+        this.mapTab.active = true;
+        this.screen.add(this.mapTab);
+
+        this.statsTab = new TabItem(this.game,'stats-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.statsTab.buttonX = this.mapTab.buttonX + this.mapTab.buttonWidth + 1;
+        this.statsTab.buttonY = 0;
+        this.statsTab.text = "Stats";
+        this.screen.add(this.statsTab);
+
+        this.tabBar.clear();
+        this.tabBar.beginFill(0x3F3C46);
+        this.tabBar.drawRect(0,45,
+            this.screenWidth,
+            1,
+            0
+        )
+        this.tabBar.endFill();
+
+    }
+        
+    show(){
+        super.show();
+
+        this.wrapper.visible = true;
+        this.setupKeys();
+
+        this.map.setupKeys();
+        this.map.isActive = true;
+        this.map.centerOnSystem(this.game.system);
+
+    }
+
+    didShow(){
+        super.didShow();        
+        this.game.player.controlMode = CONTROL_MODE.inventory;
+    }
+    
+    hide(){
+        super.hide();
+        this.cleanup();
+
+        this.map.isActive = false;
+        this.map.cleanup();
+
+        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+            this.game.hud.showSystemInfo();
+        }, this);
+    }
+
+    didHide(){
+        super.didHide();
+        
+        this.destination = this.map.navigationDestination;
+        
+        if(this.destination!=this.destinationCache && this.destination){
+            this.game.hud.showFTLPanel();
+        }
+
+        this.destinationCache = this.destination;
+    }
+    
+    cleanup(){
+        this.mKey.onUp.remove(this.mKeyOnUp, this);
     }
 }
 

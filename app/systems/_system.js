@@ -3,8 +3,10 @@ class StarSystem extends GameObject{
     constructor(game) {
         super(game);
         this.stellarObjects = [];
-
+        this.neighbors = [];
+        
         this.settings = {
+            minDistanceFromAnotherStar : 60,
             nebulaChance : .1,
             minRoids : 0,
             maxRoids : 2,
@@ -31,9 +33,10 @@ class StarSystem extends GameObject{
         
         // Details
         this.name = Names.star();
-        this.galacticX = 0;
-        this.galacticY = 0;
-        
+        this.type = this.determineItemFromArray(STELLAR_TYPES);
+        this.size = rng.next(2,5);
+        this.generatePosition();
+
         // Planets
         this.planetCount = this.game.rng.nextInt(this.settings.minPlanets, this.settings.maxPlanets);    
         var x = this.game.world.centerX;
@@ -51,9 +54,23 @@ class StarSystem extends GameObject{
         }
     }
     
-    arrive(){
-        this.game.system = this;
-        this.stellarObjects.push(this.game.player);
+    generatePosition(){
+        this.position = {
+            x : rng.nextInt(0, this.game.galaxy.settings.mapWidth),
+            y : rng.nextInt(0, this.game.galaxy.settings.mapHeight),
+        }
+        for(let system of this.game.galaxy.starSystems){
+            var distance = this.distanceToStarSystem(system);
+            if(distance<this.settings.minDistanceFromAnotherStar) this.generatePosition();
+        };
+    }
+    
+    arrive(){        
+        this.game.time.events.add(1000, function(){
+            this.game.hud.showSystemInfo();
+        }, this)
+
+        this.game.mapScreen.map.currentPath.pop();
 
         // Asteroids
         var x = 0;
@@ -67,9 +84,10 @@ class StarSystem extends GameObject{
                 x : x + this.game.world.centerX,
                 y : y + this.game.world.centerY,
                 system : this,
-            }));
+            }));            
         }
 
+/*
         // Nebula
         var x = 0;
         var y = 0;
@@ -84,10 +102,79 @@ class StarSystem extends GameObject{
                 system : this,
             }));
         }
+*/
         
         // Activate Everything
         for(let object of this.stellarObjects){
             if(object.sprite!=undefined) object.sprite.exists = true;
         }
+    }
+    
+    get closestStarSystem(){
+    	var star, x1, x2, y1, y2;
+    	var smallest = 1000000;
+    	var closest = null; //use instead of 0 as we're looking for null or an object (not a number)
+    	x1 = this.position.x;
+    	y1 = this.position.y;
+    	for (var i=0; i<this.game.galaxy.starSystems.length; i++) {
+    		star = this.game.galaxy.starSystems[i];
+    		if (star === this) continue;
+    		x2 = star.position.x;
+    		y2 = star.position.y;
+    		var adjacent = Math.abs(x1-x2); //abs always returns positive number
+    		var opposite = Math.abs(y1-y2); 
+    		var hypotenuse = Math.sqrt((adjacent**2) + (opposite**2));
+    		if (hypotenuse < smallest) {
+    			closest = star;
+    			smallest = hypotenuse;
+    		}
+    	}
+
+    	return closest;
+    }
+
+    systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem){
+        var angleToDestination = this.angleToStarSystem(destinationSystem); 
+        
+        // look for systems in range, that are close to that angle.
+        var jumpCandidates = [];
+        
+        // Systems in range
+        for (let system of this.game.galaxy.starSystems){
+            if(this.distanceToStarSystem(system)<=maxJumpDistance && system!=this){
+                jumpCandidates.push(system);
+            }            
+        }
+        
+        // Of the in range candidates, return the one closest to the angle of the destination system.
+        var bestMatch = jumpCandidates.reduce(function(prev, curr) {
+            var prevAngle = this.candidate.angleToStarSystem(prev);
+            var currAngle = this.candidate.angleToStarSystem(curr);
+            var destAngle = this.destAngle;            
+            return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
+        }.bind({
+            destAngle : angleToDestination,
+            candidate : this,
+        }));
+
+        return bestMatch;
+
+    }
+    
+    distanceToStarSystem(system){
+        var a = this.position.x - system.position.x
+        var b = this.position.y - system.position.y
+        return Math.sqrt( a*a + b*b );
+    }
+
+    angleToStarSystem(system){
+        return Math.atan2(
+            this.position.y - system.position.y,
+            this.position.x - system.position.x
+        ) * 180 / Math.PI;
+    }
+    
+    get isCurrentSystem(){
+        return this==this.game.system;
     }
 }

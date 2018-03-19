@@ -12,6 +12,7 @@ class HUD {
 
         this.masterAlarmSound = game.add.audio('master_alarm');
         this.titleNotificationSound = game.add.audio('title-notification');
+        this.panelToggleSound = game.add.audio('panel-toggle');
 
         // Updaters
         game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
@@ -257,6 +258,53 @@ class HUD {
         this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
         this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
 
+        // FTL
+        this.ftlPanel = this.game.add.group();
+        this.group.add(this.ftlPanel);
+        this.ftlPanelBg = this.game.add.sprite(0,0, 'ftl-panel');
+        this.ftlPanel.add(this.ftlPanelBg);
+
+        this.ftlPanelText = new Phaser.BitmapText(
+            this.game.game, 
+            25,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        this.ftlPanelText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelText);
+
+        this.ftlPanelStatusText = new Phaser.BitmapText(
+            this.game.game, 
+            132,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        
+        this.ftlPanelStatusText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelStatusText);
+        this.ftlPanelStatusBlink = game.add.tween(this.ftlPanelStatusText).to(
+            { alpha:0 }, 1000, Phaser.Easing.Quadratic.InOut, false, 0, -1)
+        this.ftlPanelHelpText = new Phaser.BitmapText(
+            this.game.game, 
+            18,
+            135,
+            'pixelmix_8',
+            '(H) Hide',
+            5
+        );
+        this.ftlPanel.add(this.ftlPanelHelpText);
+
+        this.ftlPanelX = this.game.camera.width-150-this.ftlPanelBg.width;
+        this.ftlPanelY = this.game.camera.height-this.ftlPanelBg.height-10+200;
+        
+        this.ftlPanel.y = this.ftlPanelY;
+        this.ftlPanel.x = this.ftlPanelX;
+
+        // Storage
         Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
             if(this.equipmentText[key]){
                 var equipmentType = this.game.player.ship.specs.storage[key];    
@@ -465,6 +513,85 @@ class HUD {
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
     }
     
+    toggleFTLPanel(){
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.showFTLPanel();
+        } else {
+            this.hideFTLPanel();
+        }
+    }
+    
+    showFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.panelToggleSound.play();
+            this.ftlPanel.visible = true;
+            var showPanelTween = game.add.tween(this.ftlPanel).to( {y: '-200'}, 400, "Quart.easeOut", true);
+        }
+    }
+
+    hideFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY-200){
+            this.panelToggleSound.play();
+            var hidePanelTween = game.add.tween(this.ftlPanel).to( {y: '+200'}, 400, "Quart.easeOut", true);
+            hidePanelTween.onComplete.add(function(){
+                this.ftlPanel.visible = false;
+            }, this);
+        }
+    }
+    
+    abortFTL(){
+        if(this.game.mapScreen.map.currentPath){
+            this.panelToggleSound.play();
+            this.game.mapScreen.map.currentPath = false;
+            this.game.mapScreen.map.navigationDestination = null;
+            this.updateFTLPanel(true);
+        }
+    }
+        
+    updateFTLPanel(force){
+        if(this.ftlPanel.y == this.ftlPanelY-200 || force){ // If is showing
+            var panelText = '';
+            var path = this.game.mapScreen.map.currentPath
+            if(!this.game.mapScreen.map.navigationDestination) path = false;
+                if(path.length>0 || path!=false){
+                    if(path.length==2) {
+                        var destination = path[path.length-1];
+                        var destinationName = destination.name.substring(0,12);
+                        var formattedDistance = numeral(this.game.system.distanceToStarSystem(destination)*PIXEL_TO_LIGHTYEAR).format('0,0.0a');                    
+                        panelText = `FTL DRIVE\nDESTINATION\n${destinationName} (${formattedDistance} ly)\n\nPRESS J TO JUMP`;
+                    } else {
+                        panelText = 'FTL DRIVE\nCOURSE SET\n';
+                        for (var i = 0; i < path.length; i++) {
+                            var system;
+                            if(path[i+1]!=undefined) {
+                                system = path[i+1];
+                            } else {
+                                system = false;
+                            }
+                            if(i<4 && system){
+                                panelText += `${i+1}. ${system.name.substring(0,18)}\n`;                            
+                            }
+                            if(i==5){
+                                panelText += `... ${path.length-i} more`;                            
+                            }
+                        }
+                    }
+
+                    this.ftlPanelHelpText.setText('(J) Jump  (A) Abort  (H) Hide')
+                } else {
+                    panelText = 'FTL DRIVE\n';
+                    panelText += `NO DESTINATION\n\nPRESS M TO VIEW MAP`;
+
+                    this.ftlPanelHelpText.setText('(H) Hide')
+                }
+            this.ftlPanelText.setText(panelText);
+            this.ftlPanelStatusText.setText('JUMPS (3/3)');
+            this.ftlPanelStatusText.x = 101;
+        }
+    }
+
     slowUpdate(){
         this.minimap.update();
     }
@@ -479,6 +606,12 @@ class HUD {
             var maxSpace = this.game.player.ship.maxSpaceForStorageClass(key);
             this.cargoText[key].setText(`${usedSpace}/${maxSpace}`);
         }.bind(this));
+
+        // FTL
+        this.updateFTLPanel();
+    
+        // System
+        this.systemLabel.setText(this.game.system.name);        
     }
     
     update() {

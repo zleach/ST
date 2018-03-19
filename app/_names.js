@@ -20,11 +20,29 @@ class Names {
     
     static star(){
         var markovChain = new Markov;
-        markovChain.maxLength = rng.nextInt(3,14);
-        markovChain.n = rng.nextInt(3,4);
+        markovChain.n = rng.nextInt(5,5);
         markovChain.sequences = Names.parseWords(NAMES_STAR.join('\n'));
         markovChain.rng = rng;
-        return Names.capitalize(markovChain.generate().join(""));
+        
+        var name;
+        
+        if(rng.next()>.9){
+            markovChain.maxLength = rng.nextInt(3,6);
+            var word1 = Names.capitalize(markovChain.generate().join(""))
+            markovChain.maxLength = rng.nextInt(4,14);
+            var word2 = Names.capitalize(markovChain.generate().join(""))
+            name = `${word1} ${word2}`;            
+        } else {
+            markovChain.maxLength = rng.nextInt(3,14);
+            name = Names.capitalize(markovChain.generate().join(""));
+        }
+
+        if(rng.next()>.4){
+            var greekPrefix = GREEK_ALPHABET[rng.nextInt(0, GREEK_ALPHABET.length-1)]
+            name = `${greekPrefix} ${name}`;
+        }
+        
+        return name;
     }
 
     static proper(){

@@ -135,9 +135,6 @@ class InventoryScreen extends GuiScreen {
         this.statsTab.text = "Stats";
         this.screen.add(this.statsTab);
 
-
-
-
         // Bottom Bar
         this.bottomBarHeight = 38;
         this.bottomBar.clear();

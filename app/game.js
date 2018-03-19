@@ -3,7 +3,7 @@ const screenHeight = 1000/2
 
 var ITEMS = [];
 
-var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
+var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
     gameObjects : [],
     preload : function(){
         this.time.advancedTiming = true
@@ -34,6 +34,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
     },
     loadComplete:function() {
         this.setup();
+	    this.loadText.visible = false;
         this.loaded = true;
     },
     init : function(){
@@ -86,6 +87,9 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         // O2
         this.load.image('oxygen-gauge', 'assets/oxygen-gauge.png');
         this.load.image('gauge-arrow', 'assets/gauge-arrow.png');
+        
+        // FTL
+        this.load.image('ftl-panel', 'assets/ftl-panel.png');
 
         // Planet Stuff
         this.load.image('planet-arrival-1', 'assets/planet-arrival-1.png');
@@ -124,6 +128,12 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
             'assets/fonts/pixelmix1.png',
             'assets/fonts/pixelmix1.fnt'
         );
+
+        this.load.bitmapFont(
+            'pixelmix_8_leaded',
+            'assets/fonts/pixelmix1.png',
+            'assets/fonts/pixelmix1.fnt'
+        );
         
         // Hud
         this.load.image('minimap-bg', 'assets/minimap-bg.png');
@@ -157,7 +167,6 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.audio('ice-crash-6', 'assets/audio/ice-crash-6.mp3');
         this.load.audio('nebula-ambient-1', 'assets/audio/nebula-ambient-1.mp3');
 
-
         this.load.audio('rcs-engine', 'assets/audio/rcs.mp3');
         this.load.audio('rcs-loop', 'assets/audio/rcs-loop-2.mp3');
         this.load.audio('hiss-1', 'assets/audio/hiss-1.mp3');
@@ -166,17 +175,24 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.audio('hiss-4', 'assets/audio/hiss-4.mp3');
         this.load.audio('hiss-5', 'assets/audio/hiss-5.mp3');
 
+        this.load.audio('ftl-charge', 'assets/audio/ftl-charge.mp3');
+        this.load.audio('ftl-jump', 'assets/audio/ftl-jump.mp3');
+        this.load.audio('jump-complete', 'assets/audio/jump-complete.mp3');
+
         this.load.audio('pickup-common-1', 'assets/audio/pickup-common-1.mp3');
         this.load.audio('gui_click', 'assets/audio/Button 3.m4a');
         this.load.audio('gui_click_soft', 'assets/audio/Button 5.m4a');
         this.load.audio('gui_collapse', 'assets/audio/Collapse.m4a');
         this.load.audio('gui_expand', 'assets/audio/Expand.m4a');
+        this.load.audio('panel-toggle', 'assets/audio/panel-toggle.mp3');
         this.load.audio('beep-beep', 'assets/audio/Error 1.m4a');
         this.load.audio('blorp', 'assets/audio/Error 4.m4a');
+        this.load.audio('cancel', 'assets/audio/Cancel 1.m4a');
         this.load.audio('success', 'assets/audio/Success 3.m4a');
         this.load.audio('gas-leak', 'assets/audio/gas-leak.mp3');
         this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
         this.load.audio('title-notification', 'assets/audio/title-notification.mp3');
+        this.load.audio('invalid', 'assets/audio/Error 5.m4a');
 
         this.load.audio('dock-connect', 'assets/audio/dock-connect.mp3');
         this.load.audio('dock-release', 'assets/audio/dock-release.mp3');
@@ -194,12 +210,16 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.load.start();
     },
     setup : function(){
-        var seed = 77712;
+        var seed = 2;
         window.rng = new Prando(seed);
         this.rng = window.rng;
         this.names = new Names(this.rng);
-
+        this.galaxy = new Galaxy(this);
+        this.galaxy.build();
+        this.system = this.galaxy.starSystems[0];
+                
         this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
+        this.cache.getBitmapFont('pixelmix_8_leaded').font.lineHeight = 16;
 
         this.game.physics.startSystem(Phaser.Physics.P2JS);
         this.game.physics.p2.restitution = 0.05;
@@ -235,38 +255,24 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.ships = this.game.add.group();
 
         this.economy = new Economy(this);
-        this.galaxy = new Galaxy(this);
-
-
-/*
-        var asteroidField = new AsteroidField(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX-3000,this.game.world.centerY+2500);
-        var nebula = new Nebula(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX+5500,this.game.world.centerY);
-        var nebula = new Nebula(this,ASTEROID_FIELD_SIZE.large,this.game.world.centerX+100,this.game.world.centerY);
-        this.testplanet = new BasicPlanet(this,this.game.world.centerX,this.game.world.centerY);
-        var moon = new BasicMoon(this,this.game.world.centerX+7000,this.game.world.centerY+1000);        
-
-        this.ft = new FuelTanker(this,this.game.world.centerX+200,this.game.world.centerY-200);
-        this.ft.sprite.body.angle = 270;
-*/
-
+        
         this.game.world.bringToTop(this.asteroids);
         this.game.world.bringToTop(this.ships);
         this.player = new Player(this);
-        this.galaxy.starSystems[0].arrive();
-        
+
         // FullSCreen
         var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
         fKey.onDown.add(this.fullScreen, this);
-        
+
         // HUD
         this.hudGroup = this.game.add.group();
         this.hud = new HUD(this);
-        this.hud.showSystemInfo();
         
         // GUI
         this.guiGroup = this.game.add.group();
         this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
         this.inventoryScreen = new InventoryScreen(this,this.guiGroup);
+        this.mapScreen = new MapScreen(this,this.guiGroup);
         
         // Weapons
         var miningLaser = InventoryObject.make('mining_laser_1',this);
@@ -293,12 +299,15 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.updateTime();
 
         // Camera
-        this.cameraFree = true;
+        this.cameraFree = false;
         this.setupCamera(silent = true);
 
         // Very top layer
         this.notificationGroup = this.game.add.group(); 
-        this.notificationGroup.fixedToCamera = true;    
+        this.notificationGroup.fixedToCamera = true;
+        
+        // Kick things off
+        this.galaxy.starSystems[0].arrive();
     },
     
     register : function(object){
@@ -371,25 +380,33 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
         this.setupCamera();
     },
     
+    lockCamera : function(){
+        // Locked
+        this.game.camera.follow(this.player.sprite);            
+        this.game.camera.deadzone = null;
+        this.game.camera.targetOffset.x = 50;
+    },
+    
+    freeCamera : function(){
+        // Free
+        this.game.camera.follow(this.player.sprite);
+        var deadzonePadding = 100;
+        this.freeDeadzone = new Phaser.Rectangle(
+            deadzonePadding,
+            deadzonePadding,
+            screenWidth-350,
+            screenHeight-deadzonePadding*2
+        );  
+        this.game.camera.deadzone = this.freeDeadzone;
+        this.game.camera.focusOnXY(this.player.ship.sprite.x + 50,this.player.ship.sprite.y);
+    },
+    
     setupCamera : function(silent){
         if(this.cameraFree){
-            // Free
-            this.game.camera.follow(this.player.sprite);
-            var deadzonePadding = 100;
-            this.freeDeadzone = new Phaser.Rectangle(
-                deadzonePadding,
-                deadzonePadding,
-                screenWidth-350,
-                screenHeight-deadzonePadding*2
-            );  
-            this.game.camera.deadzone = this.freeDeadzone;
-            this.game.camera.focusOnXY(this.player.ship.sprite.x + 50,this.player.ship.sprite.y);
+            this.freeCamera();
             if(!silent) this.hud.message('Camera Mode: Free');
         } else {
-            // Locked
-            this.game.camera.follow(this.player.sprite);            
-            this.game.camera.deadzone = null;
-            this.game.camera.targetOffset.x = 50;
+            this.lockCamera();
             if(!silent) this.hud.message('Camera Mode: Locked');            
         }
 
@@ -402,13 +419,14 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
     
     update : function(){
         if(this.loaded){
-            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
-            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
-            
             // Update all registered objects
             this.gameObjects.forEach(function(gameObject) {
                 gameObject.update();
             });
+
+            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
+            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
+            
 
             // Move stars
             this.starsDistant.tilePosition.x = -this.game.camera.x*0.3;

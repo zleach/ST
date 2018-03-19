@@ -58,11 +58,25 @@ class Player extends GameObject {
         jKey.onUp.add(function(){
             if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
         }, this);
+        var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
+        aKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.abortFTL();
+        }, this);
+        var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
+        hKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.toggleFTLPanel();
+        }, this);
 
         // Inventory
         var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
         iKey.onUp.add(function(){
             if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
+        }, this);
+
+        // Map
+        var mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        mKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.mapScreen.show();
         }, this);
 
         // Camera
