@@ -30,29 +30,35 @@ class Minimap {
     }
     update(){
         this.dotsBitmapData.clear();
-        this.game.system.stellarObjects.forEach(function(gameObject) {
-                if(gameObject.sprite!=undefined){
-                    var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
-                    if(distance<(this.distanceFactor/this.scale)){
-                        var x = ((gameObject.sprite.x-this.game.player.ship.sprite.x)*this.scale)+this.size/2;
-                        var y = ((gameObject.sprite.y-this.game.player.ship.sprite.y)*this.scale)+this.size/2;
-                        var size = 1; // Default dot size
-                        if(gameObject.minimapSize!=undefined){
-                            size = gameObject.minimapSize;
-                        }
-                        var a = Math.abs(distance*(this.distanceFactor/100000)-1)+.1
-                        
-                        if(this.game.player.ship.navigationTarget == gameObject){
-                            this.dotsBitmapData.circle(x,y,size+3,`rgba(255,255,255,${a})`);                            
-                            this.dotsBitmapData.circle(x,y,size+2,`#3f3c46`);                            
-                            this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
-                        } else {
-                            this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
-                        }
-                    }
-                }
-        }.bind(this));
+        this.game.system.stellarObjects.forEach(this.drawDotsForGameObject,this);
+        this.game.system.planets.forEach(this.drawDotsForGameObject,this);
         this.dotsBitmapData.dirty = true;        
+    }
+    
+    drawDotsForGameObject(gameObject){
+        if(gameObject.sprite!=undefined){
+            var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
+            if(distance<(this.distanceFactor/this.scale)){
+                var x = ((gameObject.sprite.x-this.game.player.ship.sprite.x)*this.scale)+this.size/2;
+                var y = ((gameObject.sprite.y-this.game.player.ship.sprite.y)*this.scale)+this.size/2;
+                var size = 1; // Default dot size
+                if(gameObject.minimapSize!=undefined){
+                    size = gameObject.minimapSize;
+                }
+                var a = Math.abs(distance*(this.distanceFactor/100000)-1)+.1
+                
+                if(this.game.player.ship.navigationTarget == gameObject){
+                    this.dotsBitmapData.circle(x,y,size+3,`rgba(255,255,255,${a})`);                            
+                    this.dotsBitmapData.circle(x,y,size+2,`#3f3c46`);                            
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                } else {
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                }
+                
+                // Player
+                this.dotsBitmapData.circle(this.size/2,this.size/2,1,`rgba(255,255,255,1)`);                            
+            }
+        }
     }
     
 }

@@ -5,9 +5,9 @@ class Galaxy extends GameObject{
         this.name = Names.star();
 
         this.settings = {
-            starsAmount : 45,
-            mapWidth : 1000,
-            mapHeight : 1000,
+            starsAmount : 50,
+            mapWidth : 3000,
+            mapHeight : 3000,
         }    
     }
     
@@ -17,5 +17,9 @@ class Galaxy extends GameObject{
             var system = new StarSystem(this.game);
             this.starSystems.push(system);
         }
+    }
+    
+    get closestSystemToCenter() {
+        return _.sortBy(this.starSystems,'distanceFromGalacticCenter').firstItem();
     }
 }

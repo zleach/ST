@@ -12,7 +12,7 @@ ITEMS.push(...[{
 		"key": "raw_paladium",
 		"name": "Raw Paladium",
 		"type": "Mineral",
-        "description" : "A bright coppery and very hard ore. The interconnects of most modern hyperdrive systems rely in this and other rare mineral based alloys.",
+        "description" : "A bright coppery and very hard ore. The interconnects and power relays of modern FTL systems rely on this, and other rare mineral based alloys.",
 		"rarity": "rare",
 		"storageClass": "bulk",
 		"baseValue": 65,
@@ -59,6 +59,8 @@ ITEMS.push(...[{
 		"mass": 8
 	},
 	{
+        "_category" : "Commodity",
+        "_specialty" : "crops",
 		"key": "potatoes",
 		"name": "Potatoes",
         "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply. Best when cut into strips and deep-fried.",
@@ -69,6 +71,8 @@ ITEMS.push(...[{
 		"mass": 100
 	},
 	{
+        "_category" : "Commodity",
+        "_specialty" : "crops",
 		"key": "coffee",
 		"name": "Coffee",
         "description" : "Coffee keeps the galaxy running. These beans are the seeds of berries from the Coffea plant. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",

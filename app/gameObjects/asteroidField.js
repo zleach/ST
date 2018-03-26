@@ -2,6 +2,7 @@ class AsteroidField extends GameObject {
     constructor(game,options) {
         super(game);
         
+        this.system = options.system;
         var size = options.size;
         if(size==undefined) size = 2000;
         var densityLowerBound = 50;
@@ -24,24 +25,19 @@ class AsteroidField extends GameObject {
             }
 
             // Add to system
-            options.system.stellarObjects.push(asteroid);
+            this.system.stellarObjects.push(asteroid);
         }
 
         this.buoy = new Buoy(this.game,options.x,options.y);
         this.buoy.description = `${Names.proper()} Asteroid Field`
 
-        options.system.stellarObjects.push(this.buoy);
+        this.system.stellarObjects.push(this.buoy);
     }
 
-    cleanup(){
-        this.asteroids.forEach(function(item) {
-            item.sprite.destroy();
-            item = null;            
-        });
-    }
-    
     update(){
         super.update();
-        this.game.physics.arcade.collide(this.asteroids, this.asteroids);
+        if(this.system == this.game.system){    
+            this.game.physics.arcade.collide(this.asteroids, this.asteroids);
+        }
     }    
 }

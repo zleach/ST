@@ -38,6 +38,29 @@ Array.prototype.lastItem = function() {
     return this[this.length-1];
 };
 
+Array.prototype.firstItem = function() {
+    return this[0];
+};
+
+Array.prototype.clean = function(deleteValue) {
+  for (var i = 0; i < this.length; i++) {
+    if (this[i] == deleteValue) {         
+      this.splice(i, 1);
+      i--;
+    }
+  }
+  return this;
+};
+
+Number.prototype.between = function(a, b, inclusive) {
+  var min = Math.min.apply(Math, [a, b]),
+    max = Math.max.apply(Math, [a, b]);
+  return inclusive ? this >= min && this <= max : this > min && this < max;
+};
+
+Number.prototype.clamp = function(min, max) {
+  return Math.min(Math.max(this, min), max);
+};
 
 function isEven(n) {
    return n % 2 == 0;
@@ -189,6 +212,13 @@ const PLANET_SERVICES_REQUIREMENTS = [
         level : 7,
     }
 ];
+
+PLANET_SPECIALIZATIONS = {
+    culture : ['peaceful','tourism','military'],
+    industry : ['manufacturing','agriculture'],
+    science : ['mining','technology'],
+    trade : ['luxury','government'],
+}
 
 const WEAPON_TYPES = {
     miningLaser :    'miningLaser',
@@ -350,4 +380,12 @@ const GREEK_ALPHABET = [
     'Tau',
     'Upsilon',
     'Omega',
+]
+
+const OUTER_RIM_DESIGNATIONS = [
+    'NCG',
+    'HD',
+    'NCC',
+    'GH',
+    'F',
 ]

@@ -19,12 +19,12 @@ class Names {
     }
     
     static star(){
+        var name;
+
         var markovChain = new Markov;
         markovChain.n = rng.nextInt(5,5);
         markovChain.sequences = Names.parseWords(NAMES_STAR.join('\n'));
-        markovChain.rng = rng;
-        
-        var name;
+        markovChain.rng = rng;        
         
         if(rng.next()>.9){
             markovChain.maxLength = rng.nextInt(3,6);
@@ -43,6 +43,12 @@ class Names {
         }
         
         return name;
+    }
+
+    static outerRimStar(){
+        var designation = OUTER_RIM_DESIGNATIONS[rng.nextInt(0, OUTER_RIM_DESIGNATIONS.length-1)]
+        var number = rng.nextInt(100,999);
+        return `${designation}-${number}`
     }
 
     static proper(){

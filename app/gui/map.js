@@ -77,10 +77,14 @@ class GalacticMap extends GameObject{
         }
 
         var getNextJump = function(){
-            var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
-            if(path.includes(nextJump)) return null;
-            path.push(nextJump);
-            validatePath();
+            if(path[path.length-1]){
+                var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
+                if(path.includes(nextJump)) return null;
+                path.push(nextJump);
+                validatePath();                
+            } else {
+                return null;
+            }
         }
 
         if(distanceToDestination<=maxJumpDistance){
@@ -89,6 +93,8 @@ class GalacticMap extends GameObject{
         } else {
             getNextJump();
         }
+         
+        path.clean(null); // remove all nulls;
                 
         return path;        
     }
@@ -98,7 +104,7 @@ class GalacticMap extends GameObject{
         var previousSystem = null;
 
         for(let system of path){
-            if(previousSystem){
+            if(previousSystem && system!=null){
                 distance+= system.distanceToStarSystem(previousSystem);
             }
             previousSystem = system;
@@ -120,19 +126,7 @@ class GalacticMap extends GameObject{
     
     drawMap(){      
         this.bmd.ctx.clearRect(0,0,this.width,this.height);
-        var zoom = this.mapZoom;
-                
-                
-        // Title
-        this.bmd.ctx.font = `18px ${FONT}`;
-        this.bmd.ctx.strokeStyle='#000000'
-        this.bmd.ctx.fillStyle='#FFFFFF'
-        this.bmd.ctx.lineWidth = 3;
-        this.drawShadowText(`${this.game.galaxy.name} Galaxy`, (this.mapScrollX)*zoom, (this.mapScrollY-32)*zoom);
-        this.bmd.ctx.font = `12px ${FONT}`;
-        this.bmd.ctx.fillStyle='#AAAAAA'
-        this.drawShadowText(`Local Cluster - Major Star Systems`, (this.mapScrollX)*zoom, (this.mapScrollY-12)*zoom);
-        
+        var zoom = this.mapZoom;        
         // Lines
         for(let system of this.starSystems){
             // Save distnce for later
@@ -179,7 +173,7 @@ class GalacticMap extends GameObject{
         // Stars
         for(let system of this.starSystems){                  
             // Black Space
-            this.bmd.ctx.fillStyle='#000000'
+            this.bmd.ctx.fillStyle='#111111'
             this.bmd.ctx.beginPath();
             this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
             this.bmd.ctx.fill();
@@ -219,7 +213,7 @@ class GalacticMap extends GameObject{
             
             var labelString = `${system.name}`
             this.bmd.ctx.font = `12px ${FONT}`;
-            this.bmd.ctx.strokeStyle='#000000'
+            this.bmd.ctx.strokeStyle='#111111'
             this.bmd.ctx.fillStyle='#FFFFFF'
             this.bmd.ctx.lineWidth = 3;
             
@@ -236,7 +230,7 @@ class GalacticMap extends GameObject{
             }
             
             if(this.currentPath){
-                if(system==this.currentPath.lastItem()){
+                if(system==this.currentPath.lastItem() && !system.isCurrentSystem){
                     if(system==this.navigationDestination){
                         this.bmd.ctx.fillStyle='#1aae5c'
                     } else {
@@ -298,33 +292,34 @@ class GalacticMap extends GameObject{
     
     drawGridLines(options){
         var zoom = this.mapZoom;
-        var major = options.major || 100;
-        var minor = options.minor || 25;            
+        var major = options.major || 100*zoom;
+        var minor = options.minor || 25*zoom;            
     	this.bmd.ctx.strokeStyle = options.color || "#333333";
     	
         // Verticle
-        for (var x = 0; x <= this.game.galaxy.settings.mapWidth*zoom; x+=minor) {
+        for (var x = 0; x <= this.game.galaxy.settings.mapWidth; x+=minor) {
             if (x % major == 0) {
                 this.bmd.ctx.lineWidth = 2;
             } else {
                 this.bmd.ctx.lineWidth = 1;                
             }
         	this.bmd.ctx.beginPath();
-        	this.bmd.ctx.moveTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)));
-        	this.bmd.ctx.lineTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)+(this.game.galaxy.settings.mapHeight*zoom)));
+        	this.bmd.ctx.moveTo((x+this.mapScrollX)*zoom,this.mapScrollY*zoom);
+        	this.bmd.ctx.lineTo((x+this.mapScrollX)*zoom,(this.mapScrollY*zoom)+(this.game.galaxy.settings.mapHeight*zoom));
             this.bmd.ctx.stroke();
         }
 
+
         // Horizontal
-        for (var y = 0; y <= this.game.galaxy.settings.mapHeight*zoom; y+=minor) {
+        for (var y = 0; y <= this.game.galaxy.settings.mapHeight; y+=minor) {
             if (y % major == 0) {
                 this.bmd.ctx.lineWidth = 2;
             } else {
                 this.bmd.ctx.lineWidth = 1;                
             }
         	this.bmd.ctx.beginPath();
-        	this.bmd.ctx.moveTo(Math.round(((this.mapScrollX)*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
-        	this.bmd.ctx.lineTo(Math.round(((this.mapScrollX)*zoom)+(this.game.galaxy.settings.mapWidth*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
+        	this.bmd.ctx.moveTo(this.mapScrollX*zoom,(y+this.mapScrollY)*zoom);
+        	this.bmd.ctx.lineTo((this.mapScrollX*zoom)+(this.game.galaxy.settings.mapWidth*zoom),(y+this.mapScrollY)*zoom);
             this.bmd.ctx.stroke();
         }
     }

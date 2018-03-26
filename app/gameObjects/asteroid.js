@@ -125,41 +125,43 @@ class Asteroid extends GameObject {
     } 
        
     explode(){
-	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
-	    this.game.asteroids.add(emitter);
-        emitter.makeParticles('asteroid-flake-1',0,7);
-        emitter.gravity = 0;
-        emitter.maxRotation = 100;
-        emitter.minRotation = 30;
-        emitter.minParticleScale = .5;
-        emitter.maxParticleScale = 1;
-        emitter.explode(6000, game.rnd.integerInRange(3, 7));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles('asteroid-flake-1',0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .5;
+        this.explodeEmitter.maxParticleScale = 1;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
         this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
     }
     
     // Rendering
-    update() {
-        if(this.sprite.exists){
-            super.update();
-            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-    
-            if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
-                this.sprite.exists = true;
-            } else {
-                this.sprite.exists = false;
-            }
-    
-            if(this.soundCountdown==0){
-                this.damageSound.stop();
-            } else {
-                this.soundCountdown--;
-            }
-            
-            // Spin
-            if(this.sprite.exists){
-                this.sprite.body.angularVelocity = this.roationSpeed;                
-            }
+    update() {        
+        super.update();
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+
+        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+            this.sprite.exists = true;
+        } else {
+            this.sprite.exists = false;
         }
+
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
+        
+        // Spin
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
+    }
+    
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
     }
 }

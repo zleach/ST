@@ -7,6 +7,7 @@ class ArrivalScreen extends GuiScreen {
         this._destination = null;
         this.serviceButtons = [];
         this.serviceScreens = {};      
+        this.serviceSelectedIndex = null;
         
         this.setupKeys();
         this.setupScreen();
@@ -21,6 +22,18 @@ class ArrivalScreen extends GuiScreen {
     }
     
     setupKeys(){
+        var upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        upKey.onUp.add(this.upKeyPressed, this);
+        
+        var downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+        downKey.onUp.add(this.downKeyPressed, this);
+
+        var leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
+        leftKey.onUp.add(this.leftKeyPressed, this);
+
+        var rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+        rightKey.onUp.add(this.rightKeyPressed, this);
+
         var escKey = game.input.keyboard.addKey(Phaser.Keyboard.ESC);
         escKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
@@ -30,6 +43,50 @@ class ArrivalScreen extends GuiScreen {
         lKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
         }, this);
+    }
+    
+    upKeyPressed(){
+        // Later
+    }
+    
+    downKeyPressed(){
+        // Later
+    }
+    
+    leftKeyPressed(){
+        this.selectPreviousService();
+    }
+    
+    rightKeyPressed(){
+        this.selectNextService();
+    }
+    
+    selectNextService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+
+        this.serviceSelectedIndex++;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    selectPreviousService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+        
+        this.serviceSelectedIndex--;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    clickSelectedService(){
+        
     }
     
     setupScreen(){
@@ -143,6 +200,8 @@ class ArrivalScreen extends GuiScreen {
     layout(){        
         this.cleanup();
         
+        console.log(this.serviceSelectedIndex);
+        
         // Description
         this.destDesc.setText(this.destination.description);
 
@@ -168,6 +227,10 @@ class ArrivalScreen extends GuiScreen {
             var serviceButton = new TwoLineButton(this.game,'service-button');
             serviceButton.screen = this;
             serviceButton.service = service;
+
+            if(servicesIndex==this.serviceSelectedIndex){
+                serviceButton.over = true;
+            }
 
             serviceButton.callbacks = {
                 onDown : function() {

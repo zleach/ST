@@ -4,10 +4,11 @@ class StarSystem extends GameObject{
         super(game);
         this.stellarObjects = [];
         this.neighbors = [];
+        this.planets = [];
         
         this.settings = {
             minDistanceFromAnotherStar : 60,
-            nebulaChance : .1,
+            nebulaChance : 1,
             minRoids : 0,
             maxRoids : 2,
             minRoidOffset : {
@@ -32,45 +33,62 @@ class StarSystem extends GameObject{
         }
         
         // Details
+        this.generatePosition();
+        
         this.name = Names.star();
+        if(this.isOuterRimSystem) this.name = Names.outerRimStar();
+
         this.type = this.determineItemFromArray(STELLAR_TYPES);
         this.size = rng.next(2,5);
-        this.generatePosition();
 
         // Planets
         this.planetCount = this.game.rng.nextInt(this.settings.minPlanets, this.settings.maxPlanets);    
         var x = this.game.world.centerX;
         var y = this.game.world.centerX;
         for (var i = 0; i < this.planetCount; i++) {             
-            this.stellarObjects.push(new BasicPlanet(this.game,{
+            this.planets.push(new BasicPlanet(this.game,{
                 x : x,
                 y : y,
                 index : i,
                 system : this,
             }));
-
-            x += this.game.rng.nextInt(this.settings.minPlanetOffset.x, this.settings.maxPlanetOffset.x);
-            y += this.game.rng.nextInt(this.settings.minPlanetOffset.y, this.settings.maxPlanetOffset.y);
+            
+            x += this.game.rng.next(this.settings.minPlanetOffset.x, this.settings.maxPlanetOffset.x);
+            y += this.game.rng.next(this.settings.minPlanetOffset.y, this.settings.maxPlanetOffset.y);
         }
     }
     
     generatePosition(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var densityFactor = (this.game.galaxy.starSystems.length+1)/this.game.galaxy.settings.starsAmount;
+        var maximumDistance = ((size*densityFactor)*2)+200;
+
+        var x = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapWidth/2;
+        var y = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapHeight/2;
+
         this.position = {
-            x : rng.nextInt(0, this.game.galaxy.settings.mapWidth),
-            y : rng.nextInt(0, this.game.galaxy.settings.mapHeight),
-        }
+            x : x.clamp(0,this.game.galaxy.settings.mapWidth),
+            y : y.clamp(0,this.game.galaxy.settings.mapHeight)
+        }        
+        
+        // Validate Postion
         for(let system of this.game.galaxy.starSystems){
             var distance = this.distanceToStarSystem(system);
+            
+            // Minium Distance (Prevent too close)
             if(distance<this.settings.minDistanceFromAnotherStar) this.generatePosition();
         };
+
+
+        
     }
     
     arrive(){        
+        this.cleanup();
+        this.game.system = this;
         this.game.time.events.add(1000, function(){
             this.game.hud.showSystemInfo();
         }, this)
-
-        this.game.mapScreen.map.currentPath.pop();
 
         // Asteroids
         var x = 0;
@@ -87,7 +105,6 @@ class StarSystem extends GameObject{
             }));            
         }
 
-/*
         // Nebula
         var x = 0;
         var y = 0;
@@ -102,12 +119,29 @@ class StarSystem extends GameObject{
                 system : this,
             }));
         }
-*/
         
         // Activate Everything
+        for(let planet of this.planets){
+            planet.wrapper.children.forEach(function(element) {
+                element.exists = true;
+            }, this);
+        }
+        
         for(let object of this.stellarObjects){
             if(object.sprite!=undefined) object.sprite.exists = true;
         }
+    }
+
+    cleanup(){
+        this.game.asteroids.removeAll(true);
+        for(let planet of this.game.planets.children){
+            planet.children.forEach(function(element) {
+                element.exists = false
+            }, this);
+        }
+
+        for(let object of this.stellarObjects) object.destroy();
+        this.stellarObjects.length = 0;
     }
     
     get closestStarSystem(){
@@ -146,19 +180,21 @@ class StarSystem extends GameObject{
             }            
         }
         
+        var bestMatch = null;
         // Of the in range candidates, return the one closest to the angle of the destination system.
-        var bestMatch = jumpCandidates.reduce(function(prev, curr) {
-            var prevAngle = this.candidate.angleToStarSystem(prev);
-            var currAngle = this.candidate.angleToStarSystem(curr);
-            var destAngle = this.destAngle;            
-            return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
-        }.bind({
-            destAngle : angleToDestination,
-            candidate : this,
-        }));
+        if(jumpCandidates.length>0){
+                bestMatch = jumpCandidates.reduce(function(prev, curr) {
+                var prevAngle = this.candidate.angleToStarSystem(prev);
+                var currAngle = this.candidate.angleToStarSystem(curr);
+                var destAngle = this.destAngle;            
+                return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
+            }.bind({
+                destAngle : angleToDestination,
+                candidate : this,
+            }));
+        }
 
         return bestMatch;
-
     }
     
     distanceToStarSystem(system){
@@ -172,6 +208,23 @@ class StarSystem extends GameObject{
             this.position.y - system.position.y,
             this.position.x - system.position.x
         ) * 180 / Math.PI;
+    }
+
+    get distanceFromGalacticCenter(){
+        var a = this.position.x - this.game.galaxy.settings.mapWidth/2
+        var b = this.position.y - this.game.galaxy.settings.mapHeight/2
+        return Math.sqrt( a*a + b*b );
+    }
+
+    get isOuterRimSystem(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var rimPercent = 0.1;
+        
+        if(this.distanceFromGalacticCenter>size*Math.abs(rimPercent-1)){
+            return true;
+        } else {
+            return false;
+        }
     }
     
     get isCurrentSystem(){

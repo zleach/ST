@@ -127,7 +127,6 @@ class MapScreen extends GuiScreen {
         this.map.setupKeys();
         this.map.isActive = true;
         this.map.centerOnSystem(this.game.system);
-
     }
 
     didShow(){
@@ -141,10 +140,6 @@ class MapScreen extends GuiScreen {
 
         this.map.isActive = false;
         this.map.cleanup();
-
-        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
-            this.game.hud.showSystemInfo();
-        }, this);
     }
 
     didHide(){

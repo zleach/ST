@@ -66,6 +66,7 @@ class Ship extends GameObject {
 
         // Hyperdrive
         this.hyperDriveDelay = 3600;
+        this.jumpWasAborted = false;
 
         // Sounds
         this.infoSound = game.add.audio('beep-beep');
@@ -189,7 +190,6 @@ class Ship extends GameObject {
         this.ventData = {
             lifespan: 8000,
             image: 'white-smooth',
-            //blendMode: 'ADD',
             vx: { min: -.4, max: .4 },
             vy: { min: -.4, max: .4 },
             alpha: { min: 0, max: .3 },
@@ -201,15 +201,21 @@ class Ship extends GameObject {
         this.atmosphereWell = this.atmosphereEmitter.createGravityWell(0,0, .01);
 
         // Hyperdrive
-        var hyperData = {
-            lifespan: 600,
-            image: 'white',
+        this.hyperData = {
+            lifespan: 300,
+            image: 'white-smooth',
             bringToTop: true,
             blendMode: 'ADD',
             hsv: { value: 250,},
             alpha: { value: .5 , control:  [{ x: 0, y: 1 }, { x: 1, y: 0 } ]},
+            scale: { value: .5 },
+            emit: {
+                name: { at: [ { time: 0, value: 'spark' } ] }, 
+                value: 0, at: [ { time: 0, value: 5 } ]
+            }
         };
-        this.game.ps.addData('hyperDrive', hyperData);
+        
+        this.game.ps.addData('hyperDrive', this.hyperData);
         this.hyperDriveEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
         this.hyperDriveEmitter.addToWorld();
 
@@ -426,7 +432,7 @@ class Ship extends GameObject {
     }
 
     goInReverse() {
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             if(this.speed<this.specs.maxReverse){
                 this.sprite.body.reverse(this.specs.reverseThrust)
             }
@@ -437,7 +443,7 @@ class Ship extends GameObject {
     }
     
     turnLeft(){
-        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel) {
+        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.angularVelocity -= this.specs.turnAccel;
         
             this.fireThruster('forward_right');
@@ -446,7 +452,7 @@ class Ship extends GameObject {
     }
 
     turnRight(){
-        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel) {
+        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.angularVelocity += this.specs.turnAccel;
 
             this.fireThruster('forward_left');
@@ -455,7 +461,7 @@ class Ship extends GameObject {
     }
 
     moveLeft(){
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.thrustLeft(this.specs.leftRightThrust)
 
             this.fireThruster('forward_right');
@@ -464,7 +470,7 @@ class Ship extends GameObject {
     }
 
     moveRight(){
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.thrustRight(this.specs.leftRightThrust)
 
             this.fireThruster('forward_left');
@@ -518,7 +524,6 @@ class Ship extends GameObject {
             this.reachedWaypoint();
         } else {
             var turnSpeed = Math.abs(difference)*.02;
-            //sconsole.log(`turn:${turnSpeed.toFixed(2)} | dist: ${this.distanceToWaypoint.toFixed(2)} | eta: ${eta.toFixed(2)}s`);
             if(difference<-3 && difference>-180){
                 if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
                     this.turnLeft();
@@ -594,6 +599,12 @@ class Ship extends GameObject {
                 objects.push(gameObject);
             }
         },this);
+        this.game.system.planets.forEach(function(gameObject) {
+            if(gameObject.canNavigateTo && gameObject != this){
+                objects.push(gameObject);
+            }
+        },this);
+
         return objects;
     }
     
@@ -640,7 +651,12 @@ class Ship extends GameObject {
     get formattedTimeToCurrentNavigationTarget(){
         var vx = this.sprite.body.velocity.x;
         var vy = this.sprite.body.velocity.y;
-        var eta = this.distanceToCurrentNavigationTarget/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+        var distanceToNavigationTarget = this.distanceToCurrentNavigationTarget
+        if(this.navigationTarget.isPlanet){
+            distanceToNavigationTarget = distanceToNavigationTarget*2; // Planets have difference scale
+        }
+        
+        var eta = distanceToNavigationTarget/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
         if(eta<1 || eta.isNaN){
             return '--';
         } else {
@@ -663,12 +679,14 @@ class Ship extends GameObject {
     refuel(){
         this.fuelQuantity = this.maxFuel;
         this.lowFuelLightShown = false;
+        
+        this.game.hud.hasFuel();
     }
     
     lowFuelLight(){
         if(!this.lowFuelLightShown) {
-            this.game.hud.message("Low Fuel");
             this.lowFuelLightShown = true;
+            this.game.hud.lowFuel();
         }
     }
     
@@ -686,6 +704,10 @@ class Ship extends GameObject {
 
     addFuel(amount){
         this.fuelQuantity += amount;
+
+        if(this.fuelPercentage>25){
+            this.game.hud.hasFuel();
+        }
     }
     
     get fuelPercentage(){
@@ -742,7 +764,7 @@ class Ship extends GameObject {
         var closestLandingSite = false;
         var landingSitesInRange = [];
         for (let landingSite of this.game.gameObjects) {
-            if(landingSite.canLand){
+            if(landingSite.canLand && landingSite.system == this.game.system){
                 var distance = this.game.physics.arcade.distanceBetween(landingSite.sprite, this.sprite);
                 if(distance<=landingSite.showInfoDistance)
                     landingSitesInRange.push({
@@ -760,7 +782,7 @@ class Ship extends GameObject {
             var maxSpeedWhenLanding = 10;
 
             if((this.speed)>maxSpeedWhenLanding){
-                this.game.hud.message("Moving too fast to land");
+                this.game.hud.message("Moving maxSpeedWhenLandingt to land");
                 return;
             }
 
@@ -1001,15 +1023,27 @@ class Ship extends GameObject {
     // HyperDrive™
     toggleHyperDrive(){        
         if(!this.hyperDriveEngaged){
-            //this.game.lockCamera();
+            if(this.jumpsRemaining<1){
+                this.game.hud.message("No FTL fuel in inventory");
+                return;
+            }
+
+            if((this.speed)>15){
+                this.game.hud.message("Moving too fast to engage FTL Drive");
+                return;
+            }
+
             this.hyperDriveTimer = game.time.events.add(this.hyperDriveDelay, this.jump, this);
             this.ftlChargeSound.play();
             this.hyperDriveEngaged = true;
+            this.jumpWasAborted = false;
+            
+            this.consumeHyperdriveFuel();
         }
     }
     
     hyperDriveUpdate(){
-        this.sprite.body.thrust(1000);
+        this.sprite.body.thrust(500);
         this.hyperDriveEmitter.emit(
             'hyperDrive',
             this.sprite.worldPosition.x + this.game.camera.x,
@@ -1017,16 +1051,99 @@ class Ship extends GameObject {
         );        
     }
     
+    abortJump(){
+        this.ftlChargeSound.stop();
+        
+        if(this.hyperDriveEngaged){
+            this.jumpCompleteSound.play();
+        }
+        
+        this.jumpWasAborted = true;
+        
+        this.disengageHyperDrive();    
+    }
+    
+    get jumpsRemaining(){
+        // Calculate remaing hyperdrive fuel.
+        var jumpsRemaining = 0;
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) jumpsRemaining++;
+        }
+        return jumpsRemaining;
+    }
+
+    consumeHyperdriveFuel(){
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) {
+                item.consume();
+                break;
+            }
+        }
+    }
+    
     jump(){
+        if(this.jumpWasAborted) return;
+
         this.ftlJumpSound.play();
         game.camera.flash(0xFFFFFF, 500);
-        this.disengageHyperDrive();
+        
+        // Systems
+        var previousSystem = this.game.mapScreen.map.currentPath.shift();
+        var currentSystem = this.game.mapScreen.map.currentPath.firstItem();
+        if(currentSystem) currentSystem.arrive();
+        
+        // Time
+        this.game.skipTime(rng.nextInt(6,36),'hours');             
+        
+        // We're there.
+        if(this.game.mapScreen.map.currentPath.length==1){
+            if(this.game.mapScreen.map.currentPath.firstItem() == currentSystem){
+                this.game.mapScreen.map.currentPath = false;
+                this.game.mapScreen.map.navigationDestination = null;
+                
+                game.time.events.add(1000, function(){
+                    this.game.hud.hideFTLPanel();
+                }, this);
+            }
+        }
+        
+        // Figure out where we should land
+        var angleToSystemCenter = Phaser.Math.reverseAngle(Math.atan2(
+            this.sprite.y - this.game.world.centerY,
+            this.sprite.x - this.game.world.centerX
+        ));
+         // Radians
+        var r = 5000;
+        var landingX = this.sprite.x + r * Math.cos(angleToSystemCenter);
+        var landingY = this.sprite.y + r * Math.sin(angleToSystemCenter);
+                
+        this.sprite.body.x = landingX;
+        this.sprite.body.y = landingY;
+        
+        // Slow down
+        var slowDownTween = this.game.add.tween(this.sprite.body).to({
+            damping: .95,
+        }, 2000, "Quart.easeOut", true)
+        slowDownTween.onComplete.add(function(){
+            var slowDownTween = this.game.add.tween(this.sprite.body).to({
+                damping: 0,
+            }, 1000, "Quart.easeOut", true)
+        }, this);
+        game.time.events.add(2000, function(){
+            this.disengageHyperDrive();
+        }, this);
 
-        this.game.mapScreen.map.navigationDestination.arrive();
-
+        // Power down sound
         game.time.events.add(800, function(){
             this.jumpCompleteSound.play();
         }, this);
+
+        // Cleanup
+        this.game.player.exitDarkness();
+        this.game.hud.updateFTLPanel();
+        this.navigationMode = NAVIGATION_MODE.free;
+        this.navigationIndex = -1;
+        this.setNavigationTargetToCurrentNavigationTargetIndex();
    }
     
     disengageHyperDrive(){
@@ -1147,7 +1264,15 @@ class Ship extends GameObject {
         // Damage
         if(this.hullBreached){
             this.ventAtmosphere();
+            if(this.healthPercentage>this.hullBreachAtHealthPercentage){
+                this.hullBreached = false;
+                if(this == this.game.player.ship) {
+                    this.game.hud.hideO2Panel();
+                }
+            }
         }
+
+
 
         // Cargo
 

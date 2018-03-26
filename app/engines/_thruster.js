@@ -1,6 +1,7 @@
 class Thruster extends Engine {
     constructor(game,options) {
         super(game,options);
+        this.game.register(this);
 
         this.engineType = ENGINE_TYPES.reactionControlThruster;
         this.thrust = 0;
@@ -17,11 +18,9 @@ class Thruster extends Engine {
         this.flames.angle = this.layout.angle;
         this.flames.scale.set(.9);
         this.flames.anchor.set(0,0);
-        this.flames.blendMode = PIXI.blendModes.ADD;    
 
         var smoke = {
             image: 'smoke-trail',
-            blendMode: 'HARD_LIGHT',
             lifespan: { min: 150, max: 400 },
             scale: { value: { min: .03, max: .1 } },
             vx: { value: { min: 0, max: 0 } },

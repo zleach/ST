@@ -27,18 +27,19 @@ class Planet extends GameObject{
         this.infoSound = game.add.audio('beep-beep');
     }
     
-    setupSprite(){
+    setupSprite(options){
         super.setupSprite(this.sprite);
-        this.wrapper =  this.game.make.group();
+        this.wrapper = this.game.make.group();
         this.wrapper.add(this.sprite);
 
         this.sprite.anchor.setTo(.5, .5);
         this.sprite.smoothed = false;
-
         this.sprite.parentObject = this;
 
+        this.game.planets.add(this.wrapper);
+
         this.nameText = this.game.add.text( 
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y - 20, 
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top+10, 
             this.name, 
             { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
             this.game.planets,
@@ -47,7 +48,7 @@ class Planet extends GameObject{
         this.nameText.alpha = 0;
 
         this.subText = this.game.add.text(
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y, 
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 30, 
             this.description, 
             { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
             this.game.planets,
@@ -56,7 +57,7 @@ class Planet extends GameObject{
         this.subText.alpha = 0;
 
         this.landingMessage = this.game.add.text(
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y + 40, 
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 60, 
             'Press L to Land', 
             { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
             this.game.planets,
@@ -68,18 +69,14 @@ class Planet extends GameObject{
     
     // Info Display
     showInfoIfNeeded(){
-        if(this.shouldShowInfo && !this.infoShowing){ 
-            this.infoSound.play();
+        if(this.shouldShowInfo && !this.infoShowing && this.game.initialized){ 
+            if(!this.game.player.ship.hyperDriveEngaged) this.infoSound.play();
                    
             this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
-            this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
-            
             this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
-            this.game.add.tween(this.subText).to( { y: '-30' }, 300, "Quart.easeOut", true);                
 
             if(this.canLand){
-                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true,400);
-                this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
+                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true);
             }
         
             this.infoShowing = true;
@@ -104,10 +101,6 @@ class Planet extends GameObject{
         this.game.add.tween(this.subText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
         this.game.add.tween(this.landingMessage).to( { alpha: 0 }, 300, "Quart.easeOut", true);
 
-        this.game.add.tween(this.subText).to( { y: '+30' }, 0, "Quart.easeOut", true);                
-        this.game.add.tween(this.nameText).to( { y: '+30' }, 0, "Quart.easeOut", true);    
-        this.game.add.tween(this.landingMessage).to( { y: '+30' }, 0, "Quart.easeOut", true);                
-
         this.infoShowing = false;
     }
         
@@ -119,7 +112,7 @@ class Planet extends GameObject{
     get services(){
         var services = [];
         for (let service of PLANET_SERVICES_REQUIREMENTS)
-            if(this[service.requirement]>=service.level)
+            if(this.stats[service.requirement]>=service.level)
                 services.push(service.service)
         return services;
     }
@@ -141,9 +134,11 @@ class Planet extends GameObject{
             this.showInfoIfNeeded();
             
             // Paralax
-            if(this.isPlanet && this.wrapper && this.game.camera){
-                this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
-                this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);
+            if(this.isPlanet){
+                if(this.game.camera.deltaX || this.game.camera.deltaY){
+                    this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
+                    this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);                    
+                }
             }
         }
     }

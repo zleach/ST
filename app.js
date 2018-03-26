@@ -5,9 +5,179 @@
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-/* Last merge : Mon Mar 19 05:00:49 PDT 2018  */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: lib/prando.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+"use strict";
+var Prando = /** @class */ (function () {
+    function Prando(seed) {
+        if (seed === void 0) { seed = undefined; }
+        if (typeof (seed) === "string") {
+            // String seed
+            this._seed = this.hashCode(seed);
+        }
+        else if (typeof (seed) === "number") {
+            // Numeric seed
+            this._seed = seed;
+        }
+        else {
+            // Pseudo-random seed
+            this._seed = Date.now() + Math.random();
+        }
+        this.reset();
+    }
+    // ================================================================================================================
+    // PUBLIC INTERFACE -----------------------------------------------------------------------------------------------
+    /**
+     * Generates a pseudo-random number between a lower (inclusive) and a higher (exclusive) bounds.
+     *
+     * @param min - The minimum number that can be randomly generated.
+     * @param pseudoMax - The maximum number that can be randomly generated (exclusive).
+     * @return The generated pseudo-random number.
+     */
+    Prando.prototype.next = function (min, pseudoMax) {
+        if (min === void 0) { min = 0; }
+        if (pseudoMax === void 0) { pseudoMax = 1; }
+        this.recalculate();
+        return this.map(this._value, Prando.MIN, Prando.MAX, min, pseudoMax);
+    };
+    /**
+     * Generates a pseudo-random integer number in a range (inclusive).
+     *
+     * @param min - The minimum number that can be randomly generated.
+     * @param max - The maximum number that can be randomly generated.
+     * @return The generated pseudo-random number.
+     */
+    Prando.prototype.nextInt = function (min, max) {
+        if (min === void 0) { min = 10; }
+        if (max === void 0) { max = 100; }
+        this.recalculate();
+        return Math.floor(this.map(this._value, Prando.MIN, Prando.MAX, min, max + 1));
+    };
+    /**
+     * Generates a pseudo-random string sequence of a particular length from a specific character range.
+     *
+     * Note: keep in mind that creating a random string sequence does not guarantee uniqueness; there is always a
+     * 1 in (char_length^string_length) chance of collision. For real unique string ids, always check for
+     * pre-existing ids, or employ a robust GUID/UUID generator.
+     *
+     * @param length - Length of the strting to be generated.
+     * @param chars - Characters that are used when creating the random string. Defaults to all alphanumeric chars (A-Z, a-z, 0-9).
+     * @return The generated string sequence.
+     */
+    Prando.prototype.nextString = function (length, chars) {
+        if (length === void 0) { length = 16; }
+        if (chars === void 0) { chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; }
+        var str = "";
+        while (str.length < length) {
+            str += this.nextChar(chars);
+        }
+        return str;
+    };
+    /**
+     * Generates a pseudo-random string of 1 character specific character range.
+     *
+     * @param chars - Characters that are used when creating the random string. Defaults to all alphanumeric chars (A-Z, a-z, 0-9).
+     * @return The generated character.
+     */
+    Prando.prototype.nextChar = function (chars) {
+        if (chars === void 0) { chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"; }
+        this.recalculate();
+        return chars.substr(this.nextInt(0, chars.length - 1), 1);
+    };
+    /**
+     * Picks a pseudo-random item from an array. The array is left unmodified.
+     *
+     * Note: keep in mind that while the returned item will be random enough, picking one item from the array at a time
+     * does not guarantee nor imply that a sequence of random non-repeating items will be picked. If you want to
+     * *pick items in a random order* from an array, instead of *pick one random item from an array*, it's best to
+     * apply a *shuffle* transformation to the array instead, then read it linearly.
+     *
+     * @param array - Array of any type containing one or more candidates for random picking.
+     * @return An item from the array.
+     */
+    Prando.prototype.nextArrayItem = function (array) {
+        this.recalculate();
+        return array[this.nextInt(0, array.length - 1)];
+    };
+    /**
+     * Generates a pseudo-random boolean.
+     *
+     * @return A value of true or false.
+     */
+    Prando.prototype.nextBoolean = function () {
+        this.recalculate();
+        return this._value > 0.5;
+    };
+    /**
+     * Skips ahead in the sequence of numbers that are being generated. This is equivalent to
+     * calling next() a specified number of times, but faster since it doesn't need to map the
+     * new random numbers to a range and return it.
+     *
+     * @param iterations - The number of items to skip ahead.
+     */
+    Prando.prototype.skip = function (iterations) {
+        if (iterations === void 0) { iterations = 1; }
+        while (iterations-- > 0) {
+            this.recalculate();
+        }
+    };
+    /**
+     * Reset the pseudo-random number sequence back to its starting seed. Further calls to next()
+     * will then produce the same sequence of numbers it had produced before. This is equivalent to
+     * creating a new Prando instance with the same seed as another Prando instance.
+     *
+     * Example:
+     * let rng = new Prando(12345678);
+     * console.log(rng.next()); // 0.6177754114889017
+     * console.log(rng.next()); // 0.5784605181725837
+     * rng.reset();
+     * console.log(rng.next()); // 0.6177754114889017 again
+     * console.log(rng.next()); // 0.5784605181725837 again
+     */
+    Prando.prototype.reset = function () {
+        this._value = this._seed;
+    };
+    // ================================================================================================================
+    // PRIVATE INTERFACE ----------------------------------------------------------------------------------------------
+    Prando.prototype.recalculate = function () {
+        // Xorshift*32
+        // Based on George Marsaglia's work: http://www.jstatsoft.org/v08/i14/paper
+        this._value ^= this._value << 13;
+        this._value ^= this._value >> 17;
+        this._value ^= this._value << 5;
+    };
+    Prando.prototype.map = function (val, minFrom, maxFrom, minTo, maxTo) {
+        return ((val - minFrom) / (maxFrom - minFrom)) * (maxTo - minTo) + minTo;
+    };
+    Prando.prototype.hashCode = function (str) {
+        var hash = 0;
+        if (str) {
+            var l = str.length;
+            for (var i = 0; i < l; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+        }
+        return hash;
+    };
+    Prando.MIN = -2147483648; // Int32 min
+    Prando.MAX = 2147483647; // Int32 max
+    return Prando;
+}());/* Last merge : Sun Mar 25 22:29:07 PDT 2018  */
 
 /* Merging order :
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: lib/markov.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 
 - app/game.js
 - app/__equipment.json
@@ -39,18 +209,181 @@
 - app/equipment/BasicFuelTank.js
 - app/equipment/RepairKit.js
 - app/equipment/FuelKit.js
+- app/equipment/FTLFuel.js
 - app/weapons/_weapon.js
 - app/ships/_ship.js
 - app/engines/_engine.js
 - app/engines/basicEngine.js
 - app/engines/smallEngine.js
 - app/engines/_thruster.js
-- app/gameObjects/pickup.js
+/*
+Markov.coffee - Markov chains in CoffeeScript.
+github.com/SyntaxColoring/Markov-Word-Generator
+
+Released under the MIT license.
+
+Copyright (c) 2013 Max Marrone
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+var Markov;
+
+Markov = (function() {
+  function Markov(sequences, n1, maxLength) {
+    this.sequences = sequences != null ? sequences : [];
+    this.n = n1 != null ? n1 : 2;
+    this.maxLength = maxLength != null ? maxLength : 20;
+  }
+
+  Markov.prototype.generate = function() {
+    var continuation, currentState, nextElement, result;
+    result = [];
+    currentState = (function(_this) {
+      return function() {
+        return result.slice(Math.max(0, result.length - _this.n), result.length);
+      };
+    })(this);
+    continuation = (function(_this) {
+      return function() {
+        return _this["continue"](currentState());
+      };
+    })(this);
+    while (result.length < this.maxLength && ((nextElement = continuation()) != null)) {
+      result.push(nextElement);
+    }
+    return result;
+  };
+
+  Markov.prototype.ngrams = function() {
+    var ngramsFromSequence;
+    ngramsFromSequence = function(sequence, n) {
+      var i, j, ref, results;
+      if (n < 1 || n > sequence.length) {
+        return [];
+      } else {
+        results = [];
+        for (i = j = 0, ref = sequence.length - n; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+          results.push(sequence.slice(i, i + n));
+        }
+        return results;
+      }
+    };
+    return this.sequences.reduce(((function(_this) {
+      return function(a, b) {
+        return a.concat(ngramsFromSequence(b, _this.n + 1));
+      };
+    })(this)), []);
+  };
+
+  Markov.prototype.tree = function(sequence) {
+    var element, j, k, len, len1, ngram, ngrams, node, normalize, reduce, root;
+    if (sequence == null) {
+      sequence = [];
+    }
+    ngrams = this.ngrams();
+    root = {
+      continuations: {},
+      count: ngrams.length,
+      frequency: 1.0
+    };
+    for (j = 0, len = ngrams.length; j < len; j++) {
+      ngram = ngrams[j];
+      node = root;
+      for (k = 0, len1 = ngram.length; k < len1; k++) {
+        element = ngram[k];
+        if (node.continuations[element] == null) {
+          node.continuations[element] = {
+            continuations: {},
+            count: 0
+          };
+        }
+        node = node.continuations[element];
+        node.count++;
+      }
+    }
+    normalize = function(node) {
+      var child, childName, ref, results;
+      ref = node.continuations;
+      results = [];
+      for (childName in ref) {
+        child = ref[childName];
+        child.frequency = child.count / node.count;
+        results.push(normalize(child));
+      }
+      return results;
+    };
+    normalize(root);
+    if (typeof sequence === "string") {
+      sequence = sequence.split("");
+    }
+    reduce = function(node, element) {
+      var ref;
+      if (node != null) {
+        return (ref = node.continuations[element]) != null ? ref : null;
+      } else {
+        return null;
+      }
+    };
+    return sequence.reduce(reduce, root);
+  };
+
+  Markov.prototype["continue"] = function(sequence) {
+    var continuationName, continuationNode, node, ref, sum, target;
+    node = this.tree(sequence);
+    if (node != null) {
+      target = this.rng.next();
+      sum = 0;
+      ref = node.continuations;
+      for (continuationName in ref) {
+        continuationNode = ref[continuationName];
+        sum += continuationNode.frequency;
+        if (sum >= target) {
+          return continuationName;
+        }
+      }
+    }
+    return null;
+  };
+
+  return Markov;
+
+})();
+
+if (typeof module !== "undefined" && module !== null) {
+  module.exports = Markov;
+} else {
+  this.Markov = Markov;
+}
+
+// ---
+// generated by coffee-script 1.9.2- app/gameObjects/pickup.js
 - app/gameObjects/flake.js
 - app/gameObjects/iceFlake.js
 - app/gameObjects/asteroid.js
 - app/gameObjects/asteroidField.js
 - app/gameObjects/nebula.js
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: lib/tombola.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 - app/gameObjects/iceteroid.js
 - app/items/flake.js
 - app/items/paladium.js
@@ -85,8 +418,504 @@
 */
 
 
+//-------------------------------------------------------------------------------------------
+//  TOMBOLA SETUP
+//-------------------------------------------------------------------------------------------
+
+function Tombola() {
+}
+var tombola = new Tombola();
+
+
+//-------------------------------------------------------------------------------------------
+//  RANGE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number between 'min' and 'max' //
+
+Tombola.prototype.range = function(min,max) {
+    return Math.round(min + (Math.random() * (max - min))); // int
+};
+
+// Returns a random float number between 'min' and 'max' //
+
+Tombola.prototype.rangeFloat = function(min,max) {
+    return min + (Math.random() * (max - min)); // float
+};
+
+// Returns an array populated with random whole numbers between 'min' and 'max' //
+
+Tombola.prototype.rangeArray = function(min,max,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.range(min,max));
+    }
+    return a; // int array
+};
+
+// Returns an array populated with random float numbers between 'min' and 'max' //
+
+Tombola.prototype.rangeFloatArray = function(min,max,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.range(min,max));
+    }
+    return a; // float array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  DICE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number from simulated dice rolls //
+
+Tombola.prototype.dice = function(die,sides) {
+    die = Math.round(die);
+    sides = Math.round(sides);
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (1 + Math.floor(Math.random() * sides));
+    }
+    return t; // int
+};
+
+// Returns an array populated with random whole numbers from simulated dice rolls //
+
+Tombola.prototype.diceArray = function(die,sides,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.dice(die,sides));
+    }
+    return a; // int array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  FUDGE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole positive or negative number from simulated fudge dice rolls //
+// 'strength' of 1 and 'die' of 3 gives a possible range of -3 to 3 //
+
+Tombola.prototype.fudge = function(die,strength) {
+    die = Math.round(die);
+    strength = Math.round(strength) || 1;
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (-strength + Math.floor(Math.random() * ((strength * 2) + 1)));
+    }
+    return t; // int
+};
+
+// Returns a random float positive or negative number from simulated fudge dice rolls //
+// 'strength' of 0.1 and 'die' of 3 gives a possible range of -0.3 to 0.3 //
+
+Tombola.prototype.fudgeFloat = function(die,strength) {
+    die = Math.round(die);
+    strength = strength || 1;
+    var t = 0;
+    for (var i=0; i<die; i++) {
+        t += (-strength + (Math.random() * (strength * 2)));
+    }
+    return t; // float
+};
+
+// Returns an array populated with random whole positive or negative numbers from simulated fudge dice rolls //
+
+Tombola.prototype.fudgeArray = function(die,strength,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.fudge(die,strength));
+    }
+    return a; // int array
+};
+
+// Returns an array populated with random float positive or negative numbers from simulated fudge dice rolls //
+
+Tombola.prototype.fudgeFloatArray = function(die,strength,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.fudgeFloat(die,strength));
+    }
+    return a; // float array
+};
+
+//-------------------------------------------------------------------------------------------
+//  CHANCE ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns true or false the results of a chance roll //
+// a 'chance' of 1 and 'possibility' of 5 means there's a 1 in 5 chance of returning true //
+
+Tombola.prototype.chance = function(chance,possibility) {
+    var n = Math.random() * possibility;
+    return (n < chance); // bool
+};
+
+// Returns an array populated with true or false results from chance rolls //
+
+Tombola.prototype.chanceArray = function(chance,possibility,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.chance(chance,possibility));
+    }
+    return a; // bool array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  PERCENT ROLL
+//-------------------------------------------------------------------------------------------
+
+// Returns true or false the results of a percent roll //
+// a 'percent' of 25 means there's a 25% chance of returning true //
+
+Tombola.prototype.percent = function(percent) {
+    var n = Math.random() * 100;
+    return (n < percent); // bool
+};
+
+// Returns an array populated with true or false results from percent rolls //
+
+Tombola.prototype.percentArray = function(percent,length) {
+    var a = [];
+    for (var i=0; i<length; i++) {
+        a.push(this.percent(percent));
+    }
+    return a; // bool array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  ITEM
+//-------------------------------------------------------------------------------------------
+
+// Returns a randomly selected item with equal probability //
+// 'items' is an array of items to be chosen from //
+
+Tombola.prototype.item = function(items) {
+    var l = items.length;
+    var n = Math.floor(Math.random() * l);
+    return items[n]; // item
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED NUMBER
+//-------------------------------------------------------------------------------------------
+
+// Returns a random whole number with a weighted probability //
+// 'weights' is an array of probability weights, four weights would mean a number between 1 - 4 is generated //
+// 'weights' of [20,10,10] will return a number between 1 and 3, with 1 being twice as likely an outcome as either 2 or 3 //
+
+Tombola.prototype.weightedNumber = function(weights) {
+    var l = weights.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i];
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i];
+        if (n <= w) {
+            return i+1; // int
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED ITEM
+//-------------------------------------------------------------------------------------------
+
+// Returns a randomly selected item with a weighted probability //
+// 'items' is an array of items to be chosen from //
+// 'weights' is an array of probability weights, setting the probability of each item being selected e.g [5,20,1,0.1] //
+
+Tombola.prototype.weightedItem = function(items,weights) {
+    var l = items.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i] || 0;
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i] || 0;
+        if (n <= w) {
+            return items[i]; // item
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED FUNCTION
+//-------------------------------------------------------------------------------------------
+
+// Calls a randomly selected function with a weighted probability //
+// 'functions' is an array of functions to be chosen from //
+// 'weights' is an array of probability weights, setting the probability of each function being selected e.g [5,20,1,0.1] //
+
+Tombola.prototype.weightedFunction = function(functions,weights) {
+    var l = functions.length;
+    var totalWeight = 0;
+    for (var i=0; i<l; i++) {
+        totalWeight += weights[i] || 0;
+    }
+    var n = Math.random() * totalWeight;
+    var w = 0;
+    for (i=0; i<l; i++) {
+        w += weights[i] || 0;
+        if (n <= w) {
+            functions[i](); // function call
+            break;
+        }
+    }
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  CLUSTER
+//-------------------------------------------------------------------------------------------
+
+// Returns an array of whole numbers which are randomly clustered within a min/max range //
+// an evenly distributed cluster width is set with 'spread' //
+
+Tombola.prototype.cluster = function(quantity,min,max,spread) {
+    var c = this.range(min,max);
+    var a = [];
+    for (var i=0; i<quantity; i++) {
+        a.push(c + this.range(-spread,spread));
+    }
+    return a; // int array
+};
+
+// Returns an array of whole numbers which are randomly clustered within a min/max range //
+// uneven cluster width is set with 'die' and 'strength' (die x strength = max possible width) //
+// the distribution is more weighted around the center using fudge rolls, more die = greater center weight //
+
+Tombola.prototype.clusterFudge = function(quantity,min,max,die,strength) {
+    strength = strength || 1;
+    var c = this.range(min,max);
+    var a = [];
+    for (var i=0; i<quantity; i++) {
+        a.push(c + this.fudge(die,strength));
+    }
+    return a; // int array
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  PERSISTENT DECK
+//-------------------------------------------------------------------------------------------
+
+// Creates a deck (hat/tombola) which can be drawn from, added to or shuffled //
+// 'contents' is an array of items to populate the deck with //
+
+
+Tombola.prototype.deck = function(contents) {
+    return new RandomDeck(contents);
+};
+
+
+function RandomDeck(contents) {
+    this.contents = contents || [];
+}
+
+// Returns an item from the deck, randomly or at a given index, and removes that item from the deck //
+RandomDeck.prototype.draw = function(index) {
+    if (this.contents.length>0) {
+        index = index || Math.floor(Math.random() * this.contents.length);
+        var item = this.contents[index];
+        this.contents.splice(index,1);
+        return item;
+    } else {
+        return null;
+    }
+};
+
+// Returns an item from the deck, randomly or at a given index, the item stays in the deck //
+RandomDeck.prototype.look = function(index) {
+    if (this.contents.length>0) {
+        index = index || Math.floor(Math.random() * this.contents.length);
+        return this.contents[index];
+    } else {
+        return null;
+    }
+};
+
+// Adds an item to the deck, randomly or at a given index //
+RandomDeck.prototype.insert = function(item, index) {
+    index = index || Math.round(Math.random() * this.contents.length);
+    this.contents.splice(index,0,item);
+};
+
+// Shuffles the deck order //
+RandomDeck.prototype.shuffle = function() {
+    var a = [];
+    var l = this.contents.length;
+    for (var i=0; i<l; i++) {
+        a.push(this.draw());
+    }
+    this.contents = a;
+};
+
+// Returns an array of all contents of the deck //
+RandomDeck.prototype.show = function() {
+    return this.contents;
+};
+
+
+//-------------------------------------------------------------------------------------------
+//  WEIGHTED DECK
+//-------------------------------------------------------------------------------------------
+
+// Creates a deck (hat/tombola) which can be drawn from, added to or shuffled //
+// 'contents' is an array of items to populate the deck with, 'weights' add weighting to
+// the chance, and 'instances' allows for multiple instances of each object. //
+
+
+Tombola.prototype.weightedDeck = function(contents, options) {
+    return new WeightedDeck(contents, options);
+};
+
+function WeightedDeck(contents, options) {
+    options = options || {};
+    this.contents = contents || [];
+    this.weights = options.weights || [];
+    this.instances = options.instances || [];
+
+    var i;
+    if (this.weights.length===0) {
+        for (i=0; i<contents.length; i++) {
+            this.weights.push(1);
+        }
+    }
+    if (this.instances.length===0) {
+        for (i=0; i<contents.length; i++) {
+            this.instances.push(1);
+        }
+    }
+}
+
+// Returns an item from the deck, randomly or at a given index, and removes that item from the deck //
+WeightedDeck.prototype.draw = function(index) {
+    if (this.contents.length>0) {
+
+        // no given index, do random weighting //
+        var l = this.contents.length;
+        if (!(index >=0 && index<l)) {
+            var totalWeight = 0;
+            for (var i=0; i<l; i++) {
+                totalWeight += this.weights[i] || 0;
+            }
+            var n = Math.random() * totalWeight;
+            var w = 0;
+            for (i=0; i<l; i++) {
+                w += this.weights[i] || 0;
+                if (n <= w) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        var item = this.contents[index];
+
+        // remove an instance //
+        this.instances[index] -= 1;
+        if (this.instances[index]<1) {
+            this.contents.splice(index,1);
+            this.weights.splice(index,1);
+            this.instances.splice(index,1);
+        }
+
+        return item;
+    } else {
+        return null;
+    }
+};
+
+// Returns an item from the deck, randomly or at a given index, the item stays in the deck //
+WeightedDeck.prototype.look = function(index) {
+    if (this.contents.length>0) {
+
+        // no given index, do random weighting //
+        var l = this.contents.length;
+        if (!(index >=0 && index<l)) {
+            var totalWeight = 0;
+            for (var i=0; i<l; i++) {
+                totalWeight += this.weights[i] || 0;
+            }
+            var n = Math.random() * totalWeight;
+            var w = 0;
+            for (i=0; i<l; i++) {
+                w += this.weights[i] || 0;
+                if (n <= w) {
+                    index = i;
+                    break;
+                }
+            }
+        }
+        return this.contents[index];
+    } else {
+        return null;
+    }
+};
+
+// Adds an item to the deck, randomly or at a given index //
+WeightedDeck.prototype.insert = function(item, options) {
+    options = options || {};
+    var index = options.index || Math.round(Math.random() * this.contents.length);
+    var weight = options.weight || 1;
+    var instances = options.instances || 1;
+    this.contents.splice(index,0,item);
+    this.weights.splice(index,0,weight);
+    this.instances.splice(index,0,instances);
+};
+
+// Shuffles the deck order //
+WeightedDeck.prototype.shuffle = function() {
+    var a = [];
+    var b = [];
+    var c = [];
+    var l = this.contents.length;
+    for (var i=0; i<l; i++) {
+        var index = Math.floor(Math.random() * this.contents.length);
+        a.push(this.contents[index]);
+        b.push(this.weights[index]);
+        c.push(this.instances[index]);
+        this.contents.splice(index,1);
+        this.weights.splice(index,1);
+        this.instances.splice(index,1);
+    }
+    this.contents = a;
+    this.weights = b;
+    this.instances = c;
+};
+
+// Returns an array of all contents of the deck //
+WeightedDeck.prototype.show = function() {
+    return this.contents;
+};
+
+
+// npm export //
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
+    module.exports = Tombola;
+}
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/game.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/_names.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -95,7 +924,7 @@ const screenHeight = 1000/2
 
 var ITEMS = [];
 
-var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
+var game = new Phaser.Game(screenWidth, screenHeight, Phaser.CANVAS, 'screen', {
     gameObjects : [],
     preload : function(){
         this.time.advancedTiming = true
@@ -112,10 +941,11 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.onLoadStart.add(this.loadStart, this);
         this.load.onFileComplete.add(this.fileComplete, this);
         this.load.onLoadComplete.add(this.loadComplete, this);
-
+                
         this.loadText = this.add.text(0, 0, 'Loading...', { font: `12px Fira Code`, fill: '#FFFFFF', boundsAlignH: "center", boundsAlignV: "middle"});
         this.loadText.setTextBounds(0, 0, screenWidth, screenHeight);
-        
+
+        this.initialized = false;
         this.init();
     },
     loadStart : function(){
@@ -285,6 +1115,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.audio('basic-engine', 'assets/audio/basic-engine.mp3');
         this.load.audio('title-notification', 'assets/audio/title-notification.mp3');
         this.load.audio('invalid', 'assets/audio/Error 5.m4a');
+        this.load.audio('low-fuel-warning', 'assets/audio/low-fuel-warning.mp3');
 
         this.load.audio('dock-connect', 'assets/audio/dock-connect.mp3');
         this.load.audio('dock-release', 'assets/audio/dock-release.mp3');
@@ -302,14 +1133,8 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.load.start();
     },
     setup : function(){
-        var seed = 2;
-        window.rng = new Prando(seed);
-        this.rng = window.rng;
-        this.names = new Names(this.rng);
-        this.galaxy = new Galaxy(this);
-        this.galaxy.build();
-        this.system = this.galaxy.starSystems[0];
-                
+        //this.sound.mute = true;
+        
         this.cache.getBitmapFont('pixelmix_8').font.lineHeight = 12;
         this.cache.getBitmapFont('pixelmix_8_leaded').font.lineHeight = 16;
 
@@ -321,9 +1146,17 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.ps = this.game.plugins.add(Phaser.ParticleStorm);
         this.game.physics.p2.setImpactEvents(true);
         
+        var tildeKey = game.input.keyboard.addKey(Phaser.Keyboard.TILDE);
+        tildeKey.onUp.add(this.debug, this);
+
+        var seed = 208;
+        window.rng = new Prando(seed);
+        this.rng = window.rng;
+        this.names = new Names(this.rng);
+
         // Sounds
         this.soundFX = {};
-        this.soundFX.click = game.add.audio('gui_click_soft');
+        this.soundFX.click = game.add.audio('gui_click_soft');                
 
         //  Tiled scrolling background
         this.bgGroup = this.game.add.group();
@@ -342,15 +1175,26 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.starsNear.fixedToCamera = true;
         this.stars.add(this.starsNear);
 
+
+        // Game World
+        // Camera
         this.planets = this.game.add.group();
         this.asteroids = this.game.add.group();
         this.ships = this.game.add.group();
 
+        this.player = new Player(this);
+
+        this.cameraFree = false;
+        this.setupCamera(silent = true);
+
         this.economy = new Economy(this);
-        
+
+        this.galaxy = new Galaxy(this);
+        this.galaxy.build();
+        this.system = this.galaxy.closestSystemToCenter;
+
         this.game.world.bringToTop(this.asteroids);
         this.game.world.bringToTop(this.ships);
-        this.player = new Player(this);
 
         // FullSCreen
         var fKey = game.input.keyboard.addKey(Phaser.Keyboard.F);
@@ -365,7 +1209,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.arrivalScreen = new ArrivalScreen(this,this.guiGroup);
         this.inventoryScreen = new InventoryScreen(this,this.guiGroup);
         this.mapScreen = new MapScreen(this,this.guiGroup);
-        
+                
         // Weapons
         var miningLaser = InventoryObject.make('mining_laser_1',this);
             miningLaser.equipTo(this.player.ship);
@@ -384,22 +1228,26 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.player.ship.recharge();        
 
         this.player.ship.addItemsToInventory(1, InventoryObject.make('light_repair_kit',this));
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('theta_crystal',this));
+        this.player.ship.addItemsToInventory(1, InventoryObject.make('theta_crystal',this));
 
         // Date
         this.starDate = moment("22841207", "YYYYMMDD");
         game.time.events.loop(Phaser.Timer.SECOND * 5, this.tickTime, this);
         this.updateTime();
 
-        // Camera
-        this.cameraFree = false;
-        this.setupCamera(silent = true);
-
         // Very top layer
         this.notificationGroup = this.game.add.group(); 
         this.notificationGroup.fixedToCamera = true;
         
         // Kick things off
-        this.galaxy.starSystems[0].arrive();
+        this.system.arrive();
+        
+        // Curtains
+        this.curtain = this.game.add.graphics();
+        this.curtain.beginFill(0x000000);
+        this.curtain.drawRect(0, 0, screenWidth, screenHeight);
+        this.curtain.fixedToCamera = true;
     },
     
     register : function(object){
@@ -418,10 +1266,11 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         // Date
     },
     updateTime : function(){
-        this.hud.stardateLabel.setText(moment(this.starDate).format('MMM Do'));        
+        this.hud.stardateLabel.setText(moment(this.starDate).format('MMM Do YY HH:mm'));        
     },
     skipTime : function(amount,unit){
-        this.starDate = moment(this.starDate).add(amount, unit);        
+        this.starDate = moment(this.starDate).add(amount, unit);     
+        this.updateTime();   
     },
     broadphaseCallback : function(body1, body2){
         if(body1.sprite.parentObject == this.player.ship || body2.sprite.parentObject == this.player.ship){
@@ -477,6 +1326,11 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         this.game.camera.follow(this.player.sprite);            
         this.game.camera.deadzone = null;
         this.game.camera.targetOffset.x = 50;
+
+        this.game.camera.cache = {
+            x : this.game.camera.x,
+            y : this.game.camera.y,            
+        }
     },
     
     freeCamera : function(){
@@ -491,34 +1345,50 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         );  
         this.game.camera.deadzone = this.freeDeadzone;
         this.game.camera.focusOnXY(this.player.ship.sprite.x + 50,this.player.ship.sprite.y);
-    },
-    
-    setupCamera : function(silent){
-        if(this.cameraFree){
-            this.freeCamera();
-            if(!silent) this.hud.message('Camera Mode: Free');
-        } else {
-            this.lockCamera();
-            if(!silent) this.hud.message('Camera Mode: Locked');            
-        }
 
-        // Initialize cache
         this.game.camera.cache = {
             x : this.game.camera.x,
             y : this.game.camera.y,            
         }
     },
     
+    setupCamera : function(silent){
+        if(this.cameraFree){
+            this.freeCamera();
+            if(!silent) this.hud.message('Camera Free');
+        } else {
+            this.lockCamera();
+            if(!silent) this.hud.message('Camera Locked');            
+        }
+
+        this.camera.x = this.game.world.centerX;
+        this.camera.y = this.game.world.centerY;
+
+        // Initialize cache
+        this.game.camera.cache = {
+            x : this.game.camera.x,
+            y : this.game.camera.y,            
+        }
+        
+        this.game.camera.deltaX = 0;
+        this.game.camera.deltay = 0;
+    },
+    
     update : function(){
-        if(this.loaded){
+        if(this.loaded){                
+            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
+            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
+
             // Update all registered objects
             this.gameObjects.forEach(function(gameObject) {
                 gameObject.update();
             });
-
-            this.game.camera.deltaX = this.game.camera.x - this.game.camera.cache.x;
-            this.game.camera.deltaY = this.game.camera.y - this.game.camera.cache.y;            
-            
+            if(!this.initialized) {
+                this.game.add.tween(this.curtain).to({
+                    alpha : 0,
+                }, 1000, "Quart.easeOut", true, 100);
+                this.initialized = true;
+            }
 
             // Move stars
             this.starsDistant.tilePosition.x = -this.game.camera.x*0.3;
@@ -549,7 +1419,7 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         if(this.logValue!=undefined){
             this.game.debug.text(this.logValue, 32, 32) 
         }
-        //this.game.debug.text(game.time.fps +' fps', 32, 32) 
+        //this.game.debug.text(game.time.fps +' fps', screenWidth-80, screenHeight-10) 
         //this.game.debug.body(this.player.sprite);
         //this.game.debug.bodyInfo(this.player.sprite,32,32);
 
@@ -572,16 +1442,76 @@ var game = new Phaser.Game(screenWidth, screenHeight, Phaser.WEBGL, 'screen', {
         }, this);
 */
     },
-});
+    debug : function(){
+        debugger;  
+    },
+});class Names {
+    constructor(rng) {
+        this.rng = rng;
+    }
+    
+    wordGenerator(){
 
-Number.prototype.between = function(a, b, inclusive) {
-  var min = Math.min.apply(Math, [a, b]),
-    max = Math.max.apply(Math, [a, b]);
-  return inclusive ? this >= min && this <= max : this > min && this < max;
-};
+    }
+    static parseName(rawName) {
+        return Names.capitalize(rawName.split(' ')[0].toLowerCase())
+    }
+    
+    static parseWords(rawInput) {
+        return rawInput.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s/g);
+    }
+
+    static capitalize(string){
+        return string[0].toUpperCase() + string.slice(1);
+    }
+    
+    static star(){
+        var name;
+
+        var markovChain = new Markov;
+        markovChain.n = rng.nextInt(5,5);
+        markovChain.sequences = Names.parseWords(NAMES_STAR.join('\n'));
+        markovChain.rng = rng;        
+        
+        if(rng.next()>.9){
+            markovChain.maxLength = rng.nextInt(3,6);
+            var word1 = Names.capitalize(markovChain.generate().join(""))
+            markovChain.maxLength = rng.nextInt(4,14);
+            var word2 = Names.capitalize(markovChain.generate().join(""))
+            name = `${word1} ${word2}`;            
+        } else {
+            markovChain.maxLength = rng.nextInt(3,14);
+            name = Names.capitalize(markovChain.generate().join(""));
+        }
+
+        if(rng.next()>.4){
+            var greekPrefix = GREEK_ALPHABET[rng.nextInt(0, GREEK_ALPHABET.length-1)]
+            name = `${greekPrefix} ${name}`;
+        }
+        
+        return name;
+    }
+
+    static outerRimStar(){
+        var designation = OUTER_RIM_DESIGNATIONS[rng.nextInt(0, OUTER_RIM_DESIGNATIONS.length-1)]
+        var number = rng.nextInt(100,999);
+        return `${designation}-${number}`
+    }
+
+    static proper(){
+        return Names.parseName(NAMES_PROPER[rng.nextInt(0, NAMES_PROPER.length-1)]);
+    }
+}
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/__equipment.json begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/_constants.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -653,7 +1583,7 @@ ITEMS.push(...[
         "_class" : "RepairKit",
 		"_slot": "equipment",
 		"key": "light_repair_kit",
-		"name": "Light Hull Repair Kit",
+		"name": "Light Hull Patch Kit",
         "description" : "A gently used kit containing hull tape, foil and sealant. The absolute minimum to get you home in a pinch. Or try to at least.",
 		"storageClass": "equipment",
 		"baseValue": 100,
@@ -661,20 +1591,441 @@ ITEMS.push(...[
         "repairAmount" : 30,
 	},
     {
+        "_class" : "RepairKit",
+		"_slot": "equipment",
+		"key": "med_repair_kit",
+		"name": "Repair Equipment",
+        "description" : "More than enough to fix any leak, ding or dent in your hull. Welding experience not required, but couldn't hurt.",
+		"storageClass": "equipment",
+		"baseValue": 300,
+		"mass": 25,
+        "repairAmount" : 100,
+	},
+
+    {
         "_class" : "FuelKit",
 		"_slot": "equipment",
 		"key": "small_fuel_drum",
 		"name": "Small Fuel Drum",
-        "description" : "A bucket of kerosene for use as reserve fuel. Also works well for lighting barbecue pits. Provides 500 units of liquid rocket fuel.",
+        "description" : "A cylinder of kerosene for use as reserve fuel. Also works well for lighting barbecue pits. Provides 500 units of rocket fuel.",
 		"storageClass": "equipment",
         "fuelAmount" : 500,
 		"baseValue": 200,
 		"mass": 10,
 	},
-]);
+	{
+        "_class" : "FTLFuel",
+		"_slot": "equipment",
+		"key": "theta_crystal",
+		"name": "Theta Crystals",
+		"type": "FTL Drive Fuel",
+        "description" : "A shaphire crystal synthesized from various volatile compounds. Used to power faster than light drives. The metalic storage cylinder reads DANGEROUS.",
+		"rarity": "uncommon",
+		"storageClass": "equipment",
+		"baseValue": 100,
+		"mass": 3
+	},
+]);//alert("5678".toHHMMSS());
+function TIME_FORMAT(time) {
+    var sec_num = parseInt(time, 10); // don't forget the second param
+    var hours   = Math.floor(sec_num / 3600);
+    var minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+    var seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+    if (hours   < 10) {hours   = "0"+hours;}
+    if (minutes < 10) {minutes = "0"+minutes;}
+    if (seconds < 10) {seconds = "0"+seconds;}
+    
+    if(time==Infinity || isNaN(time)){
+        return '--';
+    } else {
+        return minutes+':'+seconds;
+    }
+}
+
+FONT = 'Fira Code';
+
+DISTANCE_FACTOR_PLANETS = 1000;
+DISTANCE_FACTOR_SHIPS = .2;
+PIXEL_TO_LIGHTYEAR = .1;
+
+AMBIENT_VOLUME = .95;
+
+// Convert from degrees to radians.
+Math.radians = function(degrees) {
+	return degrees * Math.PI / 180;
+}
+
+// Convert from radians to degrees.
+Math.degrees = function(radians) {
+	return radians * 180 / Math.PI;
+}
+
+Array.prototype.lastItem = function() {
+    return this[this.length-1];
+};
+
+Array.prototype.firstItem = function() {
+    return this[0];
+};
+
+Array.prototype.clean = function(deleteValue) {
+  for (var i = 0; i < this.length; i++) {
+    if (this[i] == deleteValue) {         
+      this.splice(i, 1);
+      i--;
+    }
+  }
+  return this;
+};
+
+Number.prototype.between = function(a, b, inclusive) {
+  var min = Math.min.apply(Math, [a, b]),
+    max = Math.max.apply(Math, [a, b]);
+  return inclusive ? this >= min && this <= max : this > min && this < max;
+};
+
+Number.prototype.clamp = function(min, max) {
+  return Math.min(Math.max(this, min), max);
+};
+
+function isEven(n) {
+   return n % 2 == 0;
+}
+
+function isOdd(n) {
+   return Math.abs(n % 2) == 1;
+}
+
+function decimalToHexString(number) {
+    if (number < 0)
+    {
+        number = 0xFFFFFFFF + number + 1;
+    }
+
+    return number.toString(16).toUpperCase();
+}
+
+function extend(a, b){
+    for(var key in b)
+        if(b.hasOwnProperty(key))
+            a[key] = b[key];
+    return a;
+}
+
+
+const P2BODY_DEBUG = false;
+
+const DEG_IN_RAD_90 = 1.5708;
+
+const CONTROL_MODE = {
+    gui : 'gui',
+    play: 'play',
+    landed: 'landed',
+    exchange: 'exchange',
+}
+
+const SCREEN_TRANSITION_STYLE = {
+    none : 'none',
+    fromBottom : 'fromBottom',
+    fromRight : 'fromRight',
+}
+
+const CREDIT_PREFIX = {
+    short : '$',
+    long: 'Credits ',
+}
+
+const BUTTON_STYLE = {
+    simple : 'simple',
+    twoLine : 'twoLine',
+}
+
+const NAVIGATION_MODE = {
+    free : 'free',
+    target : 'target',
+    stationKeeping : 'stationKeeping',
+    followWaypoints : 'followWaypoints',
+}
+
+const CARGO_STORAGE_CLASS = {
+    bulk : 'bulk',
+    passengers : 'passengers',
+    gas : 'gas',
+    liquid : 'liquid',
+    equipment : 'equipment',
+}
+
+const CARGO_STORAGE_CLASS_NAMES = {
+    bulk : 'Bulk',
+    passengers : 'Passenger',
+    gas : 'Gas',
+    liquid : 'Liquid',
+    equipment : 'Equipment',
+}
+
+
+const ASTEROID_FIELD_SIZE = {
+    small : 1400,
+    medium : 1800,
+    large: 2200,
+    huge: 4000
+}
+
+const PLANET_SERVICES = {
+    refinery : 'refinery',
+    fuelDepot : 'fuelDepot',
+    shipyard : 'shipyard',
+    market : 'market',
+    tavern : 'tavern',
+    casino : 'casino',
+    passengerTerminal : 'passengerTerminal',
+}
+
+const PLANET_SERVICES_TITLE = {
+    refinery : 'Refinery',
+    fuelDepot : 'Fuel Depot',
+    shipyard : 'Shipyard',
+    market : 'Marketplace',
+    tavern : 'Tavern',
+    casino : 'Clubhouse',
+    passengerTerminal : 'Starport',
+}
+
+const PLANET_SERVICES_DESC = {
+    refinery : 'Process raw materials',
+    fuelDepot : 'Refuel and recharge',
+    shipyard : 'Trade and repair ships',
+    market : 'Buy, sell & trade goods',
+    tavern : 'Drink with the locals',
+    casino : 'Members only gambling',
+    passengerTerminal : 'Find transport jobs',
+}
+
+const PLANET_SERVICES_REQUIREMENTS = [
+    {
+        service : 'refinery',
+        requirement : 'industry',
+        level : 6,
+    },
+    {
+        service : 'fuelDepot',
+        requirement : 'industry',
+        level : 3,
+    },
+    {
+        service : 'shipyard',
+        requirement : 'science',
+        level : 7,
+    },
+    {
+        service : 'market',
+        requirement : 'trade',
+        level : 5,
+    },
+    {
+        service : 'tavern',
+        requirement : 'culture',
+        level : 5,
+    },
+    {
+        service : 'casino',
+        requirement : 'culture',
+        level : 8,
+    },
+    {
+        service : 'passengerTerminal',
+        requirement : 'trade',
+        level : 7,
+    }
+];
+
+PLANET_SPECIALIZATIONS = {
+    culture : ['peaceful','tourism','military'],
+    industry : ['manufacturing','agriculture'],
+    science : ['mining','technology'],
+    trade : ['luxury','government'],
+}
+
+const WEAPON_TYPES = {
+    miningLaser :    'miningLaser',
+    kinetic :  'kinetic',
+    blaster :  'blaster',
+    missleLauncher :  'missleLauncher',
+}
+
+const ENGINE_TYPES = {
+    rocket :    'rocket',
+    reactionControlThruster :  'reactionControlThruster',
+}
+
+const RARITY = {
+    common :    'common',
+    uncommon :  'uncommon',
+    rare :      'rare',
+    exquisite :      'exquisite',
+    exotic : 'exotic',
+}
+
+const RARITY_NAMES = {
+    common :    'Common',
+    uncommon :  'Uncommon',
+    rare :      'Rare',
+    exquisite : 'Exquisite',
+    exotic : 'Exotic',
+}
+
+const RARITY_COLOR = {
+    common :    0xFFFFFF,
+    uncommon :  0x3DD20B,
+    rare :      0x2F78FF,
+    exquisite : 0x9132C8,
+    exotic : 0xCF4747,
+}
+
+const RARITY_INDEX = {
+    common :    1,
+    uncommon :  2,
+    rare :      3,
+    exquisite : 4,
+    exotic : 5,
+}
+
+const RARITY_MINING_CHANCE = {
+    common :    1,
+    uncommon :  .1,
+    rare :      .01,
+    exquisite :      .001,
+    exotic : .0001,
+}
+
+const INVENTORY_LIST_CURSOR_STYLE = {
+    none : 'none',
+    left : 'left',
+    right : 'right',
+}
+
+const STELLAR_TYPES = [
+{
+    class : 'O5',
+    color : '#9db4ff',
+},
+{
+    class : 'B1',
+    color : '#a2b9ff',
+},
+{
+    class : 'B3',
+    color : '#a7bcff',
+},
+{
+    class : 'B5',
+    color : '#aabfff',
+},
+{
+    class : 'B8',
+    color : '#afc3ff',
+},
+{
+    class : 'A1',
+    color : '#baccff',
+},
+{
+    class : 'A3',
+    color : '#c0d1ff',
+},
+{
+    class : 'A5',
+    color : '#cad8ff',
+},
+{
+    class : 'F0',
+    color : '#e4e8ff',
+},
+{
+    class : 'F2',
+    color : '#edeeff',
+},
+{
+    class : 'F5',
+    color : '#fbf8ff',
+},
+{
+    class : 'F8',
+    color : '#fff9f9',
+},
+{
+    class : 'G2',
+    color : '#fff5ec',
+},
+{
+    class : 'G5',
+    color : '#fff4e8',
+},
+{
+    class : 'G8',
+    color : '#fff1df',
+},
+{
+    class : 'K0',
+    color : '#ffebd1',
+},
+{
+    class : 'K4',
+    color : '#ffd7ae',
+},
+{
+    class : 'K7',
+    color : '#ffc690',
+},
+{
+    class : 'M2',
+    color : '#ffbe7f',
+},
+{
+    class : 'M4',
+    color : '#ffbb7b',
+},
+{
+    class : 'M6',
+    color : '#ffbb7b',
+}    
+]
+
+const GREEK_ALPHABET = [
+    'Alpha',
+    'Beta',
+    'Gamma',
+    'Delta',
+    'Epsilon',
+    'Zeta',
+    'Eta',
+    'Theta',
+    'Omicron',
+    'Pi',
+    'Sigma',
+    'Tau',
+    'Upsilon',
+    'Omega',
+]
+
+const OUTER_RIM_DESIGNATIONS = [
+    'NCG',
+    'HD',
+    'NCC',
+    'GH',
+    'F',
+]
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /* Merging js: app/__items.json begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/* Merging js: app/_inventoryObject.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -692,7 +2043,7 @@ ITEMS.push(...[{
 		"key": "raw_paladium",
 		"name": "Raw Paladium",
 		"type": "Mineral",
-        "description" : "A bright coppery and very hard ore. The interconnects of most modern hyperdrive systems rely in this and other rare mineral based alloys.",
+        "description" : "A bright coppery and very hard ore. The interconnects and power relays of modern FTL systems rely on this, and other rare mineral based alloys.",
 		"rarity": "rare",
 		"storageClass": "bulk",
 		"baseValue": 65,
@@ -739,6 +2090,8 @@ ITEMS.push(...[{
 		"mass": 8
 	},
 	{
+        "_category" : "Commodity",
+        "_specialty" : "crops",
 		"key": "potatoes",
 		"name": "Potatoes",
         "description" : "The potato is a starchy, tuberous crop from the perennial nightshade Solanum tuberosum. Potato may be applied to both the plant and the edible tuber. Potatoes have become a staple food in many parts of the galaxy and an integral part of much of the galactic food supply. Best when cut into strips and deep-fried.",
@@ -749,6 +2102,8 @@ ITEMS.push(...[{
 		"mass": 100
 	},
 	{
+        "_category" : "Commodity",
+        "_specialty" : "crops",
 		"key": "coffee",
 		"name": "Coffee",
         "description" : "Coffee keeps the galaxy running. These beans are the seeds of berries from the Coffea plant. The plant was exported from Earth to planets around the galaxy. Coffee plants are now cultivated on over 70 off world settlements.",
@@ -758,7 +2113,74 @@ ITEMS.push(...[{
 		"baseValue": 1270,
 		"mass": 100
 	},
-]);
+]);// Things you can pickup and sell.
+class InventoryObject {
+    constructor(game,options) {
+        this.game = game;
+        
+        this.name = 'Unknown Object';
+        this.baseValue = 0;
+        this.type = 'Unknown'
+        this.mass = 0;
+        this.rarity = RARITY.common;
+
+        this.infoFields = ['baseValue','mass','rarity','storageClass'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','Container'];
+
+        if(options.data) this.initWithData(options.data);
+    }
+    
+    initWithData(data){
+        for(var prop in data) this[prop] = data[prop]
+    }
+
+    static make(key,game){
+        var data = ITEMS.filter(function(e) {
+            return e.key == key;
+        })[0];
+                
+        if(!data) return false; // No Key found
+        
+        if(data._class){
+            // Specific Subclass
+            return eval("new " + data._class + "(game,{data : data})");
+        } else {
+            // Generic
+            return new InventoryObject(game,{data:data});
+        }        
+    }
+
+    get buyValue(){
+        if(this.containedIn!=undefined){
+            return Math.round(this.baseValue * this.containedIn.itemMarkup);
+        } else {
+            return this.baseValue;
+        }
+    }
+
+    get readableType(){
+        if(this.rarity == RARITY.common){
+            return this.type;
+        } else {
+            return `${RARITY_NAMES[this.rarity]} ${this.type}`
+        }
+    }
+
+    get readableMass(){
+        return `${numeral(this.mass).format('0,0')} kg`
+    }
+    
+    remove(){
+        this.parentObject.removeItemFromInventory(this);
+    }    
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/_gameObject.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/__names_star.json begins */
@@ -1407,14 +2829,359 @@ var NAMES_STAR = [
     'Zubeneschamali',
     'Larawag',
     'Ginan',
-];
+];class GameObject {
+    constructor(game) {
+        this._name = 'Unknown Object';
+        this.description = '';
 
+        this.game = game;
+        this.game.register(this);
+    
+        this.showInfoDistance = 200;
+        this.canNavigateTo = false;
+        this.navigationIndex = this.game.gameObjects.length;
+        
+        // Basics
+        this.health = 0;
+        this.alive = true;
+        this.isInvinsible = false;
+        this._targeted = false;
+
+        // Damage Managment        
+        this.damageAccumulating = false;
+        this.damageAccumulationAmount = 0;        
+    
+        // Item Managment
+        this.itemMarkup = 1;
+        this.freeSpace = {};
+        this.inventory = [];
+        this.itemsAccumulating = false;
+        this.itemsAccumulator = [];     
+
+        this.dingSound = game.add.audio('pickup-common-1');
+
+        this.rng = this.game.rng;
+    }
+    
+    setupSprite(sprite){
+        this.maxHealth = this.health;
+    }
+    
+    // Targeting
+    set targeted(targeted){
+        this._targeted = targeted;
+        
+        if(targeted){
+            this.showReticle();
+        } else {
+            this.hideReticle();
+        }
+
+    }
+
+    get targeted(){
+        return this._targeted;
+    }
+
+    showReticle(){
+        
+    }
+    
+    hideReticle(){
+        
+    }
+
+    
+    // Damage
+    inflictDamage(amount){
+        if(!this.isInvinsible){            
+            if(!this.damageAccumulating){
+                this.damageAccumulating = true;
+                this.damageAccumulationAmount +=amount;
+                setTimeout(function(){
+                    this.damageAccumulating = false;
+                    this.showDamage(this.damageAccumulationAmount);
+                    this.damageAccumulationAmount = 0;
+                }.bind(this), 250)
+            } else {
+                this.damageAccumulationAmount +=amount;                
+            }
+            
+            if(this.health>0){
+                this.health -= amount;
+            } else if(this.health<=0 && this.alive){
+                this.kill();
+            }        
+        }
+    }
+    
+    get healthPercentage(){
+        return this.health/this.maxHealth;
+    }
+        
+    showDamage(amount){
+        var x = this.sprite.x + game.rnd.integerInRange(-this.sprite.width/5, this.sprite.width/5);
+
+        var damageText = this.game.add.text(
+            x,
+            this.sprite.y, 
+            Math.round(amount), 
+            { font: `18px ${FONT}`, fill: "#eeed00", align: 'center' }, 
+        );
+        damageText.anchor.x = 0.5;
+        damageText.alpha = 0;
+                
+        var fadeIn = this.game.add.tween(damageText).to( { alpha: 1 }, 200, "Quart.easeOut", false);
+    	var moveUp = this.game.add.tween(damageText).to( { y: '-30' }, 800, "Quart.easeOut", true);
+        var fadeOut = this.game.add.tween(damageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, 150);        
+    
+        fadeIn.chain(fadeOut);
+        fadeIn.start();
+
+        game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, damageText);
+    }
+    
+    hit(bullet){
+        // Usually specific per object.
+    }
+    
+    // Items
+    collectNumberOfItems(amount,item){
+        if(this.addItemsToInventory(amount,item)){
+            if(!this.itemsAccumulating){
+                this.itemsAccumulating = true;
+                this.itemsAccumulator[item.name] = { item: item, amount: amount };
+                
+                setTimeout(function(){
+                    this.itemsAccumulating = false;
+                    this.showItemsCollected(this.itemsAccumulator);
+                    this.itemsAccumulator = [];
+                }.bind(this), 500)
+            } else {
+                if(this.itemsAccumulator[item.name]==undefined){
+                    this.itemsAccumulator[item.name] = { item: item, amount: amount };
+                } else {
+                    this.itemsAccumulator[item.name]['amount'] +=amount;                
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+        
+    showItemsCollected(items){
+        var context = this;
+        Object.keys(items).forEach(function(key,index) {
+            var verticalSpacing = 18;
+            var itemGroup = items[key];
+            var itemMessage = `+${itemGroup.amount} ${itemGroup.item.name}`;
+
+            var itemText = this.game.add.text(
+                this.sprite.x,
+                this.sprite.y-(verticalSpacing*index), 
+                itemMessage, 
+                { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'center' }, 
+            );
+            itemText.stroke = '#000000';
+            itemText.strokeThickness = 3;
+            itemText.tint = RARITY_COLOR[itemGroup.item.rarity];
+        
+            var fadeIn = this.game.add.tween(itemText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+        	var moveUp = this.game.add.tween(itemText).to( { y: '-30' }, 300, "Quart.easeOut", true);
+            var fadeOut = this.game.add.tween(itemText).to( { alpha: 0 }, 300, "Quart.easeOut", false, 1000);        
+    
+            fadeIn.chain(fadeOut);
+            fadeIn.start();
+
+            game.time.events.add(Phaser.Timer.SECOND * 2, this.destroyObject, itemText);
+        }.bind(this));
+        
+        this.dingSound.play();
+    }
+
+    // Inventory
+    usedSpaceForStorageClass(storageClass){
+        return numeral(this.specs.storage[storageClass]-this.freeSpace[storageClass]).format('0a')
+    }
+
+    freeSpaceForStorageClass(storageClass){
+        return numeral(this.freeSpace[storageClass]).format('0a')
+    }
+
+    maxSpaceForStorageClass(storageClass){
+        return numeral(this.specs.storage[storageClass]).format('0a')        
+    }
+
+    calculateFreeSpaceForStorageClass(storageClass){
+        return this.freeSpace[storageClass];
+    }
+    
+    hasEnoughSpaceForItemOfStorageClassWithMass(storageClass,mass){
+        if(this.calculateFreeSpaceForStorageClass(storageClass) >= mass){
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    addItemsToInventory(amount,item){        
+        for (var i = 0; i < amount; i++) { 
+            if(this.hasEnoughSpaceForItemOfStorageClassWithMass(item.storageClass,item.mass)){
+                item.containedIn = this;
+                
+                this.inventory.push(item);
+                this.freeSpace[item.storageClass] -= item.mass;
+                return true;
+            } else {
+                this.game.hud.message('Not Enough Cargo Space');
+                return false;
+            }
+        }
+    }
+
+    removeItemsFromInventory(items){
+        var removedItems = [];
+        for (let item of items) {
+            removedItems.push(item);
+            this.removeItemFromInventory(item);
+        }
+        return removedItems;
+    }
+
+    removeItemFromInventory(item){
+        var index = this.inventory.indexOf(item);
+        if (index > -1) {
+            this.inventory.splice(index, 1);
+        }
+        return true;
+    }
+
+    // Cargo
+    emptyCargoHold(){
+        this.inventory = [];
+
+        this.freeSpace[CARGO_STORAGE_CLASS.bulk] = this.specs.storage.bulk;
+        this.freeSpace[CARGO_STORAGE_CLASS.passengers] = this.specs.storage.passengers;
+        this.freeSpace[CARGO_STORAGE_CLASS.gas] = this.specs.storage.gas;
+        this.freeSpace[CARGO_STORAGE_CLASS.liquid] = this.specs.storage.liquid;
+        this.freeSpace[CARGO_STORAGE_CLASS.equipment] = this.specs.storage.equipment;
+    }
+    
+    // Lifecycle
+    kill(){
+        this.alive = false;
+        this.game.unregister(this);        
+
+        if(this.sprite!=undefined){
+            //this.sprite.body.kill();
+            this.sprite.kill();
+        }
+    }
+
+    destroy(){
+        this.game.unregister(this);        
+        if(this.sprite!=undefined){
+            this.sprite.destroy();
+        }
+        delete this;
+    }
+
+    destroyEmitter(){
+        debugger;
+        this.destroy();        
+    } 
+
+    destroyObject(){
+        this.destroy();        
+    } 
+
+    // Misc
+    get name(){ return this._name; }
+    set name(name){
+        this._name = name;
+    }
+    
+    get speed(){
+        var body = this.sprite.body
+        var vx, vy;
+        
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        
+        return vx * vx + vy * vy;
+    }
+    
+    
+    // Hashing and whatnot
+    get hash(){
+        var fullHash = Math.abs(CryptoJS.MD5(this._seed + this.name).words[0]);
+        var hashString = fullHash.toString().slice(0,5);
+        return hashString;
+    }
+
+    determineItemFromArray(array){
+        return array[this.rng.nextInt(0, array.length-1)];
+    }
+
+    determineFloatBetween(min,max){
+        return this.rng.next(min, max);
+    }
+
+    determineIntegerBetween(min,max){
+        return this.rng.nextInt(min, max);
+    }
+
+    determinePercent(){
+        return this.rng.next();
+    }
+    
+    cleanup(){
+        
+    }
+
+    update(){
+        this.game.counter++;
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/__names_proper.json begins */
+/* Merging js: app/systems/_galaxy.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-var NAMES_PROPER = [
+
+
+class Galaxy extends GameObject{
+    constructor(game) {
+        super(game);
+
+        this.name = Names.star();
+
+        this.settings = {
+            starsAmount : 50,
+            mapWidth : 3000,
+            mapHeight : 3000,
+        }    
+    }
+    
+    build(){
+        this.starSystems = [];
+        for (var i = 0; i < this.settings.starsAmount; i++) { 
+            var system = new StarSystem(this.game);
+            this.starSystems.push(system);
+        }
+    }
+    
+    get closestSystemToCenter() {
+        return _.sortBy(this.starSystems,'distanceFromGalacticCenter').firstItem();
+    }
+}var NAMES_PROPER = [
 'SMITH          1.006  1.006      1',
 'JOHNSON        0.810  1.816      2',
 'WILLIAMS       0.699  2.515      3',
@@ -11115,7 +12882,8 @@ var NAMES_PROPER = [
 'GAUVIN         0.001 70.774   9698',
 'GARROW         0.001 70.775   9699',
 'FONTANEZ       0.001 70.776   9700',
-'FLORIO         0.001 70.777   9701',
+'FLORIO         0.0
+01 70.777   9701',
 'FLEISCHMAN     0.001 70.778   9702',
 'FINKE          0.001 70.780   9703',
 'FASANO         0.001 70.781   9704',
@@ -11223,7 +12991,8 @@ var NAMES_PROPER = [
 'MANDEVILLE     0.001 70.893   9806',
 'MAEDA          0.001 70.894   9807',
 'LUNDE          0.001 70.896   9808',
-'LUDLOW         0.001 70.897   9809',
+'LUDLOW    
+     0.001 70.897   9809',
 'LOEB           0.001 70.898   9810',
 'LINDO          0.001 70.899   9811',
 'LINDERMAN      0.001 70.900   9812',
@@ -11331,7 +13100,8 @@ var NAMES_PROPER = [
 'RICHERT        0.001 71.011   9914',
 'REHM           0.001 71.012   9915',
 'RANDEL         0.001 71.013   9916',
-'RAGIN          0.001 71.014   9917',
+'RA/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+GIN          0.001 71.014   9917',
 'QUESENBERRY    0.001 71.015   9918',
 'PUENTES        0.001 71.017   9919',
 'PLYLER         0.001 71.018   9920',
@@ -11438,7 +13208,8 @@ var NAMES_PROPER = [
 'STARCHER       0.001 71.127  10021',
 'SPOTTS         0.001 71.128  10022',
 'SLAUGH         0.001 71.129  10023',
-'SIMONSEN       0.001 71.130  10024',
+'SIMONSEN       0.001 71.130  100/* Merging js: app/systems/_system.js begins */
+24',
 'SHEFFER        0.001 71.131  10025',
 'SEQUEIRA       0.001 71.132  10026',
 'ROSATI         0.001 71.133  10027',
@@ -11546,7 +13317,8 @@ var NAMES_PROPER = [
 'ANDUJAR        0.001 71.242  10129',
 'ALKIRE         0.001 71.243  10130',
 'ALDER          0.001 71.244  10131',
-'AGAN           0.001 71.245  10132',
+'AGAN           0.001 71./*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+245  10132',
 'ZUKOWSKI       0.001 71.246  10133',
 'ZUCKERMAN      0.001 71.247  10134',
 'ZEHR           0.001 71.248  10135',
@@ -11654,7 +13426,9 @@ var NAMES_PROPER = [
 'EELLS          0.001 71.355  10237',
 'EBEL           0.001 71.356  10238',
 'DUNPHY         0.001 71.357  10239',
-'DONAHOE        0.001 71.358  10240',
+'DONAHOE        0
+
+.001 71.358  10240',
 'DIMAS          0.001 71.359  10241',
 'DILEO          0.001 71.360  10242',
 'DIBENEDETTO    0.001 71.361  10243',
@@ -25855,6 +27629,245 @@ var NAMES_PROPER = [
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+// Handles all planets, objects, etc.
+class StarSystem extends GameObject{
+    constructor(game) {
+        super(game);
+        this.stellarObjects = [];
+        this.neighbors = [];
+        this.planets = [];
+        
+        this.settings = {
+            minDistanceFromAnotherStar : 60,
+            nebulaChance : 1,
+            minRoids : 0,
+            maxRoids : 2,
+            minRoidOffset : {
+                x : -5000,
+                y : -5000,
+            },
+            maxRoidOffset : {
+                x : 5000,
+                y : 5000,
+            },
+
+            minPlanets : 0,
+            maxPlanets : 6,
+            minPlanetOffset : {
+                x : -2000,
+                y : -2000,
+            },
+            maxPlanetOffset : {
+                x : 2000,
+                y : 2000,
+            }
+        }
+        
+        // Details
+        this.generatePosition();
+        
+        this.name = Names.star();
+        if(this.isOuterRimSystem) this.name = Names.outerRimStar();
+
+        this.type = this.determineItemFromArray(STELLAR_TYPES);
+        this.size = rng.next(2,5);
+
+        // Planets
+        this.planetCount = this.game.rng.nextInt(this.settings.minPlanets, this.settings.maxPlanets);    
+        var x = this.game.world.centerX;
+        var y = this.game.world.centerX;
+        for (var i = 0; i < this.planetCount; i++) {             
+            this.planets.push(new BasicPlanet(this.game,{
+                x : x,
+                y : y,
+                index : i,
+                system : this,
+            }));
+            
+            x += this.game.rng.next(this.settings.minPlanetOffset.x, this.settings.maxPlanetOffset.x);
+            y += this.game.rng.next(this.settings.minPlanetOffset.y, this.settings.maxPlanetOffset.y);
+        }
+    }
+    
+    generatePosition(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var densityFactor = (this.game.galaxy.starSystems.length+1)/this.game.galaxy.settings.starsAmount;
+        var maximumDistance = ((size*densityFactor)*2)+200;
+
+        var x = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapWidth/2;
+        var y = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapHeight/2;
+
+        this.position = {
+            x : x.clamp(0,this.game.galaxy.settings.mapWidth),
+            y : y.clamp(0,this.game.galaxy.settings.mapHeight)
+        }        
+        
+        // Validate Postion
+        for(let system of this.game.galaxy.starSystems){
+            var distance = this.distanceToStarSystem(system);
+            
+            // Minium Distance (Prevent too close)
+            if(distance<this.settings.minDistanceFromAnotherStar) this.generatePosition();
+        };
+
+
+        
+    }
+    
+    arrive(){        
+        this.cleanup();
+        this.game.system = this;
+        this.game.time.events.add(1000, function(){
+            this.game.hud.showSystemInfo();
+        }, this)
+
+        // Asteroids
+        var x = 0;
+        var y = 0;
+        this.asteroidFieldCount = this.game.rng.nextInt(this.settings.minRoids, this.settings.maxRoids);
+        for (var i = 0; i < this.asteroidFieldCount; i++) {
+            x = this.game.rng.nextInt(this.settings.minRoidOffset.x, this.settings.maxRoidOffset.x) + x;
+            y = this.game.rng.nextInt(this.settings.minRoidOffset.y, this.settings.maxRoidOffset.y) + y;
+            this.stellarObjects.push(new AsteroidField(this.game,{
+                size : ASTEROID_FIELD_SIZE.large,
+                x : x + this.game.world.centerX,
+                y : y + this.game.world.centerY,
+                system : this,
+            }));            
+        }
+
+        // Nebula
+        var x = 0;
+        var y = 0;
+        if(this.game.rng.next()<this.settings.nebulaChance){
+            x = this.game.rng.nextInt(this.settings.minRoidOffset.x*2, this.settings.maxRoidOffset.x*2) + x;
+            y = this.game.rng.nextInt(this.settings.minRoidOffset.y*2, this.settings.maxRoidOffset.y*2) + y;
+            
+            this.stellarObjects.push(new Nebula(this.game,{
+                size : ASTEROID_FIELD_SIZE.large,
+                x : x + this.game.world.centerX,
+                y : y + this.game.world.centerY,
+                system : this,
+            }));
+        }
+        
+        // Activate Everything
+        for(let planet of this.planets){
+            planet.wrapper.children.forEach(function(element) {
+                element.exists = true;
+            }, this);
+        }
+        
+        for(let object of this.stellarObjects){
+            if(object.sprite!=undefined) object.sprite.exists = true;
+        }
+    }
+
+    cleanup(){
+        this.game.asteroids.removeAll(true);
+        for(let planet of this.game.planets.children){
+            planet.children.forEach(function(element) {
+                element.exists = false
+            }, this);
+        }
+
+        for(let object of this.stellarObjects) object.destroy();
+        this.stellarObjects.length = 0;
+    }
+    
+    get closestStarSystem(){
+    	var star, x1, x2, y1, y2;
+    	var smallest = 1000000;
+    	var closest = null; //use instead of 0 as we're looking for null or an object (not a number)
+    	x1 = this.position.x;
+    	y1 = this.position.y;
+    	for (var i=0; i<this.game.galaxy.starSystems.length; i++) {
+    		star = this.game.galaxy.starSystems[i];
+    		if (star === this) continue;
+    		x2 = star.position.x;
+    		y2 = star.position.y;
+    		var adjacent = Math.abs(x1-x2); //abs always returns positive number
+    		var opposite = Math.abs(y1-y2); 
+    		var hypotenuse = Math.sqrt((adjacent**2) + (opposite**2));
+    		if (hypotenuse < smallest) {
+    			closest = star;
+    			smallest = hypotenuse;
+    		}
+    	}
+
+    	return closest;
+    }
+
+    systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem){
+        var angleToDestination = this.angleToStarSystem(destinationSystem); 
+        
+        // look for systems in range, that are close to that angle.
+        var jumpCandidates = [];
+        
+        // Systems in range
+        for (let system of this.game.galaxy.starSystems){
+            if(this.distanceToStarSystem(system)<=maxJumpDistance && system!=this){
+                jumpCandidates.push(system);
+            }            
+        }
+        
+        var bestMatch = null;
+        // Of the in range candidates, return the one closest to the angle of the destination system.
+        if(jumpCandidates.length>0){
+                bestMatch = jumpCandidates.reduce(function(prev, curr) {
+                var prevAngle = this.candidate.angleToStarSystem(prev);
+                var currAngle = this.candidate.angleToStarSystem(curr);
+                var destAngle = this.destAngle;            
+                return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
+            }.bind({
+                destAngle : angleToDestination,
+                candidate : this,
+            }));
+        }
+
+        return bestMatch;
+    }
+    
+    distanceToStarSystem(system){
+        var a = this.position.x - system.position.x
+        var b = this.position.y - system.position.y
+        return Math.sqrt( a*a + b*b );
+    }
+
+    angleToStarSystem(system){
+        return Math.atan2(
+            this.position.y - system.position.y,
+            this.position.x - system.position.x
+        ) * 180 / Math.PI;
+    }
+
+    get distanceFromGalacticCenter(){
+        var a = this.position.x - this.game.galaxy.settings.mapWidth/2
+        var b = this.position.y - this.game.galaxy.settings.mapHeight/2
+        return Math.sqrt( a*a + b*b );
+    }
+
+    get isOuterRimSystem(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var rimPercent = 0.1;
+        
+        if(this.distanceFromGalacticCenter>size*Math.abs(rimPercent-1)){
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    get isCurrentSystem(){
+        return this==this.game.system;
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/_equipment.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 Number.prototype.toRoman= function () {
     var num = Math.floor(this), 
         val, s= '', i= 0, 
@@ -25894,6 +27907,75 @@ Number.prototype.toRoman= function () {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/lodash.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Equipment extends InventoryObject {
+    constructor(game,options) {
+        super(game,options);
+
+        this.parentObject = options.parentObject;
+
+        this.isEquippable = true;
+        this._equipped = false;
+        
+        this.energyConsumption = 0;
+        this.storageClass = CARGO_STORAGE_CLASS.equipment;
+
+        this.equipSound = game.add.audio('equip');
+        this.unequipSound = game.add.audio('unequip');
+    }
+    
+    set equipped(equipped){
+        this._equipped = equipped;                
+    }
+    
+    get equipped(){
+        return this._equipped;
+    }
+    
+    equipTo(parentObject){
+        if(parentObject){
+            this.equipSound.play();
+            this.parentObject = parentObject;
+            this.equipped = true;
+    
+            if(this.isWeapon) {
+                this.parentObject.equipWeaponInSlot(this,0);
+            } else if(this.isEngine) {
+                this.parentObject.equipEngineInSlot(this,0);
+            } else {
+                this.parentObject.equipEquipmentInSlot(this,0);
+            }
+
+        }
+
+        this.game.register(this);
+    }
+    
+    unequip(){        
+        if(this.parentObject){
+            this.unequipSound.play();
+
+            if(this.isWeapon) {
+                this.parentObject.unequipWeapon(this);
+            } else if(this.isEngine) {
+                this.parentObject.unequipEngine(this);
+            } else {
+                this.parentObject.unequipEquipment(this);
+            }
+        }
+        
+        this.game.unregister(this);
+    }
+    
+    update(){
+        
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/_consumable.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -43000,6 +45082,24 @@ Number.prototype.toRoman= function () {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Consumable extends InventoryObject {
+    constructor(game,options) {
+        super(game,options);
+
+        this.parentObject = this.game.player.ship;
+        this.isConsumable = true;
+    }
+
+    consume(){
+        this.parentObject.removeItemFromInventory(this);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/reactor.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 /*
  * Copyright 2016 Small Batch, Inc.
  *
@@ -43039,6 +45139,51 @@ g,0<d.length&&(d=Aa[d[0]])&&(a.c[e]=d))}a.c[e]||(d=Aa[e])&&(a.c[e]=d);for(d=0;d<
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Reactor extends Equipment {
+    constructor(game,options) {
+        super(game,options);
+        this.chargeRate = options.data.chargeRate;
+        this.capacity = options.data.capacity;
+
+        this.isReactor = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','capacity','readableChargeRate'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Reactor Type','Capacity','Recharge Rate'];
+
+        this.powerUpSound = game.add.audio('power-up')
+        this.powerDownSound = game.add.audio('power-down')
+    }
+
+    set equipped(equipped){
+        this._equipped = equipped;
+        
+        if(this.parentObject){
+             if(equipped) this.parentObject.maxEnergy += this.capacity;
+             if(!equipped) this.parentObject.maxEnergy -= this.capacity;
+        }
+        
+        if(equipped){
+            this.powerUpSound.play();
+        } else {
+            this.powerDownSound.play();            
+        }
+    }
+
+    get equipped(){
+        return this._equipped;
+    }
+
+    update(){
+        super.update();
+        if(this.parentObject) this.parentObject.charge(this.chargeRate);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/batteries.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 // TinyColor v1.4.1
 // https://github.com/bgrins/TinyColor
 // 2016-07-07, Brian Grinstead, MIT License
@@ -43046,6 +45191,26 @@ g,0<d.length&&(d=Aa[d[0]])&&(a.c[e]=d))}a.c[e]||(d=Aa[e])&&(a.c[e]=d);for(d=0;d<
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/numeral.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Batteries extends Equipment {
+    constructor(game,parentObject) {
+        super(game,parentObject);
+        
+        this.name = "Batteries"
+        this.status = "OK"
+        this.chargeRate = .03;
+    }
+
+    update(){
+        super.update();
+        this.parentObject.charge(this.chargeRate);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/BasicFuelTank.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -43063,10 +45228,89 @@ g,0<d.length&&(d=Aa[d[0]])&&(a.c[e]=d))}a.c[e]||(d=Aa[e])&&(a.c[e]=d);for(d=0;d<
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class BasicFuelTank extends Equipment {
+    constructor(game,options) {
+        super(game,options);
+        this.fuelCapacity = options.data.fuelCapacity;
+
+        this.isFuelTank = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','fuelCapacity'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Capacity'];
+    }
+
+    set equipped(equipped){
+        this._equipped = equipped;
+        
+        
+        if(this.parentObject){
+            console.log(this.parentObject.maxFuel);
+            
+            if(equipped) this.parentObject.maxFuel += this.fuelCapacity;
+            if(!equipped) this.parentObject.maxFuel -= this.fuelCapacity;
+                          
+            console.log(this.parentObject.maxFuel);
+        }
+        
+
+/*
+        TODO:
+        if(equipped){
+            this.powerUpSound.play();
+        } else {
+            this.powerDownSound.play();            
+        }
+*/
+    }
+
+    get equipped(){
+        return this._equipped;
+    }
+
+    update(){
+        super.update();
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/RepairKit.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):e.moment=t()}(this,function(){"use strict";function e(){return Qe.apply(null,arguments)}function t(e){return e instanceof Array||"[object Array]"===Object.prototype.toString.call(e)}function n(e){return null!=e&&"[object Object]"===Object.prototype.toString.call(e)}function s(e){return void 0===e}function i(e){return"number"==typeof e||"[object Number]"===Object.prototype.toString.call(e)}function r(e){return e instanceof Date||"[object Date]"===Object.prototype.toString.call(e)}function a(e,t){var n,s=[];for(n=0;n<e.length;++n)s.push(t(e[n],n));return s}function o(e,t){return Object.prototype.hasOwnProperty.call(e,t)}function u(e,t){for(var n in t)o(t,n)&&(e[n]=t[n]);return o(t,"toString")&&(e.toString=t.toString),o(t,"valueOf")&&(e.valueOf=t.valueOf),e}function l(e,t,n,s){return ge(e,t,n,s,!0).utc()}function d(e){return null==e._pf&&(e._pf={empty:!1,unusedTokens:[],unusedInput:[],overflow:-2,charsLeftOver:0,nullInput:!1,invalidMonth:null,invalidFormat:!1,userInvalidated:!1,iso:!1,parsedDateParts:[],meridiem:null,rfc2822:!1,weekdayMismatch:!1}),e._pf}function h(e){if(null==e._isValid){var t=d(e),n=Xe.call(t.parsedDateParts,function(e){return null!=e}),s=!isNaN(e._d.getTime())&&t.overflow<0&&!t.empty&&!t.invalidMonth&&!t.invalidWeekday&&!t.weekdayMismatch&&!t.nullInput&&!t.invalidFormat&&!t.userInvalidated&&(!t.meridiem||t.meridiem&&n);if(e._strict&&(s=s&&0===t.charsLeftOver&&0===t.unusedTokens.length&&void 0===t.bigHour),null!=Object.isFrozen&&Object.isFrozen(e))return s;e._isValid=s}return e._isValid}function c(e){var t=l(NaN);return null!=e?u(d(t),e):d(t).userInvalidated=!0,t}function f(e,t){var n,i,r;if(s(t._isAMomentObject)||(e._isAMomentObject=t._isAMomentObject),s(t._i)||(e._i=t._i),s(t._f)||(e._f=t._f),s(t._l)||(e._l=t._l),s(t._strict)||(e._strict=t._strict),s(t._tzm)||(e._tzm=t._tzm),s(t._isUTC)||(e._isUTC=t._isUTC),s(t._offset)||(e._offset=t._offset),s(t._pf)||(e._pf=d(t)),s(t._locale)||(e._locale=t._locale),Ke.length>0)for(n=0;n<Ke.length;n++)s(r=t[i=Ke[n]])||(e[i]=r);return e}function m(t){f(this,t),this._d=new Date(null!=t._d?t._d.getTime():NaN),this.isValid()||(this._d=new Date(NaN)),!1===et&&(et=!0,e.updateOffset(this),et=!1)}function _(e){return e instanceof m||null!=e&&null!=e._isAMomentObject}function y(e){return e<0?Math.ceil(e)||0:Math.floor(e)}function g(e){var t=+e,n=0;return 0!==t&&isFinite(t)&&(n=y(t)),n}function p(e,t,n){var s,i=Math.min(e.length,t.length),r=Math.abs(e.length-t.length),a=0;for(s=0;s<i;s++)(n&&e[s]!==t[s]||!n&&g(e[s])!==g(t[s]))&&a++;return a+r}function w(t){!1===e.suppressDeprecationWarnings&&"undefined"!=typeof console&&console.warn&&console.warn("Deprecation warning: "+t)}function v(t,n){var s=!0;return u(function(){if(null!=e.deprecationHandler&&e.deprecationHandler(null,t),s){for(var i,r=[],a=0;a<arguments.length;a++){if(i="","object"==typeof arguments[a]){i+="\n["+a+"] ";for(var o in arguments[0])i+=o+": "+arguments[0][o]+", ";i=i.slice(0,-2)}else i=arguments[a];r.push(i)}w(t+"\nArguments: "+Array.prototype.slice.call(r).join("")+"\n"+(new Error).stack),s=!1}return n.apply(this,arguments)},n)}function M(t,n){null!=e.deprecationHandler&&e.deprecationHandler(t,n),tt[t]||(w(n),tt[t]=!0)}function S(e){return e instanceof Function||"[object Function]"===Object.prototype.toString.call(e)}function D(e,t){var s,i=u({},e);for(s in t)o(t,s)&&(n(e[s])&&n(t[s])?(i[s]={},u(i[s],e[s]),u(i[s],t[s])):null!=t[s]?i[s]=t[s]:delete i[s]);for(s in e)o(e,s)&&!o(t,s)&&n(e[s])&&(i[s]=u({},i[s]));return i}function k(e){null!=e&&this.set(e)}function Y(e,t){var n=e.toLowerCase();st[n]=st[n+"s"]=st[t]=e}function O(e){return"string"==typeof e?st[e]||st[e.toLowerCase()]:void 0}function T(e){var t,n,s={};for(n in e)o(e,n)&&(t=O(n))&&(s[t]=e[n]);return s}function x(e,t){it[e]=t}function b(e,t,n){var s=""+Math.abs(e),i=t-s.length;return(e>=0?n?"+":"":"-")+Math.pow(10,Math.max(0,i)).toString().substr(1)+s}function P(e,t,n,s){var i=s;"string"==typeof s&&(i=function(){return this[s]()}),e&&(ut[e]=i),t&&(ut[t[0]]=function(){return b(i.apply(this,arguments),t[1],t[2])}),n&&(ut[n]=function(){return this.localeData().ordinal(i.apply(this,arguments),e)})}function W(e){return e.match(/\[[\s\S]/)?e.replace(/^\[|\]$/g,""):e.replace(/\\/g,"")}function H(e,t){return e.isValid()?(t=R(t,e.localeData()),ot[t]=ot[t]||function(e){var t,n,s=e.match(rt);for(t=0,n=s.length;t<n;t++)ut[s[t]]?s[t]=ut[s[t]]:s[t]=W(s[t]);return function(t){var i,r="";for(i=0;i<n;i++)r+=S(s[i])?s[i].call(t,e):s[i];return r}}(t),ot[t](e)):e.localeData().invalidDate()}function R(e,t){function n(e){return t.longDateFormat(e)||e}var s=5;for(at.lastIndex=0;s>=0&&at.test(e);)e=e.replace(at,n),at.lastIndex=0,s-=1;return e}function C(e,t,n){Yt[e]=S(t)?t:function(e,s){return e&&n?n:t}}function F(e,t){return o(Yt,e)?Yt[e](t._strict,t._locale):new RegExp(function(e){return U(e.replace("\\","").replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g,function(e,t,n,s,i){return t||n||s||i}))}(e))}function U(e){return e.replace(/[-\/\\^$*+?.()|[\]{}]/g,"\\$&")}function L(e,t){var n,s=t;for("string"==typeof e&&(e=[e]),i(t)&&(s=function(e,n){n[t]=g(e)}),n=0;n<e.length;n++)Ot[e[n]]=s}function N(e,t){L(e,function(e,n,s,i){s._w=s._w||{},t(e,s._w,s,i)})}function G(e,t,n){null!=t&&o(Ot,e)&&Ot[e](t,n._a,n,e)}function V(e){return E(e)?366:365}function E(e){return e%4==0&&e%100!=0||e%400==0}function I(t,n){return function(s){return null!=s?(j(this,t,s),e.updateOffset(this,n),this):A(this,t)}}function A(e,t){return e.isValid()?e._d["get"+(e._isUTC?"UTC":"")+t]():NaN}function j(e,t,n){e.isValid()&&!isNaN(n)&&("FullYear"===t&&E(e.year())&&1===e.month()&&29===e.date()?e._d["set"+(e._isUTC?"UTC":"")+t](n,e.month(),Z(n,e.month())):e._d["set"+(e._isUTC?"UTC":"")+t](n))}function Z(e,t){if(isNaN(e)||isNaN(t))return NaN;var n=function(e,t){return(e%t+t)%t}(t,12);return e+=(t-n)/12,1===n?E(e)?29:28:31-n%7%2}function z(e,t){var n;if(!e.isValid())return e;if("string"==typeof t)if(/^\d+$/.test(t))t=g(t);else if(t=e.localeData().monthsParse(t),!i(t))return e;return n=Math.min(e.date(),Z(e.year(),t)),e._d["set"+(e._isUTC?"UTC":"")+"Month"](t,n),e}function $(t){return null!=t?(z(this,t),e.updateOffset(this,!0),this):A(this,"Month")}function q(){function e(e,t){return t.length-e.length}var t,n,s=[],i=[],r=[];for(t=0;t<12;t++)n=l([2e3,t]),s.push(this.monthsShort(n,"")),i.push(this.months(n,"")),r.push(this.months(n,"")),r.push(this.monthsShort(n,""));for(s.sort(e),i.sort(e),r.sort(e),t=0;t<12;t++)s[t]=U(s[t]),i[t]=U(i[t]);for(t=0;t<24;t++)r[t]=U(r[t]);this._monthsRegex=new RegExp("^("+r.join("|")+")","i"),this._monthsShortRegex=this._monthsRegex,this._monthsStrictRegex=new RegExp("^("+i.join("|")+")","i"),this._monthsShortStrictRegex=new RegExp("^("+s.join("|")+")","i")}function J(e){var t=new Date(Date.UTC.apply(null,arguments));return e<100&&e>=0&&isFinite(t.getUTCFullYear())&&t.setUTCFullYear(e),t}function B(e,t,n){var s=7+t-n;return-((7+J(e,0,s).getUTCDay()-t)%7)+s-1}function Q(e,t,n,s,i){var r,a,o=1+7*(t-1)+(7+n-s)%7+B(e,s,i);return o<=0?a=V(r=e-1)+o:o>V(e)?(r=e+1,a=o-V(e)):(r=e,a=o),{year:r,dayOfYear:a}}function X(e,t,n){var s,i,r=B(e.year(),t,n),a=Math.floor((e.dayOfYear()-r-1)/7)+1;return a<1?s=a+K(i=e.year()-1,t,n):a>K(e.year(),t,n)?(s=a-K(e.year(),t,n),i=e.year()+1):(i=e.year(),s=a),{week:s,year:i}}function K(e,t,n){var s=B(e,t,n),i=B(e+1,t,n);return(V(e)-s+i)/7}function ee(){function e(e,t){return t.length-e.length}var t,n,s,i,r,a=[],o=[],u=[],d=[];for(t=0;t<7;t++)n=l([2e3,1]).day(t),s=this.weekdaysMin(n,""),i=this.weekdaysShort(n,""),r=this.weekdays(n,""),a.push(s),o.push(i),u.push(r),d.push(s),d.push(i),d.push(r);for(a.sort(e),o.sort(e),u.sort(e),d.sort(e),t=0;t<7;t++)o[t]=U(o[t]),u[t]=U(u[t]),d[t]=U(d[t]);this._weekdaysRegex=new RegExp("^("+d.join("|")+")","i"),this._weekdaysShortRegex=this._weekdaysRegex,this._weekdaysMinRegex=this._weekdaysRegex,this._weekdaysStrictRegex=new RegExp("^("+u.join("|")+")","i"),this._weekdaysShortStrictRegex=new RegExp("^("+o.join("|")+")","i"),this._weekdaysMinStrictRegex=new RegExp("^("+a.join("|")+")","i")}function te(){return this.hours()%12||12}function ne(e,t){P(e,0,0,function(){return this.localeData().meridiem(this.hours(),this.minutes(),t)})}function se(e,t){return t._meridiemParse}function ie(e){return e?e.toLowerCase().replace("_","-"):e}function re(e){var t=null;if(!Xt[e]&&"undefined"!=typeof module&&module&&module.exports)try{t=Jt._abbr;require("./locale/"+e),ae(t)}catch(e){}return Xt[e]}function ae(e,t){var n;return e&&(n=s(t)?ue(e):oe(e,t))&&(Jt=n),Jt._abbr}function oe(e,t){if(null!==t){var n=Qt;if(t.abbr=e,null!=Xt[e])M("defineLocaleOverride","use moment.updateLocale(localeName, config) to change an existing locale. moment.defineLocale(localeName, config) should only be used for creating a new locale See http://momentjs.com/guides/#/warnings/define-locale/ for more info."),n=Xt[e]._config;else if(null!=t.parentLocale){if(null==Xt[t.parentLocale])return Kt[t.parentLocale]||(Kt[t.parentLocale]=[]),Kt[t.parentLocale].push({name:e,config:t}),null;n=Xt[t.parentLocale]._config}return Xt[e]=new k(D(n,t)),Kt[e]&&Kt[e].forEach(function(e){oe(e.name,e.config)}),ae(e),Xt[e]}return delete Xt[e],null}function ue(e){var n;if(e&&e._locale&&e._locale._abbr&&(e=e._locale._abbr),!e)return Jt;if(!t(e)){if(n=re(e))return n;e=[e]}return function(e){for(var t,n,s,i,r=0;r<e.length;){for(t=(i=ie(e[r]).split("-")).length,n=(n=ie(e[r+1]))?n.split("-"):null;t>0;){if(s=re(i.slice(0,t).join("-")))return s;if(n&&n.length>=t&&p(i,n,!0)>=t-1)break;t--}r++}return null}(e)}function le(e){var t,n=e._a;return n&&-2===d(e).overflow&&(t=n[xt]<0||n[xt]>11?xt:n[bt]<1||n[bt]>Z(n[Tt],n[xt])?bt:n[Pt]<0||n[Pt]>24||24===n[Pt]&&(0!==n[Wt]||0!==n[Ht]||0!==n[Rt])?Pt:n[Wt]<0||n[Wt]>59?Wt:n[Ht]<0||n[Ht]>59?Ht:n[Rt]<0||n[Rt]>999?Rt:-1,d(e)._overflowDayOfYear&&(t<Tt||t>bt)&&(t=bt),d(e)._overflowWeeks&&-1===t&&(t=Ct),d(e)._overflowWeekday&&-1===t&&(t=Ft),d(e).overflow=t),e}function de(e,t,n){return null!=e?e:null!=t?t:n}function he(t){var n,s,i,r,a,o=[];if(!t._d){for(i=function(t){var n=new Date(e.now());return t._useUTC?[n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate()]:[n.getFullYear(),n.getMonth(),n.getDate()]}(t),t._w&&null==t._a[bt]&&null==t._a[xt]&&function(e){var t,n,s,i,r,a,o,u;if(null!=(t=e._w).GG||null!=t.W||null!=t.E)r=1,a=4,n=de(t.GG,e._a[Tt],X(pe(),1,4).year),s=de(t.W,1),((i=de(t.E,1))<1||i>7)&&(u=!0);else{r=e._locale._week.dow,a=e._locale._week.doy;var l=X(pe(),r,a);n=de(t.gg,e._a[Tt],l.year),s=de(t.w,l.week),null!=t.d?((i=t.d)<0||i>6)&&(u=!0):null!=t.e?(i=t.e+r,(t.e<0||t.e>6)&&(u=!0)):i=r}s<1||s>K(n,r,a)?d(e)._overflowWeeks=!0:null!=u?d(e)._overflowWeekday=!0:(o=Q(n,s,i,r,a),e._a[Tt]=o.year,e._dayOfYear=o.dayOfYear)}(t),null!=t._dayOfYear&&(a=de(t._a[Tt],i[Tt]),(t._dayOfYear>V(a)||0===t._dayOfYear)&&(d(t)._overflowDayOfYear=!0),s=J(a,0,t._dayOfYear),t._a[xt]=s.getUTCMonth(),t._a[bt]=s.getUTCDate()),n=0;n<3&&null==t._a[n];++n)t._a[n]=o[n]=i[n];for(;n<7;n++)t._a[n]=o[n]=null==t._a[n]?2===n?1:0:t._a[n];24===t._a[Pt]&&0===t._a[Wt]&&0===t._a[Ht]&&0===t._a[Rt]&&(t._nextDay=!0,t._a[Pt]=0),t._d=(t._useUTC?J:function(e,t,n,s,i,r,a){var o=new Date(e,t,n,s,i,r,a);return e<100&&e>=0&&isFinite(o.getFullYear())&&o.setFullYear(e),o}).apply(null,o),r=t._useUTC?t._d.getUTCDay():t._d.getDay(),null!=t._tzm&&t._d.setUTCMinutes(t._d.getUTCMinutes()-t._tzm),t._nextDay&&(t._a[Pt]=24),t._w&&void 0!==t._w.d&&t._w.d!==r&&(d(t).weekdayMismatch=!0)}}function ce(e){var t,n,s,i,r,a,o=e._i,u=en.exec(o)||tn.exec(o);if(u){for(d(e).iso=!0,t=0,n=sn.length;t<n;t++)if(sn[t][1].exec(u[1])){i=sn[t][0],s=!1!==sn[t][2];break}if(null==i)return void(e._isValid=!1);if(u[3]){for(t=0,n=rn.length;t<n;t++)if(rn[t][1].exec(u[3])){r=(u[2]||" ")+rn[t][0];break}if(null==r)return void(e._isValid=!1)}if(!s&&null!=r)return void(e._isValid=!1);if(u[4]){if(!nn.exec(u[4]))return void(e._isValid=!1);a="Z"}e._f=i+(r||"")+(a||""),_e(e)}else e._isValid=!1}function fe(e,t,n,s,i,r){var a=[function(e){var t=parseInt(e,10);{if(t<=49)return 2e3+t;if(t<=999)return 1900+t}return t}(e),Vt.indexOf(t),parseInt(n,10),parseInt(s,10),parseInt(i,10)];return r&&a.push(parseInt(r,10)),a}function me(e){var t=on.exec(function(e){return e.replace(/\([^)]*\)|[\n\t]/g," ").replace(/(\s\s+)/g," ").trim()}(e._i));if(t){var n=fe(t[4],t[3],t[2],t[5],t[6],t[7]);if(!function(e,t,n){if(e&&jt.indexOf(e)!==new Date(t[0],t[1],t[2]).getDay())return d(n).weekdayMismatch=!0,n._isValid=!1,!1;return!0}(t[1],n,e))return;e._a=n,e._tzm=function(e,t,n){if(e)return un[e];if(t)return 0;var s=parseInt(n,10),i=s%100;return(s-i)/100*60+i}(t[8],t[9],t[10]),e._d=J.apply(null,e._a),e._d.setUTCMinutes(e._d.getUTCMinutes()-e._tzm),d(e).rfc2822=!0}else e._isValid=!1}function _e(t){if(t._f!==e.ISO_8601)if(t._f!==e.RFC_2822){t._a=[],d(t).empty=!0;var n,s,i,r,a,o=""+t._i,u=o.length,l=0;for(i=R(t._f,t._locale).match(rt)||[],n=0;n<i.length;n++)r=i[n],(s=(o.match(F(r,t))||[])[0])&&((a=o.substr(0,o.indexOf(s))).length>0&&d(t).unusedInput.push(a),o=o.slice(o.indexOf(s)+s.length),l+=s.length),ut[r]?(s?d(t).empty=!1:d(t).unusedTokens.push(r),G(r,s,t)):t._strict&&!s&&d(t).unusedTokens.push(r);d(t).charsLeftOver=u-l,o.length>0&&d(t).unusedInput.push(o),t._a[Pt]<=12&&!0===d(t).bigHour&&t._a[Pt]>0&&(d(t).bigHour=void 0),d(t).parsedDateParts=t._a.slice(0),d(t).meridiem=t._meridiem,t._a[Pt]=function(e,t,n){var s;if(null==n)return t;return null!=e.meridiemHour?e.meridiemHour(t,n):null!=e.isPM?((s=e.isPM(n))&&t<12&&(t+=12),s||12!==t||(t=0),t):t}(t._locale,t._a[Pt],t._meridiem),he(t),le(t)}else me(t);else ce(t)}function ye(o){var l=o._i,y=o._f;return o._locale=o._locale||ue(o._l),null===l||void 0===y&&""===l?c({nullInput:!0}):("string"==typeof l&&(o._i=l=o._locale.preparse(l)),_(l)?new m(le(l)):(r(l)?o._d=l:t(y)?function(e){var t,n,s,i,r;if(0===e._f.length)return d(e).invalidFormat=!0,void(e._d=new Date(NaN));for(i=0;i<e._f.length;i++)r=0,t=f({},e),null!=e._useUTC&&(t._useUTC=e._useUTC),t._f=e._f[i],_e(t),h(t)&&(r+=d(t).charsLeftOver,r+=10*d(t).unusedTokens.length,d(t).score=r,(null==s||r<s)&&(s=r,n=t));u(e,n||t)}(o):y?_e(o):function(o){var u=o._i;s(u)?o._d=new Date(e.now()):r(u)?o._d=new Date(u.valueOf()):"string"==typeof u?function(t){var n=an.exec(t._i);null===n?(ce(t),!1===t._isValid&&(delete t._isValid,me(t),!1===t._isValid&&(delete t._isValid,e.createFromInputFallback(t)))):t._d=new Date(+n[1])}(o):t(u)?(o._a=a(u.slice(0),function(e){return parseInt(e,10)}),he(o)):n(u)?function(e){if(!e._d){var t=T(e._i);e._a=a([t.year,t.month,t.day||t.date,t.hour,t.minute,t.second,t.millisecond],function(e){return e&&parseInt(e,10)}),he(e)}}(o):i(u)?o._d=new Date(u):e.createFromInputFallback(o)}(o),h(o)||(o._d=null),o))}function ge(e,s,i,r,a){var o={};return!0!==i&&!1!==i||(r=i,i=void 0),(n(e)&&function(e){if(Object.getOwnPropertyNames)return 0===Object.getOwnPropertyNames(e).length;var t;for(t in e)if(e.hasOwnProperty(t))return!1;return!0}(e)||t(e)&&0===e.length)&&(e=void 0),o._isAMomentObject=!0,o._useUTC=o._isUTC=a,o._l=i,o._i=e,o._f=s,o._strict=r,function(e){var t=new m(le(ye(e)));return t._nextDay&&(t.add(1,"d"),t._nextDay=void 0),t}(o)}function pe(e,t,n,s){return ge(e,t,n,s,!1)}function we(e,n){var s,i;if(1===n.length&&t(n[0])&&(n=n[0]),!n.length)return pe();for(s=n[0],i=1;i<n.length;++i)n[i].isValid()&&!n[i][e](s)||(s=n[i]);return s}function ve(e){var t=T(e),n=t.year||0,s=t.quarter||0,i=t.month||0,r=t.week||0,a=t.day||0,o=t.hour||0,u=t.minute||0,l=t.second||0,d=t.millisecond||0;this._isValid=function(e){for(var t in e)if(-1===Ut.call(hn,t)||null!=e[t]&&isNaN(e[t]))return!1;for(var n=!1,s=0;s<hn.length;++s)if(e[hn[s]]){if(n)return!1;parseFloat(e[hn[s]])!==g(e[hn[s]])&&(n=!0)}return!0}(t),this._milliseconds=+d+1e3*l+6e4*u+1e3*o*60*60,this._days=+a+7*r,this._months=+i+3*s+12*n,this._data={},this._locale=ue(),this._bubble()}function Me(e){return e instanceof ve}function Se(e){return e<0?-1*Math.round(-1*e):Math.round(e)}function De(e,t){P(e,0,0,function(){var e=this.utcOffset(),n="+";return e<0&&(e=-e,n="-"),n+b(~~(e/60),2)+t+b(~~e%60,2)})}function ke(e,t){var n=(t||"").match(e);if(null===n)return null;var s=((n[n.length-1]||[])+"").match(cn)||["-",0,0],i=60*s[1]+g(s[2]);return 0===i?0:"+"===s[0]?i:-i}function Ye(t,n){var s,i;return n._isUTC?(s=n.clone(),i=(_(t)||r(t)?t.valueOf():pe(t).valueOf())-s.valueOf(),s._d.setTime(s._d.valueOf()+i),e.updateOffset(s,!1),s):pe(t).local()}function Oe(e){return 15*-Math.round(e._d.getTimezoneOffset()/15)}function Te(){return!!this.isValid()&&(this._isUTC&&0===this._offset)}function xe(e,t){var n,s,r,a=e,u=null;return Me(e)?a={ms:e._milliseconds,d:e._days,M:e._months}:i(e)?(a={},t?a[t]=e:a.milliseconds=e):(u=fn.exec(e))?(n="-"===u[1]?-1:1,a={y:0,d:g(u[bt])*n,h:g(u[Pt])*n,m:g(u[Wt])*n,s:g(u[Ht])*n,ms:g(Se(1e3*u[Rt]))*n}):(u=mn.exec(e))?(n="-"===u[1]?-1:(u[1],1),a={y:be(u[2],n),M:be(u[3],n),w:be(u[4],n),d:be(u[5],n),h:be(u[6],n),m:be(u[7],n),s:be(u[8],n)}):null==a?a={}:"object"==typeof a&&("from"in a||"to"in a)&&(r=function(e,t){var n;if(!e.isValid()||!t.isValid())return{milliseconds:0,months:0};t=Ye(t,e),e.isBefore(t)?n=Pe(e,t):((n=Pe(t,e)).milliseconds=-n.milliseconds,n.months=-n.months);return n}(pe(a.from),pe(a.to)),(a={}).ms=r.milliseconds,a.M=r.months),s=new ve(a),Me(e)&&o(e,"_locale")&&(s._locale=e._locale),s}function be(e,t){var n=e&&parseFloat(e.replace(",","."));return(isNaN(n)?0:n)*t}function Pe(e,t){var n={milliseconds:0,months:0};return n.months=t.month()-e.month()+12*(t.year()-e.year()),e.clone().add(n.months,"M").isAfter(t)&&--n.months,n.milliseconds=+t-+e.clone().add(n.months,"M"),n}function We(e,t){return function(n,s){var i,r;return null===s||isNaN(+s)||(M(t,"moment()."+t+"(period, number) is deprecated. Please use moment()."+t+"(number, period). See http://momentjs.com/guides/#/warnings/add-inverted-param/ for more info."),r=n,n=s,s=r),n="string"==typeof n?+n:n,i=xe(n,s),He(this,i,e),this}}function He(t,n,s,i){var r=n._milliseconds,a=Se(n._days),o=Se(n._months);t.isValid()&&(i=null==i||i,o&&z(t,A(t,"Month")+o*s),a&&j(t,"Date",A(t,"Date")+a*s),r&&t._d.setTime(t._d.valueOf()+r*s),i&&e.updateOffset(t,a||o))}function Re(e,t){var n,s=12*(t.year()-e.year())+(t.month()-e.month()),i=e.clone().add(s,"months");return n=t-i<0?(t-i)/(i-e.clone().add(s-1,"months")):(t-i)/(e.clone().add(s+1,"months")-i),-(s+n)||0}function Ce(e){var t;return void 0===e?this._locale._abbr:(null!=(t=ue(e))&&(this._locale=t),this)}function Fe(){return this._locale}function Ue(e,t){P(0,[e,e.length],0,t)}function Le(e,t,n,s,i){var r;return null==e?X(this,s,i).year:(r=K(e,s,i),t>r&&(t=r),function(e,t,n,s,i){var r=Q(e,t,n,s,i),a=J(r.year,0,r.dayOfYear);return this.year(a.getUTCFullYear()),this.month(a.getUTCMonth()),this.date(a.getUTCDate()),this}.call(this,e,t,n,s,i))}function Ne(e,t){t[Rt]=g(1e3*("0."+e))}function Ge(e){return e}function Ve(e,t,n,s){var i=ue(),r=l().set(s,t);return i[n](r,e)}function Ee(e,t,n){if(i(e)&&(t=e,e=void 0),e=e||"",null!=t)return Ve(e,t,n,"month");var s,r=[];for(s=0;s<12;s++)r[s]=Ve(e,s,n,"month");return r}function Ie(e,t,n,s){"boolean"==typeof e?(i(t)&&(n=t,t=void 0),t=t||""):(n=t=e,e=!1,i(t)&&(n=t,t=void 0),t=t||"");var r=ue(),a=e?r._week.dow:0;if(null!=n)return Ve(t,(n+a)%7,s,"day");var o,u=[];for(o=0;o<7;o++)u[o]=Ve(t,(o+a)%7,s,"day");return u}function Ae(e,t,n,s){var i=xe(t,n);return e._milliseconds+=s*i._milliseconds,e._days+=s*i._days,e._months+=s*i._months,e._bubble()}function je(e){return e<0?Math.floor(e):Math.ceil(e)}function Ze(e){return 4800*e/146097}function ze(e){return 146097*e/4800}function $e(e){return function(){return this.as(e)}}function qe(e){return function(){return this.isValid()?this._data[e]:NaN}}function Je(e){return(e>0)-(e<0)||+e}function Be(){if(!this.isValid())return this.localeData().invalidDate();var e,t,n=An(this._milliseconds)/1e3,s=An(this._days),i=An(this._months);t=y((e=y(n/60))/60),n%=60,e%=60;var r=y(i/12),a=i%=12,o=s,u=t,l=e,d=n?n.toFixed(3).replace(/\.?0+$/,""):"",h=this.asSeconds();if(!h)return"P0D";var c=h<0?"-":"",f=Je(this._months)!==Je(h)?"-":"",m=Je(this._days)!==Je(h)?"-":"",_=Je(this._milliseconds)!==Je(h)?"-":"";return c+"P"+(r?f+r+"Y":"")+(a?f+a+"M":"")+(o?m+o+"D":"")+(u||l||d?"T":"")+(u?_+u+"H":"")+(l?_+l+"M":"")+(d?_+d+"S":"")}var Qe,Xe;Xe=Array.prototype.some?Array.prototype.some:function(e){for(var t=Object(this),n=t.length>>>0,s=0;s<n;s++)if(s in t&&e.call(this,t[s],s,t))return!0;return!1};var Ke=e.momentProperties=[],et=!1,tt={};e.suppressDeprecationWarnings=!1,e.deprecationHandler=null;var nt;nt=Object.keys?Object.keys:function(e){var t,n=[];for(t in e)o(e,t)&&n.push(t);return n};var st={},it={},rt=/(\[[^\[]*\])|(\\)?([Hh]mm(ss)?|Mo|MM?M?M?|Do|DDDo|DD?D?D?|ddd?d?|do?|w[o|w]?|W[o|W]?|Qo?|YYYYYY|YYYYY|YYYY|YY|gg(ggg?)?|GG(GGG?)?|e|E|a|A|hh?|HH?|kk?|mm?|ss?|S{1,9}|x|X|zz?|ZZ?|.)/g,at=/(\[[^\[]*\])|(\\)?(LTS|LT|LL?L?L?|l{1,4})/g,ot={},ut={},lt=/\d/,dt=/\d\d/,ht=/\d{3}/,ct=/\d{4}/,ft=/[+-]?\d{6}/,mt=/\d\d?/,_t=/\d\d\d\d?/,yt=/\d\d\d\d\d\d?/,gt=/\d{1,3}/,pt=/\d{1,4}/,wt=/[+-]?\d{1,6}/,vt=/\d+/,Mt=/[+-]?\d+/,St=/Z|[+-]\d\d:?\d\d/gi,Dt=/Z|[+-]\d\d(?::?\d\d)?/gi,kt=/[0-9]{0,256}['a-z\u00A0-\u05FF\u0700-\uD7FF\uF900-\uFDCF\uFDF0-\uFF07\uFF10-\uFFEF]{1,256}|[\u0600-\u06FF\/]{1,256}(\s*?[\u0600-\u06FF]{1,256}){1,2}/i,Yt={},Ot={},Tt=0,xt=1,bt=2,Pt=3,Wt=4,Ht=5,Rt=6,Ct=7,Ft=8;P("Y",0,0,function(){var e=this.year();return e<=9999?""+e:"+"+e}),P(0,["YY",2],0,function(){return this.year()%100}),P(0,["YYYY",4],0,"year"),P(0,["YYYYY",5],0,"year"),P(0,["YYYYYY",6,!0],0,"year"),Y("year","y"),x("year",1),C("Y",Mt),C("YY",mt,dt),C("YYYY",pt,ct),C("YYYYY",wt,ft),C("YYYYYY",wt,ft),L(["YYYYY","YYYYYY"],Tt),L("YYYY",function(t,n){n[Tt]=2===t.length?e.parseTwoDigitYear(t):g(t)}),L("YY",function(t,n){n[Tt]=e.parseTwoDigitYear(t)}),L("Y",function(e,t){t[Tt]=parseInt(e,10)}),e.parseTwoDigitYear=function(e){return g(e)+(g(e)>68?1900:2e3)};var Ut,Lt=I("FullYear",!0);Ut=Array.prototype.indexOf?Array.prototype.indexOf:function(e){var t;for(t=0;t<this.length;++t)if(this[t]===e)return t;return-1},P("M",["MM",2],"Mo",function(){return this.month()+1}),P("MMM",0,0,function(e){return this.localeData().monthsShort(this,e)}),P("MMMM",0,0,function(e){return this.localeData().months(this,e)}),Y("month","M"),x("month",8),C("M",mt),C("MM",mt,dt),C("MMM",function(e,t){return t.monthsShortRegex(e)}),C("MMMM",function(e,t){return t.monthsRegex(e)}),L(["M","MM"],function(e,t){t[xt]=g(e)-1}),L(["MMM","MMMM"],function(e,t,n,s){var i=n._locale.monthsParse(e,s,n._strict);null!=i?t[xt]=i:d(n).invalidMonth=e});var Nt=/D[oD]?(\[[^\[\]]*\]|\s)+MMMM?/,Gt="January_February_March_April_May_June_July_August_September_October_November_December".split("_"),Vt="Jan_Feb_Mar_Apr_May_Jun_Jul_Aug_Sep_Oct_Nov_Dec".split("_"),Et=kt,It=kt;P("w",["ww",2],"wo","week"),P("W",["WW",2],"Wo","isoWeek"),Y("week","w"),Y("isoWeek","W"),x("week",5),x("isoWeek",5),C("w",mt),C("ww",mt,dt),C("W",mt),C("WW",mt,dt),N(["w","ww","W","WW"],function(e,t,n,s){t[s.substr(0,1)]=g(e)});P("d",0,"do","day"),P("dd",0,0,function(e){return this.localeData().weekdaysMin(this,e)}),P("ddd",0,0,function(e){return this.localeData().weekdaysShort(this,e)}),P("dddd",0,0,function(e){return this.localeData().weekdays(this,e)}),P("e",0,0,"weekday"),P("E",0,0,"isoWeekday"),Y("day","d"),Y("weekday","e"),Y("isoWeekday","E"),x("day",11),x("weekday",11),x("isoWeekday",11),C("d",mt),C("e",mt),C("E",mt),C("dd",function(e,t){return t.weekdaysMinRegex(e)}),C("ddd",function(e,t){return t.weekdaysShortRegex(e)}),C("dddd",function(e,t){return t.weekdaysRegex(e)}),N(["dd","ddd","dddd"],function(e,t,n,s){var i=n._locale.weekdaysParse(e,s,n._strict);null!=i?t.d=i:d(n).invalidWeekday=e}),N(["d","e","E"],function(e,t,n,s){t[s]=g(e)});var At="Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday".split("_"),jt="Sun_Mon_Tue_Wed_Thu_Fri_Sat".split("_"),Zt="Su_Mo_Tu_We_Th_Fr_Sa".split("_"),zt=kt,$t=kt,qt=kt;P("H",["HH",2],0,"hour"),P("h",["hh",2],0,te),P("k",["kk",2],0,function(){return this.hours()||24}),P("hmm",0,0,function(){return""+te.apply(this)+b(this.minutes(),2)}),P("hmmss",0,0,function(){return""+te.apply(this)+b(this.minutes(),2)+b(this.seconds(),2)}),P("Hmm",0,0,function(){return""+this.hours()+b(this.minutes(),2)}),P("Hmmss",0,0,function(){return""+this.hours()+b(this.minutes(),2)+b(this.seconds(),2)}),ne("a",!0),ne("A",!1),Y("hour","h"),x("hour",13),C("a",se),C("A",se),C("H",mt),C("h",mt),C("k",mt),C("HH",mt,dt),C("hh",mt,dt),C("kk",mt,dt),C("hmm",_t),C("hmmss",yt),C("Hmm",_t),C("Hmmss",yt),L(["H","HH"],Pt),L(["k","kk"],function(e,t,n){var s=g(e);t[Pt]=24===s?0:s}),L(["a","A"],function(e,t,n){n._isPm=n._locale.isPM(e),n._meridiem=e}),L(["h","hh"],function(e,t,n){t[Pt]=g(e),d(n).bigHour=!0}),L("hmm",function(e,t,n){var s=e.length-2;t[Pt]=g(e.substr(0,s)),t[Wt]=g(e.substr(s)),d(n).bigHour=!0}),L("hmmss",function(e,t,n){var s=e.length-4,i=e.length-2;t[Pt]=g(e.substr(0,s)),t[Wt]=g(e.substr(s,2)),t[Ht]=g(e.substr(i)),d(n).bigHour=!0}),L("Hmm",function(e,t,n){var s=e.length-2;t[Pt]=g(e.substr(0,s)),t[Wt]=g(e.substr(s))}),L("Hmmss",function(e,t,n){var s=e.length-4,i=e.length-2;t[Pt]=g(e.substr(0,s)),t[Wt]=g(e.substr(s,2)),t[Ht]=g(e.substr(i))});var Jt,Bt=I("Hours",!0),Qt={calendar:{sameDay:"[Today at] LT",nextDay:"[Tomorrow at] LT",nextWeek:"dddd [at] LT",lastDay:"[Yesterday at] LT",lastWeek:"[Last] dddd [at] LT",sameElse:"L"},longDateFormat:{LTS:"h:mm:ss A",LT:"h:mm A",L:"MM/DD/YYYY",LL:"MMMM D, YYYY",LLL:"MMMM D, YYYY h:mm A",LLLL:"dddd, MMMM D, YYYY h:mm A"},invalidDate:"Invalid date",ordinal:"%d",dayOfMonthOrdinalParse:/\d{1,2}/,relativeTime:{future:"in %s",past:"%s ago",s:"a few seconds",ss:"%d seconds",m:"a minute",mm:"%d minutes",h:"an hour",hh:"%d hours",d:"a day",dd:"%d days",M:"a month",MM:"%d months",y:"a year",yy:"%d years"},months:Gt,monthsShort:Vt,week:{dow:0,doy:6},weekdays:At,weekdaysMin:Zt,weekdaysShort:jt,meridiemParse:/[ap]\.?m?\.?/i},Xt={},Kt={},en=/^\s*((?:[+-]\d{6}|\d{4})-(?:\d\d-\d\d|W\d\d-\d|W\d\d|\d\d\d|\d\d))(?:(T| )(\d\d(?::\d\d(?::\d\d(?:[.,]\d+)?)?)?)([\+\-]\d\d(?::?\d\d)?|\s*Z)?)?$/,tn=/^\s*((?:[+-]\d{6}|\d{4})(?:\d\d\d\d|W\d\d\d|W\d\d|\d\d\d|\d\d))(?:(T| )(\d\d(?:\d\d(?:\d\d(?:[.,]\d+)?)?)?)([\+\-]\d\d(?::?\d\d)?|\s*Z)?)?$/,nn=/Z|[+-]\d\d(?::?\d\d)?/,sn=[["YYYYYY-MM-DD",/[+-]\d{6}-\d\d-\d\d/],["YYYY-MM-DD",/\d{4}-\d\d-\d\d/],["GGGG-[W]WW-E",/\d{4}-W\d\d-\d/],["GGGG-[W]WW",/\d{4}-W\d\d/,!1],["YYYY-DDD",/\d{4}-\d{3}/],["YYYY-MM",/\d{4}-\d\d/,!1],["YYYYYYMMDD",/[+-]\d{10}/],["YYYYMMDD",/\d{8}/],["GGGG[W]WWE",/\d{4}W\d{3}/],["GGGG[W]WW",/\d{4}W\d{2}/,!1],["YYYYDDD",/\d{7}/]],rn=[["HH:mm:ss.SSSS",/\d\d:\d\d:\d\d\.\d+/],["HH:mm:ss,SSSS",/\d\d:\d\d:\d\d,\d+/],["HH:mm:ss",/\d\d:\d\d:\d\d/],["HH:mm",/\d\d:\d\d/],["HHmmss.SSSS",/\d\d\d\d\d\d\.\d+/],["HHmmss,SSSS",/\d\d\d\d\d\d,\d+/],["HHmmss",/\d\d\d\d\d\d/],["HHmm",/\d\d\d\d/],["HH",/\d\d/]],an=/^\/?Date\((\-?\d+)/i,on=/^(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s)?(\d{1,2})\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{2,4})\s(\d\d):(\d\d)(?::(\d\d))?\s(?:(UT|GMT|[ECMP][SD]T)|([Zz])|([+-]\d{4}))$/,un={UT:0,GMT:0,EDT:-240,EST:-300,CDT:-300,CST:-360,MDT:-360,MST:-420,PDT:-420,PST:-480};e.createFromInputFallback=v("value provided is not in a recognized RFC2822 or ISO format. moment construction falls back to js Date(), which is not reliable across all browsers and versions. Non RFC2822/ISO date formats are discouraged and will be removed in an upcoming major release. Please refer to http://momentjs.com/guides/#/warnings/js-date/ for more info.",function(e){e._d=new Date(e._i+(e._useUTC?" UTC":""))}),e.ISO_8601=function(){},e.RFC_2822=function(){};var ln=v("moment().min is deprecated, use moment.max instead. http://momentjs.com/guides/#/warnings/min-max/",function(){var e=pe.apply(null,arguments);return this.isValid()&&e.isValid()?e<this?this:e:c()}),dn=v("moment().max is deprecated, use moment.min instead. http://momentjs.com/guides/#/warnings/min-max/",function(){var e=pe.apply(null,arguments);return this.isValid()&&e.isValid()?e>this?this:e:c()}),hn=["year","quarter","month","week","day","hour","minute","second","millisecond"];De("Z",":"),De("ZZ",""),C("Z",Dt),C("ZZ",Dt),L(["Z","ZZ"],function(e,t,n){n._useUTC=!0,n._tzm=ke(Dt,e)});var cn=/([\+\-]|\d\d)/gi;e.updateOffset=function(){};var fn=/^(\-|\+)?(?:(\d*)[. ])?(\d+)\:(\d+)(?:\:(\d+)(\.\d*)?)?$/,mn=/^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;xe.fn=ve.prototype,xe.invalid=function(){return xe(NaN)};var _n=We(1,"add"),yn=We(-1,"subtract");e.defaultFormat="YYYY-MM-DDTHH:mm:ssZ",e.defaultFormatUtc="YYYY-MM-DDTHH:mm:ss[Z]";var gn=v("moment().lang() is deprecated. Instead, use moment().localeData() to get the language configuration. Use moment().locale() to change languages.",function(e){return void 0===e?this.localeData():this.locale(e)});P(0,["gg",2],0,function(){return this.weekYear()%100}),P(0,["GG",2],0,function(){return this.isoWeekYear()%100}),Ue("gggg","weekYear"),Ue("ggggg","weekYear"),Ue("GGGG","isoWeekYear"),Ue("GGGGG","isoWeekYear"),Y("weekYear","gg"),Y("isoWeekYear","GG"),x("weekYear",1),x("isoWeekYear",1),C("G",Mt),C("g",Mt),C("GG",mt,dt),C("gg",mt,dt),C("GGGG",pt,ct),C("gggg",pt,ct),C("GGGGG",wt,ft),C("ggggg",wt,ft),N(["gggg","ggggg","GGGG","GGGGG"],function(e,t,n,s){t[s.substr(0,2)]=g(e)}),N(["gg","GG"],function(t,n,s,i){n[i]=e.parseTwoDigitYear(t)}),P("Q",0,"Qo","quarter"),Y("quarter","Q"),x("quarter",7),C("Q",lt),L("Q",function(e,t){t[xt]=3*(g(e)-1)}),P("D",["DD",2],"Do","date"),Y("date","D"),x("date",9),C("D",mt),C("DD",mt,dt),C("Do",function(e,t){return e?t._dayOfMonthOrdinalParse||t._ordinalParse:t._dayOfMonthOrdinalParseLenient}),L(["D","DD"],bt),L("Do",function(e,t){t[bt]=g(e.match(mt)[0])});var pn=I("Date",!0);P("DDD",["DDDD",3],"DDDo","dayOfYear"),Y("dayOfYear","DDD"),x("dayOfYear",4),C("DDD",gt),C("DDDD",ht),L(["DDD","DDDD"],function(e,t,n){n._dayOfYear=g(e)}),P("m",["mm",2],0,"minute"),Y("minute","m"),x("minute",14),C("m",mt),C("mm",mt,dt),L(["m","mm"],Wt);var wn=I("Minutes",!1);P("s",["ss",2],0,"second"),Y("second","s"),x("second",15),C("s",mt),C("ss",mt,dt),L(["s","ss"],Ht);var vn=I("Seconds",!1);P("S",0,0,function(){return~~(this.millisecond()/100)}),P(0,["SS",2],0,function(){return~~(this.millisecond()/10)}),P(0,["SSS",3],0,"millisecond"),P(0,["SSSS",4],0,function(){return 10*this.millisecond()}),P(0,["SSSSS",5],0,function(){return 100*this.millisecond()}),P(0,["SSSSSS",6],0,function(){return 1e3*this.millisecond()}),P(0,["SSSSSSS",7],0,function(){return 1e4*this.millisecond()}),P(0,["SSSSSSSS",8],0,function(){return 1e5*this.millisecond()}),P(0,["SSSSSSSSS",9],0,function(){return 1e6*this.millisecond()}),Y("millisecond","ms"),x("millisecond",16),C("S",gt,lt),C("SS",gt,dt),C("SSS",gt,ht);var Mn;for(Mn="SSSS";Mn.length<=9;Mn+="S")C(Mn,vt);for(Mn="S";Mn.length<=9;Mn+="S")L(Mn,Ne);var Sn=I("Milliseconds",!1);P("z",0,0,"zoneAbbr"),P("zz",0,0,"zoneName");var Dn=m.prototype;Dn.add=_n,Dn.calendar=function(t,n){var s=t||pe(),i=Ye(s,this).startOf("day"),r=e.calendarFormat(this,i)||"sameElse",a=n&&(S(n[r])?n[r].call(this,s):n[r]);return this.format(a||this.localeData().calendar(r,this,pe(s)))},Dn.clone=function(){return new m(this)},Dn.diff=function(e,t,n){var s,i,r;if(!this.isValid())return NaN;if(!(s=Ye(e,this)).isValid())return NaN;switch(i=6e4*(s.utcOffset()-this.utcOffset()),t=O(t)){case"year":r=Re(this,s)/12;break;case"month":r=Re(this,s);break;case"quarter":r=Re(this,s)/3;break;case"second":r=(this-s)/1e3;break;case"minute":r=(this-s)/6e4;break;case"hour":r=(this-s)/36e5;break;case"day":r=(this-s-i)/864e5;break;case"week":r=(this-s-i)/6048e5;break;default:r=this-s}return n?r:y(r)},Dn.endOf=function(e){return void 0===(e=O(e))||"millisecond"===e?this:("date"===e&&(e="day"),this.startOf(e).add(1,"isoWeek"===e?"week":e).subtract(1,"ms"))},Dn.format=function(t){t||(t=this.isUtc()?e.defaultFormatUtc:e.defaultFormat);var n=H(this,t);return this.localeData().postformat(n)},Dn.from=function(e,t){return this.isValid()&&(_(e)&&e.isValid()||pe(e).isValid())?xe({to:this,from:e}).locale(this.locale()).humanize(!t):this.localeData().invalidDate()},Dn.fromNow=function(e){return this.from(pe(),e)},Dn.to=function(e,t){return this.isValid()&&(_(e)&&e.isValid()||pe(e).isValid())?xe({from:this,to:e}).locale(this.locale()).humanize(!t):this.localeData().invalidDate()},Dn.toNow=function(e){return this.to(pe(),e)},Dn.get=function(e){return e=O(e),S(this[e])?this[e]():this},Dn.invalidAt=function(){return d(this).overflow},Dn.isAfter=function(e,t){var n=_(e)?e:pe(e);return!(!this.isValid()||!n.isValid())&&("millisecond"===(t=O(s(t)?"millisecond":t))?this.valueOf()>n.valueOf():n.valueOf()<this.clone().startOf(t).valueOf())},Dn.isBefore=function(e,t){var n=_(e)?e:pe(e);return!(!this.isValid()||!n.isValid())&&("millisecond"===(t=O(s(t)?"millisecond":t))?this.valueOf()<n.valueOf():this.clone().endOf(t).valueOf()<n.valueOf())},Dn.isBetween=function(e,t,n,s){return("("===(s=s||"()")[0]?this.isAfter(e,n):!this.isBefore(e,n))&&(")"===s[1]?this.isBefore(t,n):!this.isAfter(t,n))},Dn.isSame=function(e,t){var n,s=_(e)?e:pe(e);return!(!this.isValid()||!s.isValid())&&("millisecond"===(t=O(t||"millisecond"))?this.valueOf()===s.valueOf():(n=s.valueOf(),this.clone().startOf(t).valueOf()<=n&&n<=this.clone().endOf(t).valueOf()))},Dn.isSameOrAfter=function(e,t){return this.isSame(e,t)||this.isAfter(e,t)},Dn.isSameOrBefore=function(e,t){return this.isSame(e,t)||this.isBefore(e,t)},Dn.isValid=function(){return h(this)},Dn.lang=gn,Dn.locale=Ce,Dn.localeData=Fe,Dn.max=dn,Dn.min=ln,Dn.parsingFlags=function(){return u({},d(this))},Dn.set=function(e,t){if("object"==typeof e)for(var n=function(e){var t=[];for(var n in e)t.push({unit:n,priority:it[n]});return t.sort(function(e,t){return e.priority-t.priority}),t}(e=T(e)),s=0;s<n.length;s++)this[n[s].unit](e[n[s].unit]);else if(e=O(e),S(this[e]))return this[e](t);return this},Dn.startOf=function(e){switch(e=O(e)){case"year":this.month(0);case"quarter":case"month":this.date(1);case"week":case"isoWeek":case"day":case"date":this.hours(0);case"hour":this.minutes(0);case"minute":this.seconds(0);case"second":this.milliseconds(0)}return"week"===e&&this.weekday(0),"isoWeek"===e&&this.isoWeekday(1),"quarter"===e&&this.month(3*Math.floor(this.month()/3)),this},Dn.subtract=yn,Dn.toArray=function(){return[this.year(),this.month(),this.date(),this.hour(),this.minute(),this.second(),this.millisecond()]},Dn.toObject=function(){return{years:this.year(),months:this.month(),date:this.date(),hours:this.hours(),minutes:this.minutes(),seconds:this.seconds(),milliseconds:this.milliseconds()}},Dn.toDate=function(){return new Date(this.valueOf())},Dn.toISOString=function(e){if(!this.isValid())return null;var t=!0!==e,n=t?this.clone().utc():this;return n.year()<0||n.year()>9999?H(n,t?"YYYYYY-MM-DD[T]HH:mm:ss.SSS[Z]":"YYYYYY-MM-DD[T]HH:mm:ss.SSSZ"):S(Date.prototype.toISOString)?t?this.toDate().toISOString():new Date(this._d.valueOf()).toISOString().replace("Z",H(n,"Z")):H(n,t?"YYYY-MM-DD[T]HH:mm:ss.SSS[Z]":"YYYY-MM-DD[T]HH:mm:ss.SSSZ")},Dn.inspect=function(){if(!this.isValid())return"moment.invalid(/* "+this._i+" */)";var e="moment",t="";this.isLocal()||(e=0===this.utcOffset()?"moment.utc":"moment.parseZone",t="Z");var n="["+e+'("]',s=0<=this.year()&&this.year()<=9999?"YYYY":"YYYYYY",i=t+'[")]';return this.format(n+s+"-MM-DD[T]HH:mm:ss.SSS"+i)},Dn.toJSON=function(){return this.isValid()?this.toISOString():null},Dn.toString=function(){return this.clone().locale("en").format("ddd MMM DD YYYY HH:mm:ss [GMT]ZZ")},Dn.unix=function(){return Math.floor(this.valueOf()/1e3)},Dn.valueOf=function(){return this._d.valueOf()-6e4*(this._offset||0)},Dn.creationData=function(){return{input:this._i,format:this._f,locale:this._locale,isUTC:this._isUTC,strict:this._strict}},Dn.year=Lt,Dn.isLeapYear=function(){return E(this.year())},Dn.weekYear=function(e){return Le.call(this,e,this.week(),this.weekday(),this.localeData()._week.dow,this.localeData()._week.doy)},Dn.isoWeekYear=function(e){return Le.call(this,e,this.isoWeek(),this.isoWeekday(),1,4)},Dn.quarter=Dn.quarters=function(e){return null==e?Math.ceil((this.month()+1)/3):this.month(3*(e-1)+this.month()%3)},Dn.month=$,Dn.daysInMonth=function(){return Z(this.year(),this.month())},Dn.week=Dn.weeks=function(e){var t=this.localeData().week(this);return null==e?t:this.add(7*(e-t),"d")},Dn.isoWeek=Dn.isoWeeks=function(e){var t=X(this,1,4).week;return null==e?t:this.add(7*(e-t),"d")},Dn.weeksInYear=function(){var e=this.localeData()._week;return K(this.year(),e.dow,e.doy)},Dn.isoWeeksInYear=function(){return K(this.year(),1,4)},Dn.date=pn,Dn.day=Dn.days=function(e){if(!this.isValid())return null!=e?this:NaN;var t=this._isUTC?this._d.getUTCDay():this._d.getDay();return null!=e?(e=function(e,t){return"string"!=typeof e?e:isNaN(e)?"number"==typeof(e=t.weekdaysParse(e))?e:null:parseInt(e,10)}(e,this.localeData()),this.add(e-t,"d")):t},Dn.weekday=function(e){if(!this.isValid())return null!=e?this:NaN;var t=(this.day()+7-this.localeData()._week.dow)%7;return null==e?t:this.add(e-t,"d")},Dn.isoWeekday=function(e){if(!this.isValid())return null!=e?this:NaN;if(null!=e){var t=function(e,t){return"string"==typeof e?t.weekdaysParse(e)%7||7:isNaN(e)?null:e}(e,this.localeData());return this.day(this.day()%7?t:t-7)}return this.day()||7},Dn.dayOfYear=function(e){var t=Math.round((this.clone().startOf("day")-this.clone().startOf("year"))/864e5)+1;return null==e?t:this.add(e-t,"d")},Dn.hour=Dn.hours=Bt,Dn.minute=Dn.minutes=wn,Dn.second=Dn.seconds=vn,Dn.millisecond=Dn.milliseconds=Sn,Dn.utcOffset=function(t,n,s){var i,r=this._offset||0;if(!this.isValid())return null!=t?this:NaN;if(null!=t){if("string"==typeof t){if(null===(t=ke(Dt,t)))return this}else Math.abs(t)<16&&!s&&(t*=60);return!this._isUTC&&n&&(i=Oe(this)),this._offset=t,this._isUTC=!0,null!=i&&this.add(i,"m"),r!==t&&(!n||this._changeInProgress?He(this,xe(t-r,"m"),1,!1):this._changeInProgress||(this._changeInProgress=!0,e.updateOffset(this,!0),this._changeInProgress=null)),this}return this._isUTC?r:Oe(this)},Dn.utc=function(e){return this.utcOffset(0,e)},Dn.local=function(e){return this._isUTC&&(this.utcOffset(0,e),this._isUTC=!1,e&&this.subtract(Oe(this),"m")),this},Dn.parseZone=function(){if(null!=this._tzm)this.utcOffset(this._tzm,!1,!0);else if("string"==typeof this._i){var e=ke(St,this._i);null!=e?this.utcOffset(e):this.utcOffset(0,!0)}return this},Dn.hasAlignedHourOffset=function(e){return!!this.isValid()&&(e=e?pe(e).utcOffset():0,(this.utcOffset()-e)%60==0)},Dn.isDST=function(){return this.utcOffset()>this.clone().month(0).utcOffset()||this.utcOffset()>this.clone().month(5).utcOffset()},Dn.isLocal=function(){return!!this.isValid()&&!this._isUTC},Dn.isUtcOffset=function(){return!!this.isValid()&&this._isUTC},Dn.isUtc=Te,Dn.isUTC=Te,Dn.zoneAbbr=function(){return this._isUTC?"UTC":""},Dn.zoneName=function(){return this._isUTC?"Coordinated Universal Time":""},Dn.dates=v("dates accessor is deprecated. Use date instead.",pn),Dn.months=v("months accessor is deprecated. Use month instead",$),Dn.years=v("years accessor is deprecated. Use year instead",Lt),Dn.zone=v("moment().zone is deprecated, use moment().utcOffset instead. http://momentjs.com/guides/#/warnings/zone/",function(e,t){return null!=e?("string"!=typeof e&&(e=-e),this.utcOffset(e,t),this):-this.utcOffset()}),Dn.isDSTShifted=v("isDSTShifted is deprecated. See http://momentjs.com/guides/#/warnings/dst-shifted/ for more information",function(){if(!s(this._isDSTShifted))return this._isDSTShifted;var e={};if(f(e,this),(e=ye(e))._a){var t=e._isUTC?l(e._a):pe(e._a);this._isDSTShifted=this.isValid()&&p(e._a,t.toArray())>0}else this._isDSTShifted=!1;return this._isDSTShifted});var kn=k.prototype;kn.calendar=function(e,t,n){var s=this._calendar[e]||this._calendar.sameElse;return S(s)?s.call(t,n):s},kn.longDateFormat=function(e){var t=this._longDateFormat[e],n=this._longDateFormat[e.toUpperCase()];return t||!n?t:(this._longDateFormat[e]=n.replace(/MMMM|MM|DD|dddd/g,function(e){return e.slice(1)}),this._longDateFormat[e])},kn.invalidDate=function(){return this._invalidDate},kn.ordinal=function(e){return this._ordinal.replace("%d",e)},kn.preparse=Ge,kn.postformat=Ge,kn.relativeTime=function(e,t,n,s){var i=this._relativeTime[n];return S(i)?i(e,t,n,s):i.replace(/%d/i,e)},kn.pastFuture=function(e,t){var n=this._relativeTime[e>0?"future":"past"];return S(n)?n(t):n.replace(/%s/i,t)},kn.set=function(e){var t,n;for(n in e)S(t=e[n])?this[n]=t:this["_"+n]=t;this._config=e,this._dayOfMonthOrdinalParseLenient=new RegExp((this._dayOfMonthOrdinalParse.source||this._ordinalParse.source)+"|"+/\d{1,2}/.source)},kn.months=function(e,n){return e?t(this._months)?this._months[e.month()]:this._months[(this._months.isFormat||Nt).test(n)?"format":"standalone"][e.month()]:t(this._months)?this._months:this._months.standalone},kn.monthsShort=function(e,n){return e?t(this._monthsShort)?this._monthsShort[e.month()]:this._monthsShort[Nt.test(n)?"format":"standalone"][e.month()]:t(this._monthsShort)?this._monthsShort:this._monthsShort.standalone},kn.monthsParse=function(e,t,n){var s,i,r;if(this._monthsParseExact)return function(e,t,n){var s,i,r,a=e.toLocaleLowerCase();if(!this._monthsParse)for(this._monthsParse=[],this._longMonthsParse=[],this._shortMonthsParse=[],s=0;s<12;++s)r=l([2e3,s]),this._shortMonthsParse[s]=this.monthsShort(r,"").toLocaleLowerCase(),this._longMonthsParse[s]=this.months(r,"").toLocaleLowerCase();return n?"MMM"===t?-1!==(i=Ut.call(this._shortMonthsParse,a))?i:null:-1!==(i=Ut.call(this._longMonthsParse,a))?i:null:"MMM"===t?-1!==(i=Ut.call(this._shortMonthsParse,a))?i:-1!==(i=Ut.call(this._longMonthsParse,a))?i:null:-1!==(i=Ut.call(this._longMonthsParse,a))?i:-1!==(i=Ut.call(this._shortMonthsParse,a))?i:null}.call(this,e,t,n);for(this._monthsParse||(this._monthsParse=[],this._longMonthsParse=[],this._shortMonthsParse=[]),s=0;s<12;s++){if(i=l([2e3,s]),n&&!this._longMonthsParse[s]&&(this._longMonthsParse[s]=new RegExp("^"+this.months(i,"").replace(".","")+"$","i"),this._shortMonthsParse[s]=new RegExp("^"+this.monthsShort(i,"").replace(".","")+"$","i")),n||this._monthsParse[s]||(r="^"+this.months(i,"")+"|^"+this.monthsShort(i,""),this._monthsParse[s]=new RegExp(r.replace(".",""),"i")),n&&"MMMM"===t&&this._longMonthsParse[s].test(e))return s;if(n&&"MMM"===t&&this._shortMonthsParse[s].test(e))return s;if(!n&&this._monthsParse[s].test(e))return s}},kn.monthsRegex=function(e){return this._monthsParseExact?(o(this,"_monthsRegex")||q.call(this),e?this._monthsStrictRegex:this._monthsRegex):(o(this,"_monthsRegex")||(this._monthsRegex=It),this._monthsStrictRegex&&e?this._monthsStrictRegex:this._monthsRegex)},kn.monthsShortRegex=function(e){return this._monthsParseExact?(o(this,"_monthsRegex")||q.call(this),e?this._monthsShortStrictRegex:this._monthsShortRegex):(o(this,"_monthsShortRegex")||(this._monthsShortRegex=Et),this._monthsShortStrictRegex&&e?this._monthsShortStrictRegex:this._monthsShortRegex)},kn.week=function(e){return X(e,this._week.dow,this._week.doy).week},kn.firstDayOfYear=function(){return this._week.doy},kn.firstDayOfWeek=function(){return this._week.dow},kn.weekdays=function(e,n){return e?t(this._weekdays)?this._weekdays[e.day()]:this._weekdays[this._weekdays.isFormat.test(n)?"format":"standalone"][e.day()]:t(this._weekdays)?this._weekdays:this._weekdays.standalone},kn.weekdaysMin=function(e){return e?this._weekdaysMin[e.day()]:this._weekdaysMin},kn.weekdaysShort=function(e){return e?this._weekdaysShort[e.day()]:this._weekdaysShort},kn.weekdaysParse=function(e,t,n){var s,i,r;if(this._weekdaysParseExact)return function(e,t,n){var s,i,r,a=e.toLocaleLowerCase();if(!this._weekdaysParse)for(this._weekdaysParse=[],this._shortWeekdaysParse=[],this._minWeekdaysParse=[],s=0;s<7;++s)r=l([2e3,1]).day(s),this._minWeekdaysParse[s]=this.weekdaysMin(r,"").toLocaleLowerCase(),this._shortWeekdaysParse[s]=this.weekdaysShort(r,"").toLocaleLowerCase(),this._weekdaysParse[s]=this.weekdays(r,"").toLocaleLowerCase();return n?"dddd"===t?-1!==(i=Ut.call(this._weekdaysParse,a))?i:null:"ddd"===t?-1!==(i=Ut.call(this._shortWeekdaysParse,a))?i:null:-1!==(i=Ut.call(this._minWeekdaysParse,a))?i:null:"dddd"===t?-1!==(i=Ut.call(this._weekdaysParse,a))?i:-1!==(i=Ut.call(this._shortWeekdaysParse,a))?i:-1!==(i=Ut.call(this._minWeekdaysParse,a))?i:null:"ddd"===t?-1!==(i=Ut.call(this._shortWeekdaysParse,a))?i:-1!==(i=Ut.call(this._weekdaysParse,a))?i:-1!==(i=Ut.call(this._minWeekdaysParse,a))?i:null:-1!==(i=Ut.call(this._minWeekdaysParse,a))?i:-1!==(i=Ut.call(this._weekdaysParse,a))?i:-1!==(i=Ut.call(this._shortWeekdaysParse,a))?i:null}.call(this,e,t,n);for(this._weekdaysParse||(this._weekdaysParse=[],this._minWeekdaysParse=[],this._shortWeekdaysParse=[],this._fullWeekdaysParse=[]),s=0;s<7;s++){if(i=l([2e3,1]).day(s),n&&!this._fullWeekdaysParse[s]&&(this._fullWeekdaysParse[s]=new RegExp("^"+this.weekdays(i,"").replace(".",".?")+"$","i"),this._shortWeekdaysParse[s]=new RegExp("^"+this.weekdaysShort(i,"").replace(".",".?")+"$","i"),this._minWeekdaysParse[s]=new RegExp("^"+this.weekdaysMin(i,"").replace(".",".?")+"$","i")),this._weekdaysParse[s]||(r="^"+this.weekdays(i,"")+"|^"+this.weekdaysShort(i,"")+"|^"+this.weekdaysMin(i,""),this._weekdaysParse[s]=new RegExp(r.replace(".",""),"i")),n&&"dddd"===t&&this._fullWeekdaysParse[s].test(e))return s;if(n&&"ddd"===t&&this._shortWeekdaysParse[s].test(e))return s;if(n&&"dd"===t&&this._minWeekdaysParse[s].test(e))return s;if(!n&&this._weekdaysParse[s].test(e))return s}},kn.weekdaysRegex=function(e){return this._weekdaysParseExact?(o(this,"_weekdaysRegex")||ee.call(this),e?this._weekdaysStrictRegex:this._weekdaysRegex):(o(this,"_weekdaysRegex")||(this._weekdaysRegex=zt),this._weekdaysStrictRegex&&e?this._weekdaysStrictRegex:this._weekdaysRegex)},kn.weekdaysShortRegex=function(e){return this._weekdaysParseExact?(o(this,"_weekdaysRegex")||ee.call(this),e?this._weekdaysShortStrictRegex:this._weekdaysShortRegex):(o(this,"_weekdaysShortRegex")||(this._weekdaysShortRegex=$t),this._weekdaysShortStrictRegex&&e?this._weekdaysShortStrictRegex:this._weekdaysShortRegex)},kn.weekdaysMinRegex=function(e){return this._weekdaysParseExact?(o(this,"_weekdaysRegex")||ee.call(this),e?this._weekdaysMinStrictRegex:this._weekdaysMinRegex):(o(this,"_weekdaysMinRegex")||(this._weekdaysMinRegex=qt),this._weekdaysMinStrictRegex&&e?this._weekdaysMinStrictRegex:this._weekdaysMinRegex)},kn.isPM=function(e){return"p"===(e+"").toLowerCase().charAt(0)},kn.meridiem=function(e,t,n){return e>11?n?"pm":"PM":n?"am":"AM"},ae("en",{dayOfMonthOrdinalParse:/\d{1,2}(th|st|nd|rd)/,ordinal:function(e){var t=e%10;return e+(1===g(e%100/10)?"th":1===t?"st":2===t?"nd":3===t?"rd":"th")}}),e.lang=v("moment.lang is deprecated. Use moment.locale instead.",ae),e.langData=v("moment.langData is deprecated. Use moment.localeData instead.",ue);var Yn=Math.abs,On=$e("ms"),Tn=$e("s"),xn=$e("m"),bn=$e("h"),Pn=$e("d"),Wn=$e("w"),Hn=$e("M"),Rn=$e("y"),Cn=qe("milliseconds"),Fn=qe("seconds"),Un=qe("minutes"),Ln=qe("hours"),Nn=qe("days"),Gn=qe("months"),Vn=qe("years"),En=Math.round,In={ss:44,s:45,m:45,h:22,d:26,M:11},An=Math.abs,jn=ve.prototype;return jn.isValid=function(){return this._isValid},jn.abs=function(){var e=this._data;return this._milliseconds=Yn(this._milliseconds),this._days=Yn(this._days),this._months=Yn(this._months),e.milliseconds=Yn(e.milliseconds),e.seconds=Yn(e.seconds),e.minutes=Yn(e.minutes),e.hours=Yn(e.hours),e.months=Yn(e.months),e.years=Yn(e.years),this},jn.add=function(e,t){return Ae(this,e,t,1)},jn.subtract=function(e,t){return Ae(this,e,t,-1)},jn.as=function(e){if(!this.isValid())return NaN;var t,n,s=this._milliseconds;if("month"===(e=O(e))||"year"===e)return t=this._days+s/864e5,n=this._months+Ze(t),"month"===e?n:n/12;switch(t=this._days+Math.round(ze(this._months)),e){case"week":return t/7+s/6048e5;case"day":return t+s/864e5;case"hour":return 24*t+s/36e5;case"minute":return 1440*t+s/6e4;case"second":return 86400*t+s/1e3;case"millisecond":return Math.floor(864e5*t)+s;default:throw new Error("Unknown unit "+e)}},jn.asMilliseconds=On,jn.asSeconds=Tn,jn.asMinutes=xn,jn.asHours=bn,jn.asDays=Pn,jn.asWeeks=Wn,jn.asMonths=Hn,jn.asYears=Rn,jn.valueOf=function(){return this.isValid()?this._milliseconds+864e5*this._days+this._months%12*2592e6+31536e6*g(this._months/12):NaN},jn._bubble=function(){var e,t,n,s,i,r=this._milliseconds,a=this._days,o=this._months,u=this._data;return r>=0&&a>=0&&o>=0||r<=0&&a<=0&&o<=0||(r+=864e5*je(ze(o)+a),a=0,o=0),u.milliseconds=r%1e3,e=y(r/1e3),u.seconds=e%60,t=y(e/60),u.minutes=t%60,n=y(t/60),u.hours=n%24,a+=y(n/24),i=y(Ze(a)),o+=i,a-=je(ze(i)),s=y(o/12),o%=12,u.days=a,u.months=o,u.years=s,this},jn.clone=function(){return xe(this)},jn.get=function(e){return e=O(e),this.isValid()?this[e+"s"]():NaN},jn.milliseconds=Cn,jn.seconds=Fn,jn.minutes=Un,jn.hours=Ln,jn.days=Nn,jn.weeks=function(){return y(this.days()/7)},jn.months=Gn,jn.years=Vn,jn.humanize=function(e){if(!this.isValid())return this.localeData().invalidDate();var t=this.localeData(),n=function(e,t,n){var s=xe(e).abs(),i=En(s.as("s")),r=En(s.as("m")),a=En(s.as("h")),o=En(s.as("d")),u=En(s.as("M")),l=En(s.as("y")),d=i<=In.ss&&["s",i]||i<In.s&&["ss",i]||r<=1&&["m"]||r<In.m&&["mm",r]||a<=1&&["h"]||a<In.h&&["hh",a]||o<=1&&["d"]||o<In.d&&["dd",o]||u<=1&&["M"]||u<In.M&&["MM",u]||l<=1&&["y"]||["yy",l];return d[2]=t,d[3]=+e>0,d[4]=n,function(e,t,n,s,i){return i.relativeTime(t||1,!!n,e,s)}.apply(null,d)}(this,!e,t);return e&&(n=t.pastFuture(+this,n)),t.postformat(n)},jn.toISOString=Be,jn.toString=Be,jn.toJSON=Be,jn.locale=Ce,jn.localeData=Fe,jn.toIsoString=v("toIsoString() is deprecated. Please use toISOString() instead (notice the capitals)",Be),jn.lang=gn,P("X",0,0,"unix"),P("x",0,0,"valueOf"),C("x",Mt),C("X",/[+-]?\d+(\.\d{1,3})?/),L("X",function(e,t,n){n._d=new Date(1e3*parseFloat(e,10))}),L("x",function(e,t,n){n._d=new Date(g(e))}),e.version="2.20.1",function(e){Qe=e}(pe),e.fn=Dn,e.min=function(){return we("isBefore",[].slice.call(arguments,0))},e.max=function(){return we("isAfter",[].slice.call(arguments,0))},e.now=function(){return Date.now?Date.now():+new Date},e.utc=l,e.unix=function(e){return pe(1e3*e)},e.months=function(e,t){return Ee(e,t,"months")},e.isDate=r,e.locale=ae,e.invalid=c,e.duration=xe,e.isMoment=_,e.weekdays=function(e,t,n){return Ie(e,t,n,"weekdays")},e.parseZone=function(){return pe.apply(null,arguments).parseZone()},e.localeData=ue,e.isDuration=Me,e.monthsShort=function(e,t){return Ee(e,t,"monthsShort")},e.weekdaysMin=function(e,t,n){return Ie(e,t,n,"weekdaysMin")},e.defineLocale=oe,e.updateLocale=function(e,t){if(null!=t){var n,s,i=Qt;null!=(s=re(e))&&(i=s._config),(n=new k(t=D(i,t))).parentLocale=Xt[e],Xt[e]=n,ae(e)}else null!=Xt[e]&&(null!=Xt[e].parentLocale?Xt[e]=Xt[e].parentLocale:null!=Xt[e]&&delete Xt[e]);return Xt[e]},e.locales=function(){return nt(Xt)},e.weekdaysShort=function(e,t,n){return Ie(e,t,n,"weekdaysShort")},e.normalizeUnits=O,e.relativeTimeRounding=function(e){return void 0===e?En:"function"==typeof e&&(En=e,!0)},e.relativeTimeThreshold=function(e,t){return void 0!==In[e]&&(void 0===t?In[e]:(In[e]=t,"s"===e&&(In.ss=t-1),!0))},e.calendarFormat=function(e,t){var n=e.diff(t,"days",!0);return n<-6?"sameElse":n<-1?"lastWeek":n<0?"lastDay":n<1?"sameDay":n<2?"nextDay":n<7?"nextWeek":"sameElse"},e.prototype=Dn,e.HTML5_FMT={DATETIME_LOCAL:"YYYY-MM-DDTHH:mm",DATETIME_LOCAL_SECONDS:"YYYY-MM-DDTHH:mm:ss",DATETIME_LOCAL_MS:"YYYY-MM-DDTHH:mm:ss.SSS",DATE:"YYYY-MM-DD",TIME:"HH:mm",TIME_SECONDS:"HH:mm:ss",TIME_MS:"HH:mm:ss.SSS",WEEK:"YYYY-[W]WW",MONTH:"YYYY-MM"},e});
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/filter_blurX.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class RepairKit extends Consumable {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.repairAmount = options.data.repairAmount;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','repairAmount'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Recovery'];
+    
+        this.consumeSound = game.add.audio('repair-light')
+    }
+    
+    consume(){
+        super.consume();
+        this.consumeSound.play();
+        
+        this.parentObject.health += this.repairAmount;
+
+        if(this.parentObject.health>=this.parentObject.maxHealth) {
+            this.parentObject.health = this.parentObject.maxHealth // Don't allow exceeding max health
+        }
+    }
+
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/FuelKit.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -43126,6 +45370,36 @@ Object.defineProperty(Phaser.Filter.BlurX.prototype, 'blur', {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/filter_blurY.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class FuelKit extends Consumable {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.fuelAmount = options.data.fuelAmount;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','fuelAmount'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Fuel Provided'];
+    
+        this.consumeSound = game.add.audio('glug')
+    }
+    
+    consume(){
+        super.consume();
+        this.consumeSound.play();
+        
+        this.parentObject.fuelQuantity += this.fuelAmount;
+
+        if(this.parentObject.fuelQuantity>=this.parentObject.maxFuel) {
+            this.parentObject.fuelQuantity = this.parentObject.maxFuel // Don't allow exceeding max fuel
+        }
+    }
+
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/equipment/FTLFuel.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -43189,6 +45463,27 @@ Object.defineProperty(Phaser.Filter.BlurY.prototype, 'blur', {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class FTLFuel extends Consumable {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.jumpsAmount = 1;
+        this.isHyperdriveFuel = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','jumpsAmount'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Jumps'];
+    }
+    
+    consume(){
+        super.consume();
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/weapons/_weapon.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 /*
 CryptoJS v3.1.2
 code.google.com/p/crypto-js
@@ -43214,6 +45509,60 @@ this._hasher;k=g.finalize(k);g.reset();return g.finalize(this._oKey.clone().conc
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/prando.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Weapon extends Equipment {
+    constructor(game,options) {
+        super(game,options);
+
+        this.isWeapon = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','damage','energyConsumption','range'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Weapon Type','Damage','Energy Consumption','Range'];
+    }
+
+    fire(){
+        // Fallback
+    }
+
+    update(){
+        super.update();
+    }
+
+    postUpdate(){
+        // Bullet updates
+        if(this.weapon!=undefined && this.alive){        
+            var hits = this.game.physics.p2.hitTest(this.position);
+            if(hits.length) this.weapon.hit(this,hits)
+        }
+
+        if (this.customRender) this.key.render();
+        if (this.components.PhysicsBody) Phaser.Component.PhysicsBody.postUpdate.call(this);
+        if (this.components.FixedToCamera) Phaser.Component.FixedToCamera.postUpdate.call(this);
+        for (var i = 0; i < this.children.length; i++) {
+            this.children[i].postUpdate();
+        }
+    }
+
+    hit(bullet,hits){
+        for (let hit of hits) {
+            var target = hit.parent.sprite.parentObject;
+
+            if(this.game.player.ship == target){
+                return; // Can't hit yourself.
+            }
+            
+            target.hit(bullet);
+            
+            target.inflictDamage(bullet.damage);
+            bullet.kill();
+        }
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/_ship.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -43380,6 +45729,1330 @@ var Prando = /** @class */ (function () {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Ship extends GameObject {
+    constructor(game,x,y) {
+        super(game);
+        
+        // Basic Ship
+        this.specs = {
+            name : 'Unknown Ship',
+            description : 'Unknown Class',
+            storage : {
+                bulk : 100,
+/*
+                passengers : 100,
+                gas : 100,
+                liquid : 100,
+*/
+            }
+        }
+        
+        this.isShip = true;
+        
+        this.xStart = x;
+        this.yStart = y;
+
+        this.dockingDistance = 250;
+        this.dockedShips = [];
+        this.isDocked = false;
+
+        this.fuelQuantity = 0;
+        this.energyQuantity = 0;
+        this.maxEnergy = 0;
+        this.oxygenQuantity = 3000;
+        this.oxygenMax = 3000;
+        this.hullBreachAtHealthPercentage = .40;
+        this.hullBreached = false;
+        this.O2Critical = false;
+
+        this.weapons = [];
+        this.engines = [];    
+        this.equipment = [];
+        
+        this.canPickThingsUp = true;
+        this.canNavigateTo = true;
+        
+        this.navigation = {
+            currentWaypoint: 0,
+        }
+        this.navigationMode = NAVIGATION_MODE.free;
+        this.navigationIndex = -1;
+
+        // Lights
+        var lightWidth = 820;
+        var lightHeight = 680;
+        this.maskPoly = new Phaser.Polygon(
+            0,0,
+            lightWidth,0,
+            lightWidth/2,lightHeight
+        );
+        
+        this.lightMask = game.add.graphics(0, 0);
+        this.lightMask.beginFill(0xFFFFFF);
+        this.lightMask.drawPolygon(this.maskPoly);
+        this.lightMask.endFill();
+        this.lightMask.position.x = (-lightWidth/2)-1;
+        this.lightMask.position.y = -lightHeight-18;
+        this.lightMask.visible = false;
+
+        // Hyperdrive
+        this.hyperDriveDelay = 3600;
+        this.jumpWasAborted = false;
+
+        // Sounds
+        this.infoSound = game.add.audio('beep-beep');
+        this.gasLeakSound = game.add.audio('gas-leak');
+        this.dockConnectSound = game.add.audio('dock-connect');
+        this.dockReleaseSound = game.add.audio('dock-release');
+        this.navTargetChangedSound = game.add.audio('blorp');
+
+        this.ftlChargeSound = game.add.audio('ftl-charge');
+        this.ftlJumpSound = game.add.audio('ftl-jump');
+        this.jumpCompleteSound = game.add.audio('jump-complete');
+
+        this.crashSounds = [
+            game.add.audio('crash-1'),
+            game.add.audio('crash-2'),
+            game.add.audio('crash-3'),
+            game.add.audio('crash-4'),
+            game.add.audio('crash-5'),
+        ]
+
+        this.crashLightSounds = [
+            game.add.audio('crash-light-1'),
+            game.add.audio('crash-light-2'),
+        ]        
+
+        this.crashThudSounds = [
+            game.add.audio('crash-thud-1'),
+            game.add.audio('crash-thud-2'),
+        ]        
+    }
+    
+    setupSprite(sprite){
+        super.setupSprite(sprite);
+
+        // Physics
+        this.game.physics.p2.enable(sprite,P2BODY_DEBUG);
+        this.sprite.body.clearShapes();
+        this.sprite.body.loadPolygon(null,this.specs.polygon);       
+        this.sprite.body.damping = 0;
+        this.sprite.body.mass = this.specs.mass;
+        this.sprite.parentObject = this;
+        
+        // Lights
+        this.sprite.addChild(this.lightMask);
+
+        if(this.specs.dockingConnector!=undefined){
+            this.dockingConnector = this.sprite.addChild(this.game.make.sprite(0, 0, 'null'));
+            this.dockingConnector.x = this.specs.dockingConnector.position.x;
+            this.dockingConnector.y = this.specs.dockingConnector.position.y;
+        }
+
+        // Docking
+        if(this.specs.canBeDockedTo){
+            this.dockingPort = this.sprite.addChild(this.game.make.sprite(0, 0, 'dock-arrow'));
+            this.dockingPort.x = this.specs.dockingPorts[0].position.x;
+            this.dockingPort.y = this.specs.dockingPorts[0].position.y;
+            this.dockingPort.anchor.set(.5,2.5);
+            this.dockingPort.visible = false;
+
+            this.dockingPortBlink = this.game.add.tween(this.dockingPort).to({
+                alpha: 1,
+                y: '5'
+            }, 600, "Quart.easeOut", true, 0, 0, true).loop(true);
+        }
+        
+        this.setupRCSThrusters();
+        this.game.ships.add(this.sprite);        
+        
+        // Health
+        this.health = this.specs.health;
+        this.maxHealth = this.specs.health;
+        
+        // Fuel
+        this.maxFuel = this.specs.maxFuel
+        
+        // Info
+        this.name = this.specs.name;
+        this.description = this.specs.description;
+        
+        this.nameText = this.game.add.text(
+            0,0,
+            this.name, 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
+            this.game.ships, 
+        );
+        this.nameText.alpha = 0;
+
+        this.subText = this.game.add.text(
+            0,0, 
+            this.description, 
+            { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.ships, 
+        );
+        this.subText.alpha = 0;
+
+        this.landingMessage = this.game.add.text(
+            0,0,
+            'Cleared to Dock', 
+            { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.ships, 
+        );
+        this.landingMessage.alpha = 0;
+
+        // Emiiters
+        var flamesData = {
+            lifespan: 1000,
+            image: 'white',
+            bringToTop: true,
+            blendMode: 'ADD',
+            hsv: { initial: 0, value: 70, control: 'linear' },
+            alpha: { initial: 0, value: 1, control: [ { x: 0, y: 1 }, { x: 0.5, y: 0.8 }, { x: 1, y: 0 } ] },
+            scale: { min: 0.05, max: .5 },
+            vx: { min: -0.5, max: 0.5 },
+            vy: { min: -.1, max: .1 }
+        };
+        this.game.ps.addData('flames', flamesData);
+        this.flamesEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
+        this.flamesEmitter.addToWorld();
+
+        // Atmosphere
+        this.ventData = {
+            lifespan: 8000,
+            image: 'white-smooth',
+            vx: { min: -.4, max: .4 },
+            vy: { min: -.4, max: .4 },
+            alpha: { min: 0, max: .3 },
+            scale: { initial: 0.1, value: .4, control: 'linear' },
+        };
+        this.game.ps.addData('atmosphere', this.ventData);
+        this.atmosphereEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
+        this.atmosphereEmitter.addToWorld();
+        this.atmosphereWell = this.atmosphereEmitter.createGravityWell(0,0, .01);
+
+        // Hyperdrive
+        this.hyperData = {
+            lifespan: 300,
+            image: 'white-smooth',
+            bringToTop: true,
+            blendMode: 'ADD',
+            hsv: { value: 250,},
+            alpha: { value: .5 , control:  [{ x: 0, y: 1 }, { x: 1, y: 0 } ]},
+            scale: { value: .5 },
+            emit: {
+                name: { at: [ { time: 0, value: 'spark' } ] }, 
+                value: 0, at: [ { time: 0, value: 5 } ]
+            }
+        };
+        
+        this.game.ps.addData('hyperDrive', this.hyperData);
+        this.hyperDriveEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
+        this.hyperDriveEmitter.addToWorld();
+
+        // Cargo Jettison
+        this.cargoJettisonEmitter = game.add.emitter(0, 0, 3);    
+        this.cargoJettisonEmitter.makeParticles('crate-tiny');
+        this.cargoJettisonEmitter.gravity = 0;
+        this.cargoJettisonEmitter.setAlpha(1,0,1000);
+    }
+    
+    positionInfo(){
+        var x = 20+this.sprite.x + this.sprite.width/2;
+        var y = this.sprite.y;
+        
+        this.nameText.x = x; 
+        this.nameText.y = y-40; 
+
+        this.subText.x = x; 
+        this.subText.y = y-20; 
+
+        this.landingMessage.x = x; 
+        this.landingMessage.y = y+20;             
+    }
+    
+    // Weapons
+    firePrimaryWeapon(){
+        for (let weapon of this.weapons) {
+            if(this.hasEnergy){
+                this.consumeEnergy(weapon.energyConsumption)
+                if(this.energyPercentage>1) weapon.weapon.fire();
+            }
+        }
+    }
+
+    equipWeaponInSlot(weapon,slot){
+        this.weapons.push(weapon);
+        
+        weapon.weapon.trackSprite(
+            this.sprite,
+            this.specs.weaponSlots[slot].position.x,
+            this.specs.weaponSlots[slot].position.y,
+            true,
+            270,
+        );
+    }
+
+    unequipWeapon(weapon){
+        weapon.equipped = false;
+
+        var index = this.weapons.indexOf(weapon);
+        if (index > -1) {
+            this.weapons.splice(index, 1);
+        }
+    }
+
+    // Engines
+    equipEngineInSlot(engine,slot){
+        // Equip
+        this.engines.push(engine);
+
+        engine.parentObject = this;
+        engine.slot = slot;
+        
+        this.calculateMaxSpeed(); 
+    }
+    
+    unequipEngine(engine){
+        engine.equipped = false;
+        
+        var index = this.engines.indexOf(engine);
+        if (index > -1) {
+            this.engines.splice(index, 1);
+        }
+        
+        this.calculateMaxSpeed();
+    }
+
+    calculateMaxSpeed(){
+        // Calculate new max speed (average of engine max speeds)
+        var maxSpeed = 0;
+        for (let engine of this.engines) {
+            maxSpeed += engine.maxSpeed;
+        }
+        this.maxSpeed = maxSpeed/10 // No idea.
+    }
+    
+    
+    setupRCSThrusters(){
+        if(this.specs.RCS != undefined){
+            this.thrusters = {};
+            for (var thruster in this.specs.RCS) {
+                this.addThruster(thruster,this.specs.RCS[thruster])
+            }
+        }
+    }    
+    
+    addThruster(thruster,layout){
+        this.thrusters[thruster] = new Thruster(this.game,{
+            parentObject : this,
+            layout : layout,
+        })
+        
+        // Hande retro thrusters
+        if(layout.retro !=undefined){
+            this.thrusters[thruster].retro = layout.retro
+        }
+    }
+    
+    fireThruster(thrusterKey){
+        if(this.thrusters[thrusterKey]!=undefined && this.hasFuel){
+            var thruster = this.thrusters[thrusterKey];
+            this.consumeFuel(thruster.fuelConsumption)
+            thruster.fire();
+        }
+    }
+
+    shutdownThruster(thruster){        
+        var thruster = this.thrusters[thruster]
+        thruster.shutdown();
+    }
+    
+    shutdownAttitudeThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(!thruster.retro) thruster.shutdown();
+        }        
+    }
+    shutdownRetroThrusters(){
+        for (var thrusterKey in this.specs.RCS) {
+            var thruster = this.thrusters[thrusterKey];
+            if(thruster.retro) thruster.shutdown();
+        }        
+    }
+    
+    // Equipment
+    equipEquipmentInSlot(equipment,slot){
+        this.equipment.push(equipment);
+    }
+
+    unequipEquipment(equipment){
+        equipment.equipped = false;
+        
+        var index = this.equipment.indexOf(equipment);
+        if (index > -1) {
+            this.equipment.splice(index, 1);
+        }
+    }
+
+    
+    // Movement    
+    get heading(){
+        return this.sprite.angle;
+    }
+    
+    accelerate() {
+        if(!this.isDocked){
+            // Not Docked
+            var totalThurst = 0;
+            for (let engine of this.engines) {
+                if(this.hasFuel){
+                    this.consumeFuel(engine.fuelConsumption)
+                    totalThurst += engine.thrust;
+                    engine.accelerate();
+                } else {
+                    engine.deaccelerate();                
+                }
+            }
+            this.sprite.body.thrust(totalThurst)
+        } else {
+            // Docked
+            for (let engine of this.engines) {
+                engine.deaccelerate();
+            }
+        }
+    }
+    
+    get totalThurst(){
+        var totalThurst = 0;
+        for (let engine of this.engines) {
+            totalThurst += engine.thrust;
+        }
+        return totalThurst;
+    }
+    
+    limitSpeed() {
+        var maxVelocity = this.maxSpeed;
+        if(this.hyperDriveEngaged) maxVelocity = 50;
+        var sprite = this.sprite;
+
+        var body = sprite.body
+        var angle, currVelocitySqr, vx, vy;
+        vx = body.data.velocity[0];
+        vy = body.data.velocity[1];
+        currVelocitySqr = vx * vx + vy * vy;
+        if (currVelocitySqr > maxVelocity * maxVelocity) {
+            angle = Math.atan2(vy, vx);
+            vx = Math.cos(angle) * maxVelocity;
+            vy = Math.sin(angle) * maxVelocity;
+            body.data.velocity[0] = vx;
+            body.data.velocity[1] = vy;
+        }
+    };
+        
+    deaccelerate() {
+        if(this.sprite){
+            this.sprite.body.acceleration = 0;
+    
+            for (let engine of this.engines) {
+                engine.deaccelerate();
+            }
+
+            this.shutdownRetroThrusters();
+        }
+    }
+
+    goInReverse() {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
+            if(this.speed<this.specs.maxReverse){
+                this.sprite.body.reverse(this.specs.reverseThrust)
+            }
+
+            this.fireThruster('retro_a');
+            this.fireThruster('retro_b');
+        }
+    }
+    
+    turnLeft(){
+        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
+            this.sprite.body.angularVelocity -= this.specs.turnAccel;
+        
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_left');
+        }
+    }
+
+    turnRight(){
+        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
+            this.sprite.body.angularVelocity += this.specs.turnAccel;
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_right');
+        }
+    }
+
+    moveLeft(){
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
+            this.sprite.body.thrustLeft(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_right');
+            this.fireThruster('aft_right');
+        }
+    }
+
+    moveRight(){
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
+            this.sprite.body.thrustRight(this.specs.leftRightThrust)
+
+            this.fireThruster('forward_left');
+            this.fireThruster('aft_left');
+        }
+    }
+
+    deaccelerateTurning(){
+        if(this.sprite){
+            if(this.sprite.body.angularVelocity>0){
+                this.sprite.body.angularVelocity = Math.max(this.sprite.body.angularVelocity-this.specs.turnDecay,0);
+            }
+            if(this.sprite.body.angularVelocity<0){
+                this.sprite.body.angularVelocity = Math.min(this.sprite.body.angularVelocity+this.specs.turnDecay,0);
+            }
+        }
+        
+        this.shutdownAttitudeThrusters();
+    }
+    
+    
+    // Navigation
+    navigate(){
+        if(this.navigationMode == NAVIGATION_MODE.free) return;
+
+        if(this.navigationMode == NAVIGATION_MODE.stationKeeping) this.keepStation();
+
+        if(this.navigationMode == NAVIGATION_MODE.target) this.trackTargetCurrentNavigationTarget();
+        
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            this.goToWayPoint(this.navigation.waypoints[this.navigation.currentWaypoint]);
+        }
+    }
+
+    goToWayPoint(waypoint){
+        var shipAngle = this.sprite.rotation;
+        
+        // Heading
+        var angleToWaypoint = this.game.physics.arcade.angleToXY(this.sprite, waypoint.x, waypoint.y) + 1.5708;
+        var vx = this.sprite.body.velocity.x;
+        var vy = this.sprite.body.velocity.y;
+        var eta = this.distanceToWaypoint/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2)); // Seconds until impact.
+        
+        var difference = Phaser.Math.wrapAngle(Math.degrees(angleToWaypoint - this.sprite.body.rotation));
+
+        var distanceTolerance = 30;
+        if(this.distanceToWaypoint<distanceTolerance){
+            this.deaccelerate();
+            this.sprite.body.setZeroVelocity();
+            this.sprite.body.setZeroRotation();
+            this.reachedWaypoint();
+        } else {
+            var turnSpeed = Math.abs(difference)*.02;
+            if(difference<-3 && difference>-180){
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnLeft();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else if(difference>3 && difference<180) {
+                if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
+                    this.turnRight();
+                } else {
+                    this.deaccelerateTurning();                
+                }
+                this.deaccelerate();
+            } else {
+                if(eta < 8){
+                    if(this.distanceToWaypoint>distanceTolerance){
+                        this.goInReverse();                    
+                    }
+                    this.deaccelerate();
+                } else {
+                    this.accelerate();
+                }
+            }
+        }
+    }
+
+    reachedWaypoint(){
+        if(this.navigationMode == NAVIGATION_MODE.followWaypoints) {
+            var w = this.navigation.currentWaypoint + 1;
+            if(w>this.navigation.waypoints.length-1){
+                w = 0;
+            }
+            
+            this.navigation.currentWaypoint = w;
+        }
+    }
+            
+    get distanceToWaypoint(){
+        var waypoint = this.navigation.waypoints[this.navigation.currentWaypoint];
+        return this.game.physics.arcade.distanceToXY(this.sprite, waypoint.x,waypoint.y);
+    }
+    
+    navigateWaypoints(){
+        this.navigationMode = NAVIGATION_MODE.followWaypoints;
+    }
+    
+    keepStation(){
+        // Holds steady speed and heading
+    }
+    
+    trackTargetCurrentNavigationTarget(){
+        // Doesnt do much.
+    }
+    
+    nextNavigationTarget(){
+        this.navigationMode = NAVIGATION_MODE.target;
+        this.navigationIndex++;
+        
+        if(this.navigationIndex>this.navigatableObjects.length-1){
+            this.navigationIndex = -1;   
+        }
+
+        this.navTargetChangedSound.play();
+        
+        this.setNavigationTargetToCurrentNavigationTargetIndex();
+    }
+    
+    get navigatableObjects() {
+        var objects = [];
+        this.game.system.stellarObjects.forEach(function(gameObject) {
+            if(gameObject.canNavigateTo && gameObject != this){
+                objects.push(gameObject);
+            }
+        },this);
+        this.game.system.planets.forEach(function(gameObject) {
+            if(gameObject.canNavigateTo && gameObject != this){
+                objects.push(gameObject);
+            }
+        },this);
+
+        return objects;
+    }
+    
+    setNavigationTargetToCurrentNavigationTargetIndex(){
+        var index = 0;
+        var target = null;
+        this.navigatableObjects.forEach(function(navigatableObject) {
+            if(index==this.navigationIndex){
+                target = navigatableObject;
+            }
+            index ++;
+        },this);
+        this.navigationTarget = target;
+    }
+    
+    get distanceToCurrentNavigationTarget(){
+        return this.game.physics.arcade.distanceToXY(
+            this.sprite,
+            this.navigationTarget.sprite.x,
+            this.navigationTarget.sprite.y
+        );
+    }
+
+    get formattedDistanceToCurrentNavigationTarget(){
+        //console.log(this.navigationTarget);
+        var distance;
+        if(this.navigationTarget.isPlanet){
+            distance = this.distanceToCurrentNavigationTarget*DISTANCE_FACTOR_PLANETS;
+            if(distance<75000){
+                return 'Arrived';
+            } else {
+                return numeral(distance).format('0,0.0 a').toUpperCase()+'m';
+            }
+        } else {
+            distance = this.distanceToCurrentNavigationTarget*DISTANCE_FACTOR_SHIPS;
+            if(distance<10){
+                return 'Arrived';
+            } else {            
+                return numeral(distance).format('0,0.0 a').toUpperCase()+'m';
+            }
+        }
+    }
+
+    get formattedTimeToCurrentNavigationTarget(){
+        var vx = this.sprite.body.velocity.x;
+        var vy = this.sprite.body.velocity.y;
+        var distanceToNavigationTarget = this.distanceToCurrentNavigationTarget
+        if(this.navigationTarget.isPlanet){
+            distanceToNavigationTarget = distanceToNavigationTarget*2; // Planets have difference scale
+        }
+        
+        var eta = distanceToNavigationTarget/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+        if(eta<1 || eta.isNaN){
+            return '--';
+        } else {
+            return TIME_FORMAT(eta);       
+        }
+    }
+    
+    get angleToCurrentNavigationTarget(){
+        var angleToWaypoint = this.game.physics.arcade.angleToXY(
+            this.sprite,
+            this.navigationTarget.sprite.x,
+            this.navigationTarget.sprite.y
+        );
+        var difference = Phaser.Math.wrapAngle(Math.degrees(angleToWaypoint));
+        return difference;
+    }
+    
+    
+    // Fuel Mgmt
+    refuel(){
+        this.fuelQuantity = this.maxFuel;
+        this.lowFuelLightShown = false;
+        
+        this.game.hud.hasFuel();
+    }
+    
+    lowFuelLight(){
+        if(!this.lowFuelLightShown) {
+            this.lowFuelLightShown = true;
+            this.game.hud.lowFuel();
+        }
+    }
+    
+    consumeFuel(amount){
+        this.fuelQuantity -= amount;
+
+        if(this.fuelPercentage<25){
+            this.lowFuelLight();
+        }
+
+        if(!this.hasFuel){
+            this.game.hud.blinkingWarning("Out of Fuel");
+        }
+    }
+
+    addFuel(amount){
+        this.fuelQuantity += amount;
+
+        if(this.fuelPercentage>25){
+            this.game.hud.hasFuel();
+        }
+    }
+    
+    get fuelPercentage(){
+        return Math.round((this.fuelQuantity/this.maxFuel)*100)        
+    }
+
+    get hasFuel(){
+        if(this.fuelQuantity>=0){
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    // Energy Management
+    recharge(){
+        this.energyQuantity = this.maxEnergy;
+    }
+    
+    charge(amount){
+        if(this.energyQuantity <= this.maxEnergy){
+            this.energyQuantity += amount;
+        }
+        
+        if(this.energyQuantity>=this.maxEnergy){
+            this.energyQuantity = this.maxEnergy;
+        }
+    }
+            
+    consumeEnergy(amount){
+        this.energyQuantity -= amount;
+
+        if(!this.hasEnergy){
+            //this.game.hud.blinkingWarning("Not Enough Energy");
+        }
+    }
+    
+    get energyPercentage(){
+        var value = Math.round((this.energyQuantity/this.maxEnergy)*100);
+        return Math.max(value,0);
+    }
+        
+    get hasEnergy(){
+        if(this.energyQuantity>=0){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Landing
+    attemptToLand(){                
+        // Dock initiator calls this (ie. Dockee connects to Docker)
+        var closestLandingSite = false;
+        var landingSitesInRange = [];
+        for (let landingSite of this.game.gameObjects) {
+            if(landingSite.canLand && landingSite.system == this.game.system){
+                var distance = this.game.physics.arcade.distanceBetween(landingSite.sprite, this.sprite);
+                if(distance<=landingSite.showInfoDistance)
+                    landingSitesInRange.push({
+                        distance: distance,
+                        landingSite: landingSite,
+                    })
+            }
+        }
+        if(landingSitesInRange.length>0){
+            landingSitesInRange.sort(function(a, b) {
+                return a.distance - b.distance;
+            });
+
+            var landingSite = landingSitesInRange[0].landingSite; // Closest
+            var maxSpeedWhenLanding = 10;
+
+            if((this.speed)>maxSpeedWhenLanding){
+                this.game.hud.message("Moving maxSpeedWhenLandingt to land");
+                return;
+            }
+
+            this.landAt(landingSite);
+
+        } else {
+            this.game.hud.message("No Landing Site Available");
+        }
+    }
+
+    landAt(landingSite){
+        if(this == this.game.player.ship){
+            this.game.add.tween(this.sprite).to( { alpha: 0 }, 600, "Quart.easeOut", true);
+            this.game.add.tween(this.sprite.scale).to( { x: .5, y: .5 }, 600, "Quart.easeOut", true);
+
+            // Refuel if needed (Only if autorefuel is on)
+            if(this.game.player.settings.autoRefuel && landingSite.hasService(PLANET_SERVICES.fuelDepot)){
+                this.game.player.autoRefuel();
+            }
+
+            this.game.arrivalScreen.destination = landingSite;
+            this.game.arrivalScreen.show();
+        } else {
+            // Handle AI Ship landing
+        }
+    }
+
+    takeOff(){
+        this.game.skipTime(1,'day');
+        this.game.skipTime(game.rnd.integerInRange(1, 12),'hour');
+
+        this.game.add.tween(this.sprite).to( { alpha: 1 }, 600, "Quart.easeOut", true, 500);
+        this.game.add.tween(this.sprite.scale).to( { x: 1, y: 1 }, 600, "Quart.easeOut", true, 500);    
+    }
+
+    // Docking
+    attemptToDock(){        
+        if(this.isDocked){
+            if(this.dockingInProgress){
+                this.abortDocking();
+            } else {
+                this.releaseDock();
+            }
+            return;
+        }
+        
+        // Dock initiator calls this (ie. Dockee connects to Docker)
+        var closestShip = false;
+        var shipsInRange = [];
+        for (let ship of this.game.gameObjects) {
+            if(ship.specs!=undefined && ship!=this){
+                var distance = this.game.physics.arcade.distanceBetween(ship.sprite, this.sprite);
+                    shipsInRange.push({
+                        distance: distance,
+                        ship: ship,
+                    })
+            }
+        }
+        if(shipsInRange.length>0){
+            shipsInRange.sort(function(a, b) {
+                return a.distance - b.distance;
+            });
+
+            var shipToDockTo = shipsInRange[0].ship;
+            var maxSpeedWhenDocking = 10;
+            
+            
+
+            if((this.sprite.body.speed-shipToDockTo.sprite.body.speed)>maxSpeedWhenDocking){
+                this.game.hud.message("Moving too fast to dock");
+                return;
+            }
+            
+            if(!this.okToDock){
+                this.game.hud.message("Not aligned for docking");
+            } else {
+                this.dockWith(shipToDockTo);
+            }
+        } else {
+            this.game.hud.message("No Dock Available");
+        }
+    }
+    
+    dockWith(ship){
+        var dockingSpeed = 3000;
+        
+        var dockingPortNumber = 0;
+
+        this.sprite.body.clearShapes();
+        ship.sprite.body.clearShapes();
+        ship.sprite.body.static = true;        
+        
+        var dockingPosition = ship.specs.dockingPorts[dockingPortNumber].position
+
+        var dockingAngle = 180 * Math.PI / 180;        
+        this.dockingConstraint = game.physics.p2.createLockConstraint(this.sprite, ship.sprite, [0, 72], dockingAngle, 500);
+        this.dockedToShip = ship;
+
+        this.isDocked = true;
+        this.dockingTarget = ship;
+        ship.landingMessage.setText('Docking...');
+
+        game.time.events.add(Phaser.Timer.SECOND * 0, this.dockingComplete, {
+            target: ship,
+            dockedShip: this,
+            portNumber: dockingPortNumber,
+            game: this.game,
+        });
+    }
+    
+    dockingComplete(){
+        
+        var target = this.target;
+        var dockedShip = this.dockedShip;
+        var portNumber = this.portNumber; // What docking port am i at?
+
+        this.target.dockConnectSound.play();
+        
+        target.sprite.body.loadPolygon(null,target.specs.polygon);       
+        target.sprite.body.dynamic = true
+        target.sprite.body.mass = true
+
+        dockedShip.sprite.body.loadPolygon(null,dockedShip.specs.polygon)
+        dockedShip.dockedToShip.sprite.body.dynamic = true;        
+        dockedShip.dockedToShip.sprite.body.mass = dockedShip.specs.mass;        
+
+        dockedShip.isDocked = true;
+        dockedShip.dockedAtPortNumber = portNumber;
+        dockedShip.hardDocked = true;
+        dockedShip.dockingInProgress = false;
+
+        target.dockedShips.push(dockedShip);
+
+        this.game.hud.message("Docking Successful");
+        target.landingMessage.setText('Press D to Release');
+    }    
+
+    releaseDock(){
+        if(this.hardDocked && this.isDocked){
+            this.dockReleaseSound.play();
+            game.physics.p2.removeConstraint(this.dockingConstraint);
+            
+    	    var emitter = this.game.add.emitter(0,0,100);
+            this.dockingConnector.addChild(emitter);
+                
+            emitter.makeParticles('cloud');
+            emitter.gravity = 0;
+            emitter.maxRotation = 100;
+            emitter.minRotation = 30;
+            emitter.minParticleScale = .01;
+            emitter.maxParticleScale = .1;
+            emitter.explode(200, game.rnd.integerInRange(7, 10));
+            this.game.time.events.add(500, this.destroyEmitter, emitter);  
+        }
+
+        // Reset Docking
+        this.abortDocking();
+    }
+
+    abortDocking(){
+        //this.dockedToShip.landingMessage.setText('Press D to Dock');
+
+
+        this.isDocked = false;
+        this.dockedToShip = null;
+        this.dockedAtPortNumber = null;
+        this.hardDocked = false;
+        this.dockingInProgress = false;
+        this.dockingTarget = null;
+    }
+    
+    // Info
+    showInfoIfNeeded(){
+        if(this.shouldShowInfo && !this.infoShowing){
+            this.infoSound.play();
+
+            this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+            //this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
+            
+            this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+            //this.game.add.tween(this.subText).to( { y: '-30' }, 300, "Quart.easeOut", true);                
+
+            this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true,400);
+            //this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
+        
+            this.infoShowing = true;
+            this.dockingPort.visible = true;
+        }
+        
+        if(!this.shouldShowInfo && this.infoShowing){
+            this.hideInfo();
+            this.infoShowing = false;
+            this.dockingPort.visible = false;
+        }
+    }
+    
+    hideInfo(){
+        this.game.add.tween(this.nameText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.subText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.landingMessage).to( { alpha: 0 }, 300, "Quart.easeOut", true);
+
+        this.game.add.tween(this.subText).to( { y: '+30' }, 0, "Quart.easeOut", true);                
+        this.game.add.tween(this.nameText).to( { y: '+30' }, 0, "Quart.easeOut", true);    
+        this.game.add.tween(this.landingMessage).to( { y: '+30' }, 0, "Quart.easeOut", true);                
+
+        this.infoShowing = false;
+    }
+    
+    get shouldShowInfo(){
+        if(this.distanceToPlayer<=this.showInfoDistance) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    // Weapons + Damage Collisions
+    processBulletCollision(ship, bullet){
+	    var emitter = this.game.add.emitter(bullet.x, bullet.y, 100);
+        emitter.makeParticles('asteroid-flake-3');
+        emitter.minParticleScale = .5;
+        emitter.maxParticleScale = 1;
+        emitter.gravity = 0;
+        emitter.explode(200, 1);
+        this.game.time.events.add(500, this.destroyEmitter, emitter);
+        
+        bullet.kill();
+        return false; // Never collides, just dies.
+    }
+    
+    playJettisonCargoAnimation(){
+        this.cargoJettisonEmitter.setAngle(this.sprite.angle+90-30,this.sprite.angle+90+30);
+        this.cargoJettisonEmitter.x = this.sprite.x;
+        this.cargoJettisonEmitter.y = this.sprite.y;
+        this.cargoJettisonEmitter.start(true, 5000, null, 1);
+    }
+    
+
+    // HyperDrive™
+    toggleHyperDrive(){        
+        if(!this.hyperDriveEngaged){
+            if(this.jumpsRemaining<1){
+                this.game.hud.message("No FTL fuel in inventory");
+                return;
+            }
+
+            if((this.speed)>15){
+                this.game.hud.message("Moving too fast to engage FTL Drive");
+                return;
+            }
+
+            this.hyperDriveTimer = game.time.events.add(this.hyperDriveDelay, this.jump, this);
+            this.ftlChargeSound.play();
+            this.hyperDriveEngaged = true;
+            this.jumpWasAborted = false;
+            
+            this.consumeHyperdriveFuel();
+        }
+    }
+    
+    hyperDriveUpdate(){
+        this.sprite.body.thrust(500);
+        this.hyperDriveEmitter.emit(
+            'hyperDrive',
+            this.sprite.worldPosition.x + this.game.camera.x,
+            this.sprite.worldPosition.y + this.game.camera.y
+        );        
+    }
+    
+    abortJump(){
+        this.ftlChargeSound.stop();
+        
+        if(this.hyperDriveEngaged){
+            this.jumpCompleteSound.play();
+        }
+        
+        this.jumpWasAborted = true;
+        
+        this.disengageHyperDrive();    
+    }
+    
+    get jumpsRemaining(){
+        // Calculate remaing hyperdrive fuel.
+        var jumpsRemaining = 0;
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) jumpsRemaining++;
+        }
+        return jumpsRemaining;
+    }
+
+    consumeHyperdriveFuel(){
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) {
+                item.consume();
+                break;
+            }
+        }
+    }
+    
+    jump(){
+        if(this.jumpWasAborted) return;
+
+        this.ftlJumpSound.play();
+        game.camera.flash(0xFFFFFF, 500);
+        
+        // Systems
+        var previousSystem = this.game.mapScreen.map.currentPath.shift();
+        var currentSystem = this.game.mapScreen.map.currentPath.firstItem();
+        if(currentSystem) currentSystem.arrive();
+        
+        // Time
+        this.game.skipTime(rng.nextInt(6,36),'hours');             
+        
+        // We're there.
+        if(this.game.mapScreen.map.currentPath.length==1){
+            if(this.game.mapScreen.map.currentPath.firstItem() == currentSystem){
+                this.game.mapScreen.map.currentPath = false;
+                this.game.mapScreen.map.navigationDestination = null;
+                
+                game.time.events.add(1000, function(){
+                    this.game.hud.hideFTLPanel();
+                }, this);
+            }
+        }
+        
+        // Figure out where we should land
+        var angleToSystemCenter = Phaser.Math.reverseAngle(Math.atan2(
+            this.sprite.y - this.game.world.centerY,
+            this.sprite.x - this.game.world.centerX
+        ));
+         // Radians
+        var r = 5000;
+        var landingX = this.sprite.x + r * Math.cos(angleToSystemCenter);
+        var landingY = this.sprite.y + r * Math.sin(angleToSystemCenter);
+                
+        this.sprite.body.x = landingX;
+        this.sprite.body.y = landingY;
+        
+        // Slow down
+        var slowDownTween = this.game.add.tween(this.sprite.body).to({
+            damping: .95,
+        }, 2000, "Quart.easeOut", true)
+        slowDownTween.onComplete.add(function(){
+            var slowDownTween = this.game.add.tween(this.sprite.body).to({
+                damping: 0,
+            }, 1000, "Quart.easeOut", true)
+        }, this);
+        game.time.events.add(2000, function(){
+            this.disengageHyperDrive();
+        }, this);
+
+        // Power down sound
+        game.time.events.add(800, function(){
+            this.jumpCompleteSound.play();
+        }, this);
+
+        // Cleanup
+        this.game.player.exitDarkness();
+        this.game.hud.updateFTLPanel();
+        this.navigationMode = NAVIGATION_MODE.free;
+        this.navigationIndex = -1;
+        this.setNavigationTargetToCurrentNavigationTargetIndex();
+   }
+    
+    disengageHyperDrive(){
+        this.hyperDriveEngaged = false;
+        this.hyperDriveTimer = game.time.events.remove(this.hyperDriveDelay);
+    }
+
+    // Venting
+    ventAtmosphere(){
+        var o2Density = (this.oxygenQuantity/this.oxygenMax)*.05;
+        var o2Spread = (this.oxygenQuantity/this.oxygenMax)/2;
+        this.ventData.alpha = { min: 0, max: .05 };
+        this.ventData.vx = { min: -o2Spread, max: o2Spread };
+        this.ventData.vy = { min: -o2Spread, max: o2Spread };
+        
+        var x = this.sprite.worldPosition.x + this.game.camera.x;
+        var y = this.sprite.worldPosition.y + this.game.camera.y;
+        
+        this.atmosphereWell.position.x = x;
+        this.atmosphereWell.position.y = y;        
+        
+        if(this.oxygenQuantity>0){
+            this.atmosphereEmitter.emit(
+                'atmosphere',
+                x,
+                y
+            );
+            this.oxygenQuantity--;
+            
+            if(this.oxygenQuantity<1000){
+                if(this == this.game.player.ship && !this.O2Critical) {
+                    this.game.hud.blinkingWarning("Oxygen Levels Critical");
+                }
+                this.O2Critical = true;
+            }
+            
+        } else {
+            this.asphyxiate();
+        }
+    }
+    
+    get o2Percent(){
+        return this.oxygenQuantity/this.oxygenMax;
+    }
+    
+    asphyxiate(){
+        this.kill();
+    }
+    
+    burn(){
+        this.flamesEmitter.emit(
+            'flames',
+            this.sprite.worldPosition.x + this.game.camera.x,
+            this.sprite.worldPosition.y + this.game.camera.y
+        );        
+    }
+
+    // Damage
+    inflictDamage(amount){
+        super.inflictDamage(amount);
+
+        if(this.healthPercentage<this.hullBreachAtHealthPercentage && !this.hullBreached){
+            this.hullBreached = true;
+            if(this == this.game.player.ship) {
+                this.gasLeakSound.play();
+                this.game.hud.showO2Panel();
+                this.game.hud.blinkingWarning("Hull Breach - Venting Atmosphere");
+            }
+        }
+
+    }
+
+    // Sounds
+    crash_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashSounds[this.game.rnd.integerInRange(0,this.crashSounds.length-1)].play();
+        }               
+    }
+    crashSoft_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashLightSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashLightSounds[this.game.rnd.integerInRange(0,this.crashLightSounds.length-1)].play();
+        }       
+    }
+    crashThud_sound(){
+        var isPlayingAnySound = false;
+        for (let sound of this.crashThudSounds)
+            if(sound.isPlaying){
+                isPlayingAnySound = true;
+                break;
+            }
+        
+        if(!isPlayingAnySound){
+            this.crashThudSounds[this.game.rnd.integerInRange(0,this.crashThudSounds.length-1)].play();
+        }       
+    }
+
+    
+    // Rendering
+    update() {
+        super.update(); 
+        this.positionInfo();        
+        this.navigate();        
+
+        // Damage
+        if(this.hullBreached){
+            this.ventAtmosphere();
+            if(this.healthPercentage>this.hullBreachAtHealthPercentage){
+                this.hullBreached = false;
+                if(this == this.game.player.ship) {
+                    this.game.hud.hideO2Panel();
+                }
+            }
+        }
+
+
+
+        // Cargo
+
+        // Hyperdrive
+        if(this.hyperDriveEngaged) this.hyperDriveUpdate();
+        
+        // Docking
+        if(this.specs.canBeDockedTo && this.sprite != this.game.player.ship.sprite){
+            var a = this.dockingPort.worldPosition.x - this.game.player.ship.dockingConnector.worldPosition.x;
+            var b = this.dockingPort.worldPosition.y - this.game.player.ship.dockingConnector.worldPosition.y;
+            var d = Math.sqrt(a*a + b*b);
+           
+            // Rotation
+            var r = Math.abs(Math.abs(this.sprite.angle - this.game.player.ship.sprite.angle) - 180); 
+
+            if(d<15 && r<20){
+                this.game.player.ship.okToDock = true;
+                this.landingMessage.setText("Press D to Dock");
+            } else {
+                this.game.player.ship.okToDock = false;
+                this.landingMessage.setText("Cleared to Dock");
+            }
+            
+            // Update distance for info
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(
+                this.sprite,
+                this.game.player.sprite
+            );
+
+            this.showInfoIfNeeded();
+        }
+
+        if(this.isDocked || this.dockingInProgress){
+            this.sprite.x += this.dockingTarget.sprite.deltaX;
+            this.sprite.y += this.dockingTarget.sprite.deltaY;
+        }
+
+        // Finally, limit speed.
+        this.limitSpeed();
+    }   
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/_engine.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 /*
 Markov.coffee - Markov chains in CoffeeScript.
 github.com/SyntaxColoring/Markov-Word-Generator
@@ -43539,6 +47212,67 @@ if (typeof module !== "undefined" && module !== null) {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: lib/tombola.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Engine extends Equipment {
+    constructor(game,options) {
+        super(game,options);
+
+        this.fuelConsumption = 1;
+        this.thrust = 100;
+        this.spoolUpSpeed = 1;
+        this.spoolDownSpeed = .04;
+
+        this.currentSpool = 0;
+        this.isEngine = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','type','thrust','fuelConsumption'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Engine Type','Thrust','Fuel Consumption'];
+    }
+
+    set slot(slot){
+        var slotAnchor = this.parentObject.specs.engineSlots[slot].anchor;
+        
+        // Setup Flames
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
+        //this.flames.blendMode = PIXI.blendModes.ADD; // Some bug that makes the sidebar blink.
+        this.flames.angle = this.parentObject.specs.engineSlots[slot].angle;
+        this.flames.anchor.set(slotAnchor.x,slotAnchor.y);
+    }
+
+    accelerate(){
+        if(this.currentSpool<=1){
+            this.currentSpool = Math.min(this.currentSpool+this.spoolUpSpeed,1);
+        }
+        if(this.retro) {
+            this.currentSpool = 1
+        }        
+    }
+
+    deaccelerate(){
+        if(!this.retro) {
+            this.currentSpool = Math.max(this.currentSpool-this.spoolDownSpeed,0)
+        } else {
+            this.currentSpool = Math.max(this.currentSpool-.1,0)            
+        }
+    }
+
+    fire(){
+        this.accelerate();
+    }
+    
+    shutdown(){
+        this.deaccelerate();    
+    }
+
+    update(){
+        this.flames.alpha = this.currentSpool;    
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/basicEngine.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44038,6 +47772,38 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class BasicEngine extends Engine {
+    constructor(game,options) {
+        super(game,options);
+
+        this.thrust = options.data.thrust;
+        this.maxSpeed = options.data.maxSpeed;
+        this.spoolUpSpeed = options.data.spoolUpSpeed;
+        this.spoolDownSpeed = options.data.spoolDownSpeed;
+        this.fuelConsumption = options.data.fuelConsumption;
+
+        this.sound = game.add.audio('basic-engine');
+    }
+    accelerate(){
+        super.accelerate();
+        if(!this.sound.isPlaying) this.sound.play();
+        
+        this.sound.volume = this.flames.alpha;
+    }
+    deaccelerate(){
+        super.deaccelerate();
+        this.sound.volume = this.flames.alpha;
+        
+        if(this.sound.volume==0 && this.sound.isPlaying) this.sound.stop();
+    }
+
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/smallEngine.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 class Names {
     constructor(rng) {
         this.rng = rng;
@@ -44059,12 +47825,12 @@ class Names {
     }
     
     static star(){
+        var name;
+
         var markovChain = new Markov;
         markovChain.n = rng.nextInt(5,5);
         markovChain.sequences = Names.parseWords(NAMES_STAR.join('\n'));
-        markovChain.rng = rng;
-        
-        var name;
+        markovChain.rng = rng;        
         
         if(rng.next()>.9){
             markovChain.maxLength = rng.nextInt(3,6);
@@ -44085,6 +47851,12 @@ class Names {
         return name;
     }
 
+    static outerRimStar(){
+        var designation = OUTER_RIM_DESIGNATIONS[rng.nextInt(0, OUTER_RIM_DESIGNATIONS.length-1)]
+        var number = rng.nextInt(100,999);
+        return `${designation}-${number}`
+    }
+
     static proper(){
         return Names.parseName(NAMES_PROPER[rng.nextInt(0, NAMES_PROPER.length-1)]);
     }
@@ -44092,6 +47864,29 @@ class Names {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/_constants.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class SmallEngine extends Engine {
+    constructor(game,options) {
+        super(game,options);
+
+        this.name = 'Small Engine';
+        this.key = 'small_engine';
+
+        this.thrust = 130;
+        this.maxSpeed = 150;
+        this.spoolUpSpeed =.08;
+        this.spoolDownSpeed = .04;
+        this.fuelConsumption = .8;
+
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
+        this.flames.scale.set(.6);
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/engines/_thruster.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44135,6 +47930,29 @@ Array.prototype.lastItem = function() {
     return this[this.length-1];
 };
 
+Array.prototype.firstItem = function() {
+    return this[0];
+};
+
+Array.prototype.clean = function(deleteValue) {
+  for (var i = 0; i < this.length; i++) {
+    if (this[i] == deleteValue) {         
+      this.splice(i, 1);
+      i--;
+    }
+  }
+  return this;
+};
+
+Number.prototype.between = function(a, b, inclusive) {
+  var min = Math.min.apply(Math, [a, b]),
+    max = Math.max.apply(Math, [a, b]);
+  return inclusive ? this >= min && this <= max : this > min && this < max;
+};
+
+Number.prototype.clamp = function(min, max) {
+  return Math.min(Math.max(this, min), max);
+};
 
 function isEven(n) {
    return n % 2 == 0;
@@ -44286,6 +48104,13 @@ const PLANET_SERVICES_REQUIREMENTS = [
         level : 7,
     }
 ];
+
+PLANET_SPECIALIZATIONS = {
+    culture : ['peaceful','tourism','military'],
+    industry : ['manufacturing','agriculture'],
+    science : ['mining','technology'],
+    trade : ['luxury','government'],
+}
 
 const WEAPON_TYPES = {
     miningLaser :    'miningLaser',
@@ -44449,8 +48274,73 @@ const GREEK_ALPHABET = [
     'Omega',
 ]
 
+const OUTER_RIM_DESIGNATIONS = [
+    'NCG',
+    'HD',
+    'NCC',
+    'GH',
+    'F',
+]
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/_inventoryObject.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Thruster extends Engine {
+    constructor(game,options) {
+        super(game,options);
+        this.game.register(this);
+
+        this.engineType = ENGINE_TYPES.reactionControlThruster;
+        this.thrust = 0;
+        this.fuelConsumption = .1;
+
+        this.spoolUpSpeed = .3;
+        this.spoolDownSpeed = .6;
+
+        this.layout = options.layout;
+
+        this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'rcs_flame'));
+        this.flames.x = this.layout.x-this.parentObject.sprite.width/2;
+        this.flames.y = this.layout.y-this.parentObject.sprite.height/2;
+        this.flames.angle = this.layout.angle;
+        this.flames.scale.set(.9);
+        this.flames.anchor.set(0,0);
+
+        var smoke = {
+            image: 'smoke-trail',
+            lifespan: { min: 150, max: 400 },
+            scale: { value: { min: .03, max: .1 } },
+            vx: { value: { min: 0, max: 0 } },
+            vy: { value: { min: 0, max: 0 }, delta: .2, control: [ { x: 0, y: 1 }, { x: 0, y: 0 } ] },
+            alpha: { value: .3, control :[ { x: 0, y: 0 }, { x: 0.3, y: 1 }, { x: 1, y: 0 }] },
+            rotation: { value: 0, delta: { min: -2.0, max: 2.0 } }
+        };
+
+        this.emitter = this.game.ps.createEmitter(); 
+        this.emitter.addToWorld();
+
+        this.game.ps.addData('smoke', smoke);
+        this.soundCountdown = 10;
+    }
+    accelerate(){
+        super.accelerate();
+        this.puff();
+    }
+    deaccelerate(){
+        super.deaccelerate();
+    }    
+    puff(){
+        var px = this.flames.worldPosition.x + game.camera.x;
+        var py = this.flames.worldPosition.y + game.camera.y;
+
+        this.emitter.emit('smoke', px, py, { total: 1 });
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/pickup.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44518,6 +48408,52 @@ class InventoryObject {
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/gameObjects/_gameObject.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Pickup extends GameObject {
+    constructor(game,group,x,y) {
+        super(game);
+     
+        this.group = group        
+        this.magneticDistance = 150;    
+    }
+
+    pickedUpBy(object){
+        this.destroy();
+        return object.collectNumberOfItems(1,this.contents);
+    }
+
+    processCollision(pickup,object){
+        this.pickedUpBy(this.game.player.ship)
+    }
+            
+    kill(){
+        var fadeOut = this.game.add.tween(this.sprite).to( { alpha: 0 }, 2000, "Quart.easeIn", true);
+        fadeOut.onComplete.add(function(){
+            this.destroy();            
+        }, this);
+    }
+           
+    // Rendering
+    update() {
+        super.update();
+
+        if(this.alive){
+            var hits = this.game.physics.p2.hitTest(this.sprite.position);
+            for (let hit of hits) {
+                var target = hit.parent.sprite.parentObject;                
+                if(target.canPickThingsUp) this.pickedUpBy(target);                
+            }
+        }
+    }
+    
+    
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/flake.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44772,15 +48708,15 @@ class GameObject {
     }
 
     destroy(){
-        this.alive = false;
-
         this.game.unregister(this);        
         if(this.sprite!=undefined){
             this.sprite.destroy();
         }
+        delete this;
     }
 
     destroyEmitter(){
+        debugger;
         this.destroy();        
     } 
 
@@ -44833,12 +48769,76 @@ class GameObject {
     }
 
     update(){
-        
+        this.game.counter++;
     }
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/systems/_galaxy.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class FlakePickup extends Pickup {
+    constructor(game,group,x,y) {
+        super(game);
+     
+        this.group = group
+
+        // Basic Physics
+        this.sprite = this.group.create(x,y,'asteroid-flake-'+game.rnd.integerInRange(1,3))
+        this.game.physics.enable(this.sprite, Phaser.Physics.ARCADE);
+        this.sprite.body.bounce.setTo(1, 1);
+        this.sprite.body.collideWorldBounds = true;
+
+        // Flake
+        this.lifespan = game.rnd.realInRange(30,60);
+        this.game.time.events.add(Phaser.Timer.SECOND * this.lifespan, this.kill, this);
+        this.sprite.body.velocity.setTo(game.rnd.integerInRange(-20, 20),game.rnd.integerInRange(-20, 20));
+        this.sprite.body.mass = 3;
+        this.sprite.body.setSize(30, 30, 6, 6);
+        this.sprite.body.checkCollision.up = false;
+        this.sprite.body.checkCollision.down = false;
+        this.sprite.body.checkCollision.left = false;
+        this.sprite.body.checkCollision.right = false;
+        this.roationSpeed = game.rnd.integerInRange(-50,50);
+        this.sprite.anchor.set(0.5);
+
+        var scale = game.rnd.realInRange(.5,1.25)
+        this.sprite.scale.setTo(scale, scale);
+        
+        // Item
+        var chance = game.rnd.realInRange(0,1);
+        if(chance<RARITY_MINING_CHANCE.rare){
+            this.contents = InventoryObject.make('raw_paladium',this.game);            
+        } else if(chance<RARITY_MINING_CHANCE.uncommon){
+            this.contents = InventoryObject.make('meteoric_iron',this.game);            
+        } else {
+            this.contents = InventoryObject.make('asteroid_flake',this.game);            
+        }
+    }
+
+    processCollision(pickup,player){
+        super.processCollision(pickup,player);
+    }
+        
+    update() {
+        super.update();
+        // Spin
+        if(this.sprite.alive){
+            this.sprite.body.angularVelocity = this.roationSpeed;
+    
+            var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+            if(distance<this.magneticDistance){
+                this.game.physics.arcade.moveToObject(this.sprite, this.game.player.sprite, 100)
+            }            
+        }
+    }
+    
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/iceFlake.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44849,9 +48849,9 @@ class Galaxy extends GameObject{
         this.name = Names.star();
 
         this.settings = {
-            starsAmount : 45,
-            mapWidth : 1000,
-            mapHeight : 1000,
+            starsAmount : 50,
+            mapWidth : 3000,
+            mapHeight : 3000,
         }    
     }
     
@@ -44862,10 +48862,78 @@ class Galaxy extends GameObject{
             this.starSystems.push(system);
         }
     }
+    
+    get closestSystemToCenter() {
+        return _.sortBy(this.starSystems,'distanceFromGalacticCenter').firstItem();
+    }
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/systems/_system.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class IceFlakePickup extends Pickup {
+    constructor(game,group,x,y) {
+        super(game);
+     
+        this.group = group
+
+        // Basic Physics
+        this.sprite = this.group.create(x,y,'ice-small-'+game.rnd.integerInRange(1,5))
+        this.game.physics.enable(this.sprite, Phaser.Physics.ARCADE);
+        this.sprite.body.bounce.setTo(1, 1);
+        this.sprite.body.collideWorldBounds = true;
+
+        // Flake
+        this.lifespan = game.rnd.realInRange(30,60);
+        this.game.time.events.add(Phaser.Timer.SECOND * this.lifespan, this.kill, this);
+        this.sprite.body.velocity.setTo(game.rnd.integerInRange(-20, 20),game.rnd.integerInRange(-20, 20));
+        this.sprite.body.mass = 2;
+        this.sprite.body.setSize(16, 16, 6, 6);
+        this.sprite.body.checkCollision.up = false;
+        this.sprite.body.checkCollision.down = false;
+        this.sprite.body.checkCollision.left = false;
+        this.sprite.body.checkCollision.right = false;
+        this.roationSpeed = game.rnd.integerInRange(-50,50);
+        this.sprite.anchor.set(0.5);
+
+        var scale = game.rnd.realInRange(.3,.6)
+        this.sprite.scale.setTo(scale, scale);
+        
+        // Item
+        var chance = game.rnd.realInRange(0,1);
+        if(chance<RARITY_MINING_CHANCE.rare){
+            this.contents = InventoryObject.make('volatile_compounds',this.game);            
+        } else if(chance<RARITY_MINING_CHANCE.uncommon){
+            this.contents = InventoryObject.make('ionized_gas',this.game);            
+        } else {
+            this.contents = InventoryObject.make('space_ice',this.game);            
+        }
+    }
+
+    processCollision(pickup,player){
+        super.processCollision(pickup,player);
+    }
+        
+    update() {
+        super.update();
+        // Spin
+        if(this.sprite.alive){
+            this.sprite.body.angularVelocity = this.roationSpeed;
+    
+            var distance = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+            if(distance<this.magneticDistance){
+                this.game.physics.arcade.moveToObject(this.sprite, this.game.player.sprite, 100)
+            }            
+        }
+    }
+    
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/asteroid.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -44875,10 +48943,11 @@ class StarSystem extends GameObject{
         super(game);
         this.stellarObjects = [];
         this.neighbors = [];
+        this.planets = [];
         
         this.settings = {
             minDistanceFromAnotherStar : 60,
-            nebulaChance : .1,
+            nebulaChance : 1,
             minRoids : 0,
             maxRoids : 2,
             minRoidOffset : {
@@ -44903,45 +48972,62 @@ class StarSystem extends GameObject{
         }
         
         // Details
+        this.generatePosition();
+        
         this.name = Names.star();
+        if(this.isOuterRimSystem) this.name = Names.outerRimStar();
+
         this.type = this.determineItemFromArray(STELLAR_TYPES);
         this.size = rng.next(2,5);
-        this.generatePosition();
 
         // Planets
         this.planetCount = this.game.rng.nextInt(this.settings.minPlanets, this.settings.maxPlanets);    
         var x = this.game.world.centerX;
         var y = this.game.world.centerX;
         for (var i = 0; i < this.planetCount; i++) {             
-            this.stellarObjects.push(new BasicPlanet(this.game,{
+            this.planets.push(new BasicPlanet(this.game,{
                 x : x,
                 y : y,
                 index : i,
                 system : this,
             }));
-
-            x += this.game.rng.nextInt(this.settings.minPlanetOffset.x, this.settings.maxPlanetOffset.x);
-            y += this.game.rng.nextInt(this.settings.minPlanetOffset.y, this.settings.maxPlanetOffset.y);
+            
+            x += this.game.rng.next(this.settings.minPlanetOffset.x, this.settings.maxPlanetOffset.x);
+            y += this.game.rng.next(this.settings.minPlanetOffset.y, this.settings.maxPlanetOffset.y);
         }
     }
     
     generatePosition(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var densityFactor = (this.game.galaxy.starSystems.length+1)/this.game.galaxy.settings.starsAmount;
+        var maximumDistance = ((size*densityFactor)*2)+200;
+
+        var x = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapWidth/2;
+        var y = rng.nextInt(-maximumDistance/2, maximumDistance/2)+this.game.galaxy.settings.mapHeight/2;
+
         this.position = {
-            x : rng.nextInt(0, this.game.galaxy.settings.mapWidth),
-            y : rng.nextInt(0, this.game.galaxy.settings.mapHeight),
-        }
+            x : x.clamp(0,this.game.galaxy.settings.mapWidth),
+            y : y.clamp(0,this.game.galaxy.settings.mapHeight)
+        }        
+        
+        // Validate Postion
         for(let system of this.game.galaxy.starSystems){
             var distance = this.distanceToStarSystem(system);
+            
+            // Minium Distance (Prevent too close)
             if(distance<this.settings.minDistanceFromAnotherStar) this.generatePosition();
         };
+
+
+        
     }
     
     arrive(){        
+        this.cleanup();
+        this.game.system = this;
         this.game.time.events.add(1000, function(){
             this.game.hud.showSystemInfo();
         }, this)
-
-        this.game.mapScreen.map.currentPath.pop();
 
         // Asteroids
         var x = 0;
@@ -44958,7 +49044,6 @@ class StarSystem extends GameObject{
             }));            
         }
 
-/*
         // Nebula
         var x = 0;
         var y = 0;
@@ -44973,12 +49058,29 @@ class StarSystem extends GameObject{
                 system : this,
             }));
         }
-*/
         
         // Activate Everything
+        for(let planet of this.planets){
+            planet.wrapper.children.forEach(function(element) {
+                element.exists = true;
+            }, this);
+        }
+        
         for(let object of this.stellarObjects){
             if(object.sprite!=undefined) object.sprite.exists = true;
         }
+    }
+
+    cleanup(){
+        this.game.asteroids.removeAll(true);
+        for(let planet of this.game.planets.children){
+            planet.children.forEach(function(element) {
+                element.exists = false
+            }, this);
+        }
+
+        for(let object of this.stellarObjects) object.destroy();
+        this.stellarObjects.length = 0;
     }
     
     get closestStarSystem(){
@@ -45017,19 +49119,21 @@ class StarSystem extends GameObject{
             }            
         }
         
+        var bestMatch = null;
         // Of the in range candidates, return the one closest to the angle of the destination system.
-        var bestMatch = jumpCandidates.reduce(function(prev, curr) {
-            var prevAngle = this.candidate.angleToStarSystem(prev);
-            var currAngle = this.candidate.angleToStarSystem(curr);
-            var destAngle = this.destAngle;            
-            return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
-        }.bind({
-            destAngle : angleToDestination,
-            candidate : this,
-        }));
+        if(jumpCandidates.length>0){
+                bestMatch = jumpCandidates.reduce(function(prev, curr) {
+                var prevAngle = this.candidate.angleToStarSystem(prev);
+                var currAngle = this.candidate.angleToStarSystem(curr);
+                var destAngle = this.destAngle;            
+                return (Math.abs(currAngle - destAngle) < Math.abs(prevAngle - destAngle) ? curr : prev);
+            }.bind({
+                destAngle : angleToDestination,
+                candidate : this,
+            }));
+        }
 
         return bestMatch;
-
     }
     
     distanceToStarSystem(system){
@@ -45044,6 +49148,23 @@ class StarSystem extends GameObject{
             this.position.x - system.position.x
         ) * 180 / Math.PI;
     }
+
+    get distanceFromGalacticCenter(){
+        var a = this.position.x - this.game.galaxy.settings.mapWidth/2
+        var b = this.position.y - this.game.galaxy.settings.mapHeight/2
+        return Math.sqrt( a*a + b*b );
+    }
+
+    get isOuterRimSystem(){
+        var size = Math.min(this.game.galaxy.settings.mapWidth,this.game.galaxy.settings.mapHeight)/2;
+        var rimPercent = 0.1;
+        
+        if(this.distanceFromGalacticCenter>size*Math.abs(rimPercent-1)){
+            return true;
+        } else {
+            return false;
+        }
+    }
     
     get isCurrentSystem(){
         return this==this.game.system;
@@ -45055,11 +49176,183 @@ class StarSystem extends GameObject{
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Asteroid extends GameObject {
+    constructor(game,group,size,x,y) {
+        super(game);
+     
+        this.group = group
+        this.emitFlakes = false;
+        
+        if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
+        if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
+        if(size==undefined) size = 'large';
+        this.size = size;
+
+        if(size=='tiny'){
+            var rnd = game.rnd.integerInRange(1, 3);
+            this.sprite = this.game.asteroids.create(x,y,'asteroid-flake-'+rnd);
+        } else {
+            this.sprite = this.game.asteroids.create(x,y,'asteroid-'+size);
+        }
+
+        this.sprite.parentObject = this;
+        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
+
+        this.sprite.body.clearShapes();
+        this.sprite.body.damping = 0;
+
+        if(size=='large'){
+            this.health = game.rnd.integerInRange(150, 200);
+            this.sprite.body.mass = 100;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(32);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-50, 50),game.rnd.integerInRange(-50, 50)],0,0)
+
+            this.minimapSize = 1.2;
+        } else if(size=='medium'){
+            this.health = game.rnd.integerInRange(70, 100);
+
+            this.sprite.body.mass = 50;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(20);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10)],0,0)
+
+            this.minimapSize = .8;
+        } else if(size=='small'){
+            // Small
+            this.health = game.rnd.integerInRange(20, 30);
+
+            this.sprite.body.mass = 10;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(14);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10)],0,0)
+
+            this.minimapSize = .5;
+        } else if(size=='tiny'){
+            // Tiny
+            this.health = game.rnd.integerInRange(3, 10);
+
+            this.sprite.body.mass = .1;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(5);
+        this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-.05, .05),game.rnd.integerInRange(-.05, .05)],0,0)
+
+            this.minimapSize = 0;
+        }
+
+        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
+        this.sprite.anchor.set(0.5);
+
+        this.hitEmitter = this.game.add.emitter(0, 0, 100);
+        this.hitEmitter.makeParticles('asteroid-flake-3');
+        this.hitEmitter.minParticleScale = .5;
+        this.hitEmitter.maxParticleScale = 1;
+        this.hitEmitter.gravity = 0;
+        this.hitEmitter.particleBringToTop = true;
+        
+        this.explodeSounds = [
+            game.add.audio('rock-crash-1'),
+            game.add.audio('rock-crash-2'),
+            game.add.audio('rock-crash-3'),
+            game.add.audio('rock-crash-4'),
+            game.add.audio('rock-crash-5'),
+            game.add.audio('rock-crash-6'),
+        ]
+        this.damageSound = game.add.audio('crunch-1');
+        this.soundCountdown = 10;
+    }
+
+    hit(bullet){
+	    this.hitEmitter.x = bullet.x;
+	    this.hitEmitter.y = bullet.y;	
+	    this.emitFlakes = true;
+	    this.soundCountdown = 10;
+	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
+    }
+        
+    kill(){
+        if(this.size=='large'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.explode();
+            this.destroy();
+            var a1 = new Asteroid(this.game,this.group,'medium',x-20,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'medium',x+20,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='medium'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.destroy();
+            var a1 = new Asteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Asteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='small'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.destroy();
+            var flakeCount = game.rnd.integerInRange(3,6);
+
+            for (var i = 0; i < flakeCount; i++) { 
+                new FlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
+            }
+        } else if(this.size=='tiny'){
+            this.destroy();
+        }
+        this.damageSound.stop();
+    } 
+       
+    explode(){
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles('asteroid-flake-1',0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .5;
+        this.explodeEmitter.maxParticleScale = 1;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
+        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
+    }
+    
+    // Rendering
+    update() {        
+        super.update();
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+
+        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+            this.sprite.exists = true;
+        } else {
+            this.sprite.exists = false;
+        }
+
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
+        
+        // Spin
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
+    }
+    
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/asteroidField.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 class Equipment extends InventoryObject {
     constructor(game,options) {
         super(game,options);
 
-        this.game.register(this); // Equipment must be registered
         this.parentObject = options.parentObject;
 
         this.isEquippable = true;
@@ -45073,7 +49366,7 @@ class Equipment extends InventoryObject {
     }
     
     set equipped(equipped){
-        this._equipped = equipped;        
+        this._equipped = equipped;                
     }
     
     get equipped(){
@@ -45095,6 +49388,8 @@ class Equipment extends InventoryObject {
             }
 
         }
+
+        this.game.register(this);
     }
     
     unequip(){        
@@ -45109,6 +49404,8 @@ class Equipment extends InventoryObject {
                 this.parentObject.unequipEquipment(this);
             }
         }
+        
+        this.game.unregister(this);
     }
     
     update(){
@@ -45121,22 +49418,67 @@ class Equipment extends InventoryObject {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class AsteroidField extends GameObject {
+    constructor(game,options) {
+        super(game);
+        
+        this.system = options.system;
+        var size = options.size;
+        if(size==undefined) size = 2000;
+        var densityLowerBound = 50;
+        var densityUpperBound = 60;
+        
+        this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
+        this.asteroids = this.game.asteroids;
+        for (var i = 0; i < this.asteroidsCount; i++) { 
+            var xPos = game.rnd.integerInRange(options.x-size, options.x+size);
+            var yPos = game.rnd.integerInRange(options.y-size, options.y+size);
+            
+            var bigness = game.rnd.integerInRange(0,100);
+
+            if(bigness>=70){
+                var asteroid = new Asteroid(this.game,this.asteroids,'large',xPos,yPos);
+            } else if(bigness<70 && bigness>50){
+                var asteroid = new Asteroid(this.game,this.asteroids,'medium',xPos,yPos);                
+            } else {
+                var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
+            }
+
+            // Add to system
+            this.system.stellarObjects.push(asteroid);
+        }
+
+        this.buoy = new Buoy(this.game,options.x,options.y);
+        this.buoy.description = `${Names.proper()} Asteroid Field`
+
+        this.system.stellarObjects.push(this.buoy);
+    }
+
+    update(){
+        super.update();
+        if(this.system == this.game.system){    
+            this.game.physics.arcade.collide(this.asteroids, this.asteroids);
+        }
+    }    
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/nebula.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 class Consumable extends InventoryObject {
     constructor(game,options) {
         super(game,options);
 
         this.parentObject = this.game.player.ship;
-
         this.isConsumable = true;
-        
-        this.equipSound = game.add.audio('equip');
-        this.unequipSound = game.add.audio('unequip');
     }
 
     consume(){
         this.parentObject.removeItemFromInventory(this);
     }
-    
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -45144,6 +49486,183 @@ class Consumable extends InventoryObject {
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Nebula extends GameObject {
+    constructor(game,options) {
+        super(game);
+
+        var x = options.x;
+        var y = options.y;
+        var size = options.size;
+        if(size==undefined) size = 2000;
+        this.size = size;
+        this.system = options.system;
+            
+        var xPos = game.rnd.integerInRange(x-this.size, x+this.size);
+        var yPos = game.rnd.integerInRange(y-this.size, y+this.size);
+
+        var densityLowerBound = 50;
+        var densityUpperBound = 60;
+
+        this.iceteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
+        this.iceteroids = this.game.asteroids;
+        for (var i = 0; i < this.iceteroidsCount; i++) { 
+            var xPos = game.rnd.integerInRange(x-size, x+size);
+            var yPos = game.rnd.integerInRange(y-size, y+size);
+            
+            var bigness = game.rnd.integerInRange(0,100);
+
+            if(bigness>=70){
+                var iceteroid = new Iceteroid(this.game,this.iceteroids,'large',xPos,yPos);
+            } else {
+                var iceteroid = new Iceteroid(this.game,this.iceteroids,'small',xPos,yPos);                
+            }
+            this.system.stellarObjects.push(iceteroid);
+        }
+
+        this.buoy = new Buoy(this.game,x,y);
+        this.buoy.description = `${Names.proper()} Ice Nebula`
+        this.name = this.buoy.description;
+        this.system.stellarObjects.push(this.buoy);
+
+        this.shouldShowNebulaEffect = false;
+        this.nebulaSpawnInterval = 10;
+        this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+
+        // Effects
+        this.nebulaOverlay = this.game.add.graphics(0, 0);
+        this.nebulaOverlay.beginFill(0x34495e);
+        this.nebulaOverlay.drawRect(0,0,screenWidth,screenHeight);
+        this.nebulaOverlay.endFill();
+        this.nebulaOverlay.alpha = 0;
+        this.nebulaOverlayTargetAlpha = .4;
+        this.game.starsTargetAlpha = .2;
+        this.nebulaOverlayStepAlpha = .002;
+        this.nebulaOverlay.visible = false;
+        this.nebulaOverlay.fixedToCamera = true;
+        
+        var smoke = {
+            lifespan: 7000,
+            image: 'nebula-cloud',
+            sendToBack: true,
+            alpha: { initial: 0, value: .06, control: [ { x: 0, y: 0 }, { x: 0.2, y: 1 }, { x: 0.5, y: 0.5 }, { x: 1, y: 0 } ] },
+            scale: { min: 1, max: 1.5 },
+            vx: { min: -0.2, max: 0.2 },
+            vy: { min: -0.2, max: -0.2 },
+            hsv: { value: 210 },
+        };
+        this.game.ps.addData('nebula-cloud', smoke);
+        this.smokeEmitter = this.game.ps.createEmitter();
+        this.smokeEmitter.addToWorld();
+
+    	this.particlesEmitter = game.add.emitter(0,0, 500);
+    	this.particlesEmitter.width = game.camera.width;
+    	this.particlesEmitter.height = game.camera.height;
+    	    
+    	this.particlesEmitter.makeParticles(['ice-small-1','ice-small-2','ice-small-3','ice-small-4','ice-small-5']);
+    
+    	this.particlesEmitter.setAlpha(0, 1, 2000,Phaser.Easing.Quadratic.InOut,true);
+
+    	this.particlesEmitter.minParticleScale = 0.08;
+    	this.particlesEmitter.maxParticleScale = 0.35;
+    
+    	this.particlesEmitter.setYSpeed(-10, 10);
+    	this.particlesEmitter.setXSpeed(-10, 10);
+        this.particlesEmitter.gravity = 3;
+    
+    	this.particlesEmitter.minRotation = -100;
+    	this.particlesEmitter.maxRotation = 100;
+    
+    	this.particlesEmitter.start(false, 4000, 10, 0);
+    	this.particlesEmitter.on = false;
+    	this.iceteroids.add(this.particlesEmitter);
+    	
+    	// Ambient Sounds
+        this.ambientSound = game.add.audio('nebula-ambient-1');
+    }
+    
+    destroy(){
+        if(this.shouldShowNebulaEffect) this.game.player.exitDarkness();
+        super.destroy();
+    }
+    
+    update(){
+        super.update();
+        
+        if(this.system == this.game.system){    
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.buoy.sprite, this.game.player.sprite);
+        
+            if(this.distanceToPlayer<=this.size*1.5){
+                this.game.player.enterDarkness(this);
+                this.shouldShowNebulaEffect = true;
+            } else {
+                this.game.player.exitDarkness(this);
+                this.shouldShowNebulaEffect = false;
+            }
+            
+            if(this.shouldShowNebulaEffect){   
+                // Particles
+                this.particlesEmitter.on = true;   
+                this.particlesEmitter.x = this.game.camera.x + this.game.camera.width/2;
+                this.particlesEmitter.y = this.game.camera.y + this.game.camera.height/2;
+    
+                // Overlay
+                this.nebulaOverlay.visible = true;
+                
+                if(this.nebulaOverlay.alpha<=this.nebulaOverlayTargetAlpha)
+                    this.nebulaOverlay.alpha+=this.nebulaOverlayStepAlpha
+    
+                if(this.game.stars.alpha>=this.game.starsTargetAlpha)
+                    this.game.stars.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.game.stars.alpha<=this.game.starsTargetAlpha)
+                    this.game.stars.alpha=this.game.starsTargetAlpha    
+                
+                // Smoke
+                if(this.nebulaSpawnCountdown==0){
+                    this.smokeEmitter.emit(
+                        'nebula-cloud',
+                        this.game.camera.x + this.game.rnd.integerInRange(0, this.game.camera.width), 
+                        this.game.camera.y + this.game.rnd.integerInRange(0, this.game.camera.height),
+                    ) 
+                    this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+                } else {
+                    this.nebulaSpawnCountdown--;
+                }
+                
+                // Sound
+                if(!this.ambientSound.isPlaying) {
+                    console.log("Start Loop");
+                    this.ambientSound.loopFull(AMBIENT_VOLUME);
+                }            
+            } else {
+                // Stop Particles
+                this.particlesEmitter.on = false;   
+                
+                // Hide overlay
+                this.nebulaOverlay.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.nebulaOverlay.alpha<this.nebulaOverlayStepAlpha){
+                    this.nebulaOverlay.alpha = 0;
+                    this.nebulaOverlay.visible = false;
+                }
+                
+                // Stars
+                this.game.stars.alpha+=this.nebulaOverlayStepAlpha
+                if(this.game.stars.alpha>=1)
+                    this.game.stars.alpha=1;        
+            
+                // Stop sound
+                if(this.ambientSound.isPlaying && this.ambientSound.volume == AMBIENT_VOLUME) {
+                    this.ambientSound.fadeOut(3000);    
+                }
+                this.ambientSound.onFadeComplete.addOnce(function(){
+                    this.ambientSound.stop();
+                }, this);
+            }
+        }
+    }
+    
+}
 class Reactor extends Equipment {
     constructor(game,options) {
         super(game,options);
@@ -45185,10 +49704,150 @@ class Reactor extends Equipment {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/iceteroid.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/equipment/batteries.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class Iceteroid extends GameObject {
+    constructor(game,group,size,x,y) {
+        super(game);
+     
+        this.group = group
+        this.emitFlakes = false;
+        
+        if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
+        if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
+        if(size==undefined) size = 'large';
+        this.size = size;
+
+        this.sprite = this.game.asteroids.create(x,y,`ice-${size}-${game.rnd.integerInRange(1, 5)}`);
+
+        this.sprite.parentObject = this;
+        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
+
+        this.sprite.body.clearShapes();
+        this.sprite.body.damping = 0;
+
+        if(size=='large'){
+            this.health = game.rnd.integerInRange(150, 200);
+            this.sprite.body.mass = 10;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(10);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10)],0,0)
+
+            this.minimapSize = 1.2;
+        } else if(size=='small'){
+            this.health = game.rnd.integerInRange(70, 100);
+
+            this.sprite.body.mass = 5;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(8);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-2, 2),game.rnd.integerInRange(-2, 2)],0,0)
+
+            this.minimapSize = .8;
+        }
+
+        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
+        this.sprite.anchor.set(0.5);
+
+        this.hitEmitter = this.game.add.emitter(0, 0, 100);
+        this.hitEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`);
+        this.hitEmitter.minParticleScale = .2;
+        this.hitEmitter.maxParticleScale = .4;
+        this.hitEmitter.gravity = 0;
+        this.hitEmitter.particleBringToTop = true;
+        
+        this.explodeSounds = [
+            game.add.audio('ice-crash-1'),
+            game.add.audio('ice-crash-2'),
+            game.add.audio('ice-crash-3'),
+            game.add.audio('ice-crash-4'),
+            game.add.audio('ice-crash-5'),
+            game.add.audio('ice-crash-6'),
+        ]
+        this.damageSound = game.add.audio('crunch-1');
+        this.soundCountdown = 10;
+    }
+
+    hit(bullet){
+	    this.hitEmitter.x = bullet.x;
+	    this.hitEmitter.y = bullet.y;	
+	    this.emitFlakes = true;
+	    this.soundCountdown = 10;
+	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
+    }
+        
+    kill(){
+        if(this.size=='large'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.explode();
+            this.destroy();
+            var a1 = new Iceteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Iceteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='small'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.destroy();
+            var flakeCount = game.rnd.integerInRange(2,5);
+
+            for (var i = 0; i < flakeCount; i++) { 
+                new IceFlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
+            }
+        }
+        this.damageSound.stop();
+    } 
+       
+    explode(){
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`,0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .2;
+        this.explodeEmitter.maxParticleScale = .6;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
+        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
+    }
+    
+    // Rendering
+    update() {
+        super.update();
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+
+        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+            this.sprite.exists = true;
+        } else {
+            this.sprite.exists = false;
+        }
+
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
+        
+        // Spin
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
+    }
+
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
+    }
+}
 class Batteries extends Equipment {
     constructor(game,parentObject) {
         super(game,parentObject);
@@ -45205,11 +49864,29 @@ class Batteries extends Equipment {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/flake.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/equipment/BasicFuelTank.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class BasicFuelTank extends Equipment {
+class Item_Flake extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Asteroid Flake';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.common;
+        this.mass = 10;
+        this.baseValue = 16;
+        this.type = 'Mineral';
+    }
+}class BasicFuelTank extends Equipment {
     constructor(game,options) {
         super(game,options);
         this.fuelCapacity = options.data.fuelCapacity;
@@ -45254,11 +49931,29 @@ class BasicFuelTank extends Equipment {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/paladium.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/equipment/RepairKit.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class RepairKit extends Consumable {
+class Item_Paladium extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Raw Paladium';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.rare;
+        this.mass = 20;
+        this.baseValue = 100;
+        this.type = 'Mineral';
+    }
+}class RepairKit extends Consumable {
     constructor(game,options) {
         super(game,options);
         
@@ -45284,11 +49979,29 @@ class RepairKit extends Consumable {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/metoricIron.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/equipment/FuelKit.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class FuelKit extends Consumable {
+class Item_MeteoricIron extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Meteoric Iron';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.uncommon;
+        this.mass = 15;
+        this.baseValue = 32;
+        this.type = 'Mineral';
+    }
+}class FuelKit extends Consumable {
     constructor(game,options) {
         super(game,options);
         
@@ -45314,8 +50027,55 @@ class FuelKit extends Consumable {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/* Merging js: app/items/fuel.js begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/* Merging js: app/equipment/FTLFuel.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Item_Fuel extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Rocket Fuel';
+        this.storageClass = CARGO_STORAGE_CLASS.liquid
+        this.rarity = RARITY.exotic;
+        this.mass = 1;
+        this.type = 'Liquid'
+
+        this.baseValue = 1;
+    }
+}class FTLFuel extends Consumable {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.jumpsAmount = 1;
+        this.isHyperdriveFuel = true;
+
+        this.infoFields = ['baseValue','mass','rarity','__space__','jumpsAmount'];
+        this.infoFieldLabels = ['Value','Weight','Rarity','','Jumps'];
+    }
+    
+    consume(){
+        super.consume();
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/basicMiner.js begins */
 /* Merging js: app/weapons/_weapon.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 
 
 class Weapon extends Equipment {
@@ -45365,13 +50125,290 @@ class Weapon extends Equipment {
             bullet.kill();
         }
     }
+}class BasicMiner extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'MV Fair Rosamond',
+            description : 'Cobalt Class Mining Vessel',
+            health: 130,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
+            maxFuel : 2200,
+            maxEnergy: 0,
+            mass: 2, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [ 5,36, 6,7, 21,39, 20,51, 6,50 ]
+                },
+                {
+                    "shape": [ 28,38, 21,39, 6,7, 9,0, 18,0 ]
+                },
+                {
+                    "shape": [ 28,38, 20,7, 28,7 ]
+                },
+                {
+                    "shape": [ 6,7, 5,36, 0,36, 0,7 ]
+                }
+            ],
+            size : {
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
+            },
+            weaponSlots : [
+                {
+                    position : {
+                        x: 9,
+                        y: -22
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                }
+            ],
+            engineSlots : [{
+                anchor : {
+                    x: 0.57,
+                    y: -1.5
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 0,
+                    y: 8,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 26,
+                    y: 14,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 5,
+                    y : 41,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 21,
+                    y: 46,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 11,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 21,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: -3,
+                    y: -24,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            storage : {
+                equipment : 500,
+                bulk : 800,
+            }
+        }
+
+        // Sprites
+        this.sprite = this.game.add.sprite(x,y, 'mining_ship');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
 }
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/fuelTanker.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/ships/_ship.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class FuelTanker extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'AOG Belvidera',
+            description : 'Fuel Tanker',
+            health : 100,
+            turnDecay: .005,
+            turnAccel: .007,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 40,
+            maxReverse: 60,
+            maxFuel : 9000,
+            maxEnergy: 150,
+            mass: 10, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [ 51,54, 37,53, 36,32, 86,32, 87,54 ]
+                },
+                {
+                    "shape": [ 36,32, 37,53, 0,54, 0,32 ]
+                },
+                {
+                    "shape": [ 36,93, 37,53, 51,54, 52,93 ]
+                },
+                {
+                    "shape": [ 37,27, 51,32, 36,32 ]
+                },
+                {
+                    "shape": [ 35,5, 50,27, 51,32, 37,27 ]
+                },
+                {
+                    "shape": [ 46,1, 51.83333206176758,4.333335876464844, 50,27, 35,5, 40,1 ]
+                }
+            ],
+            size : {
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
+            },
+            weaponSlots : [
+                {
+                    position : {
+                        x: 0,
+                        y: 0
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                },
+                {
+                    position : {
+                        x: 9,
+                        y: -22
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                }
+            ],
+            engineSlots : [{
+                anchor : {
+                    x: 0.55,
+                    y: -2.8
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 35,
+                    y: 16,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 52,
+                    y: 22,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x: 35,
+                    y : 71,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 52,
+                    y: 76,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 41,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 51,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            storage : {
+                bulk : 300,
+                passengers : 2,
+                gas : 0,
+                liquid : 0,
+            },
+            dockingPorts : [{
+                position : {
+                    x: 0,
+                    y: -47,
+                    angle : 90,
+                },
+                inUse: false,
+            }],
+            dockingConnector : {
+                position : {
+                    x: 0,
+                    y: -50,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            canBeDockedTo: true,
+        }
+
+        // Sprites
+        this.sprite = this.game.add.sprite(x,y, 'fuelTanker2');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+
+        //var blaster = new BasicBlaster(this.game,this);
+        //this.equipWeaponInSlot(blaster,1);
+
+        // Engine
+/*
+        var engine = new BasicEngine(this.game,this);
+        this.equipEngineInSlot(engine,0);
+        this.refuel();
+
+        // Reactor
+        var reactor = new Reactor(this.game,this);
+        this.equipEquipmentInSlot(reactor,0);
+        this.recharge();
+*/
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
 class Ship extends GameObject {
     constructor(game,x,y) {
         super(game);
@@ -45440,6 +50477,7 @@ class Ship extends GameObject {
 
         // Hyperdrive
         this.hyperDriveDelay = 3600;
+        this.jumpWasAborted = false;
 
         // Sounds
         this.infoSound = game.add.audio('beep-beep');
@@ -45563,7 +50601,6 @@ class Ship extends GameObject {
         this.ventData = {
             lifespan: 8000,
             image: 'white-smooth',
-            //blendMode: 'ADD',
             vx: { min: -.4, max: .4 },
             vy: { min: -.4, max: .4 },
             alpha: { min: 0, max: .3 },
@@ -45575,15 +50612,21 @@ class Ship extends GameObject {
         this.atmosphereWell = this.atmosphereEmitter.createGravityWell(0,0, .01);
 
         // Hyperdrive
-        var hyperData = {
-            lifespan: 600,
-            image: 'white',
+        this.hyperData = {
+            lifespan: 300,
+            image: 'white-smooth',
             bringToTop: true,
             blendMode: 'ADD',
             hsv: { value: 250,},
             alpha: { value: .5 , control:  [{ x: 0, y: 1 }, { x: 1, y: 0 } ]},
+            scale: { value: .5 },
+            emit: {
+                name: { at: [ { time: 0, value: 'spark' } ] }, 
+                value: 0, at: [ { time: 0, value: 5 } ]
+            }
         };
-        this.game.ps.addData('hyperDrive', hyperData);
+        
+        this.game.ps.addData('hyperDrive', this.hyperData);
         this.hyperDriveEmitter = this.game.ps.createEmitter(Phaser.ParticleStorm.SPRITE, new Phaser.Point(0, 0));
         this.hyperDriveEmitter.addToWorld();
 
@@ -45800,7 +50843,7 @@ class Ship extends GameObject {
     }
 
     goInReverse() {
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             if(this.speed<this.specs.maxReverse){
                 this.sprite.body.reverse(this.specs.reverseThrust)
             }
@@ -45811,7 +50854,7 @@ class Ship extends GameObject {
     }
     
     turnLeft(){
-        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel) {
+        if(!this.isDocked && this.sprite.body.angularVelocity>-this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.angularVelocity -= this.specs.turnAccel;
         
             this.fireThruster('forward_right');
@@ -45820,7 +50863,7 @@ class Ship extends GameObject {
     }
 
     turnRight(){
-        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel) {
+        if(!this.isDocked && this.sprite.body.angularVelocity<this.specs.maxTurning && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.angularVelocity += this.specs.turnAccel;
 
             this.fireThruster('forward_left');
@@ -45829,7 +50872,7 @@ class Ship extends GameObject {
     }
 
     moveLeft(){
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.thrustLeft(this.specs.leftRightThrust)
 
             this.fireThruster('forward_right');
@@ -45838,7 +50881,7 @@ class Ship extends GameObject {
     }
 
     moveRight(){
-        if(!this.isDocked && this.hasFuel) {
+        if(!this.isDocked && this.hasFuel && !this.hyperDriveEngaged) {
             this.sprite.body.thrustRight(this.specs.leftRightThrust)
 
             this.fireThruster('forward_left');
@@ -45892,7 +50935,6 @@ class Ship extends GameObject {
             this.reachedWaypoint();
         } else {
             var turnSpeed = Math.abs(difference)*.02;
-            //sconsole.log(`turn:${turnSpeed.toFixed(2)} | dist: ${this.distanceToWaypoint.toFixed(2)} | eta: ${eta.toFixed(2)}s`);
             if(difference<-3 && difference>-180){
                 if(Math.abs(this.sprite.body.angularVelocity)< turnSpeed){
                     this.turnLeft();
@@ -45968,6 +51010,12 @@ class Ship extends GameObject {
                 objects.push(gameObject);
             }
         },this);
+        this.game.system.planets.forEach(function(gameObject) {
+            if(gameObject.canNavigateTo && gameObject != this){
+                objects.push(gameObject);
+            }
+        },this);
+
         return objects;
     }
     
@@ -46014,7 +51062,12 @@ class Ship extends GameObject {
     get formattedTimeToCurrentNavigationTarget(){
         var vx = this.sprite.body.velocity.x;
         var vy = this.sprite.body.velocity.y;
-        var eta = this.distanceToCurrentNavigationTarget/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
+        var distanceToNavigationTarget = this.distanceToCurrentNavigationTarget
+        if(this.navigationTarget.isPlanet){
+            distanceToNavigationTarget = distanceToNavigationTarget*2; // Planets have difference scale
+        }
+        
+        var eta = distanceToNavigationTarget/Math.sqrt(Math.pow(vx,2) + Math.pow(vy,2));
         if(eta<1 || eta.isNaN){
             return '--';
         } else {
@@ -46037,12 +51090,14 @@ class Ship extends GameObject {
     refuel(){
         this.fuelQuantity = this.maxFuel;
         this.lowFuelLightShown = false;
+        
+        this.game.hud.hasFuel();
     }
     
     lowFuelLight(){
         if(!this.lowFuelLightShown) {
-            this.game.hud.message("Low Fuel");
             this.lowFuelLightShown = true;
+            this.game.hud.lowFuel();
         }
     }
     
@@ -46060,6 +51115,10 @@ class Ship extends GameObject {
 
     addFuel(amount){
         this.fuelQuantity += amount;
+
+        if(this.fuelPercentage>25){
+            this.game.hud.hasFuel();
+        }
     }
     
     get fuelPercentage(){
@@ -46116,7 +51175,7 @@ class Ship extends GameObject {
         var closestLandingSite = false;
         var landingSitesInRange = [];
         for (let landingSite of this.game.gameObjects) {
-            if(landingSite.canLand){
+            if(landingSite.canLand && landingSite.system == this.game.system){
                 var distance = this.game.physics.arcade.distanceBetween(landingSite.sprite, this.sprite);
                 if(distance<=landingSite.showInfoDistance)
                     landingSitesInRange.push({
@@ -46134,7 +51193,7 @@ class Ship extends GameObject {
             var maxSpeedWhenLanding = 10;
 
             if((this.speed)>maxSpeedWhenLanding){
-                this.game.hud.message("Moving too fast to land");
+                this.game.hud.message("Moving maxSpeedWhenLandingt to land");
                 return;
             }
 
@@ -46375,15 +51434,27 @@ class Ship extends GameObject {
     // HyperDrive™
     toggleHyperDrive(){        
         if(!this.hyperDriveEngaged){
-            //this.game.lockCamera();
+            if(this.jumpsRemaining<1){
+                this.game.hud.message("No FTL fuel in inventory");
+                return;
+            }
+
+            if((this.speed)>15){
+                this.game.hud.message("Moving too fast to engage FTL Drive");
+                return;
+            }
+
             this.hyperDriveTimer = game.time.events.add(this.hyperDriveDelay, this.jump, this);
             this.ftlChargeSound.play();
             this.hyperDriveEngaged = true;
+            this.jumpWasAborted = false;
+            
+            this.consumeHyperdriveFuel();
         }
     }
     
     hyperDriveUpdate(){
-        this.sprite.body.thrust(1000);
+        this.sprite.body.thrust(500);
         this.hyperDriveEmitter.emit(
             'hyperDrive',
             this.sprite.worldPosition.x + this.game.camera.x,
@@ -46391,16 +51462,99 @@ class Ship extends GameObject {
         );        
     }
     
+    abortJump(){
+        this.ftlChargeSound.stop();
+        
+        if(this.hyperDriveEngaged){
+            this.jumpCompleteSound.play();
+        }
+        
+        this.jumpWasAborted = true;
+        
+        this.disengageHyperDrive();    
+    }
+    
+    get jumpsRemaining(){
+        // Calculate remaing hyperdrive fuel.
+        var jumpsRemaining = 0;
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) jumpsRemaining++;
+        }
+        return jumpsRemaining;
+    }
+
+    consumeHyperdriveFuel(){
+        for (let item of this.inventory){
+            if(item.isHyperdriveFuel) {
+                item.consume();
+                break;
+            }
+        }
+    }
+    
     jump(){
+        if(this.jumpWasAborted) return;
+
         this.ftlJumpSound.play();
         game.camera.flash(0xFFFFFF, 500);
-        this.disengageHyperDrive();
+        
+        // Systems
+        var previousSystem = this.game.mapScreen.map.currentPath.shift();
+        var currentSystem = this.game.mapScreen.map.currentPath.firstItem();
+        if(currentSystem) currentSystem.arrive();
+        
+        // Time
+        this.game.skipTime(rng.nextInt(6,36),'hours');             
+        
+        // We're there.
+        if(this.game.mapScreen.map.currentPath.length==1){
+            if(this.game.mapScreen.map.currentPath.firstItem() == currentSystem){
+                this.game.mapScreen.map.currentPath = false;
+                this.game.mapScreen.map.navigationDestination = null;
+                
+                game.time.events.add(1000, function(){
+                    this.game.hud.hideFTLPanel();
+                }, this);
+            }
+        }
+        
+        // Figure out where we should land
+        var angleToSystemCenter = Phaser.Math.reverseAngle(Math.atan2(
+            this.sprite.y - this.game.world.centerY,
+            this.sprite.x - this.game.world.centerX
+        ));
+         // Radians
+        var r = 5000;
+        var landingX = this.sprite.x + r * Math.cos(angleToSystemCenter);
+        var landingY = this.sprite.y + r * Math.sin(angleToSystemCenter);
+                
+        this.sprite.body.x = landingX;
+        this.sprite.body.y = landingY;
+        
+        // Slow down
+        var slowDownTween = this.game.add.tween(this.sprite.body).to({
+            damping: .95,
+        }, 2000, "Quart.easeOut", true)
+        slowDownTween.onComplete.add(function(){
+            var slowDownTween = this.game.add.tween(this.sprite.body).to({
+                damping: 0,
+            }, 1000, "Quart.easeOut", true)
+        }, this);
+        game.time.events.add(2000, function(){
+            this.disengageHyperDrive();
+        }, this);
 
-        this.game.mapScreen.map.navigationDestination.arrive();
-
+        // Power down sound
         game.time.events.add(800, function(){
             this.jumpCompleteSound.play();
         }, this);
+
+        // Cleanup
+        this.game.player.exitDarkness();
+        this.game.hud.updateFTLPanel();
+        this.navigationMode = NAVIGATION_MODE.free;
+        this.navigationIndex = -1;
+        this.setNavigationTargetToCurrentNavigationTargetIndex();
    }
     
     disengageHyperDrive(){
@@ -46521,7 +51675,15 @@ class Ship extends GameObject {
         // Damage
         if(this.hullBreached){
             this.ventAtmosphere();
+            if(this.healthPercentage>this.hullBreachAtHealthPercentage){
+                this.hullBreached = false;
+                if(this == this.game.player.ship) {
+                    this.game.hud.hideO2Panel();
+                }
+            }
         }
+
+
 
         // Cargo
 
@@ -46566,11 +51728,130 @@ class Ship extends GameObject {
 
 
 
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/shuttle.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/engines/_engine.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Shuttle extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'Shuttle',
+            description : 'Shuttle',
+            health: 100,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
+            maxFuel : 2200,
+            maxEnergy: 100,
+            mass: 1, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [   8, 24  ,  19, 24  ,  18, 33  ,  9, 33  ]
+                } ,
+                {
+                    "shape": [   27, 22  ,  19, 24  ,  8, 24  ,  0, 16  ,  7, 12  ,  21, 14  ,  27, 16  ]
+                } ,
+                {
+                    "shape": [   0, 16  ,  8, 24  ,  0, 22  ]
+                } ,
+                {
+                    "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
+                }
+            ],
+            weaponSlots : [],
+            engineSlots : [{
+                anchor : {
+                    x: 0.57,
+                    y: -1.6,
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 10,
+                    y: 3,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 17,
+                    y: 8,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 8,
+                    y : 25,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 19,
+                    y: 31,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 7,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 25,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: 0,
+                    y: -18,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            storage : {
+                passengers : 6,
+            }
+        }
+
+        // Sprites
+        
+        this.sprite = this.game.add.sprite(x,y, 'shuttle');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+
+        // Engine
+        var engine = new SmallEngine(this.game,this);
+        this.equipEngineInSlot(engine,0);
+        this.refuel();
+
+        // Reactor
+        var reactor = new Batteries(this.game,this);
+        this.equipEquipmentInSlot(reactor,0);
+        this.recharge();
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
 class Engine extends Equipment {
     constructor(game,options) {
         super(game,options);
@@ -46627,9 +51908,16 @@ class Engine extends Equipment {
     }
 }
 
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/weapons/focusedBeam.js begins */
 /* Merging js: app/engines/basicEngine.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 
 
 class BasicEngine extends Engine {
@@ -46657,10 +51945,90 @@ class BasicEngine extends Engine {
         if(this.sound.volume==0 && this.sound.isPlaying) this.sound.stop();
     }
 
+}class FocusedBeamWeapon extends Weapon {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.baseBulletSpeed = 400;
+        this.weapon = game.add.weapon(40, 'laser-sparkle');
+        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+        this.weapon.bulletLifespan = options.data.range;
+        this.weapon.bulletSpeed = this.baseBulletSpeed;
+        this.weapon.fireRate = 20;
+        this.weapon.bulletAngleVariance = 1.5;
+        this.weapon.bulletSpeedVariance = 90;
+        this.weapon.bullets.alpha = 1;
+        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
+        this.weapon.bullets.setAll('scale.x', 0.3);
+        this.weapon.bullets.setAll('scale.y', 0.1);
+        this.weapon.bullets.setAll('damage',options.data.damage);
+        this.weapon.bullets.setAll('smoothed',false);
+        this.weapon.setBulletBodyOffset(6, 6, 50, 30);        
+        this.weapon.onFire.add(this.fire, this);
+        // Should be on the ships
+        this.game.ships.addChild(this.weapon.bullets)
+        
+        this.weapon.bullets.forEach(function(bullet){
+            bullet.weapon = this;
+            bullet.postUpdate = this.postUpdate;
+        },this);
+
+        this.energyConsumption = options.data.energyConsumption;
+
+        this.sound = game.add.audio('mining-laser')
+        this.sound.addMarker('begin',0,0.15);
+        this.sound.addMarker('loop',0.15,0.573);
+        this.sound.addMarker('end',1.123,0.45);
+        this.soundCountdown = 10;
+        this.coolingDown = false;
+        this.sound.onStop.add(this.soundStopped, this);
+    }
+    soundStopped(sound,marker){
+        if(marker=='begin'){
+            this.sound.play('loop',0,1,true);
+        }
+        if(marker=='end'){
+            this.sound.pause();
+            this.coolingDown = false;
+        }
+    }    
+    
+    fire(){
+        super.fire();
+	    this.soundCountdown = 10;
+        if(!this.sound.isPlaying) this.sound.play('begin');
+    }
+    
+    doneFiring(){
+        if(!this.coolingDown && this.sound.isPlaying) {
+            this.sound.play('end');
+            this.coolingDown = true;
+        }
+    }
+    
+    update(){
+        if(this.soundCountdown==0){
+            this.doneFiring();
+        } else {
+            this.soundCountdown--;
+        }
+
+        if(this.parentObject) this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
+    }
 }
+
+
+
+
+
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/engines/smallEngine.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/weapons/basicBlaster.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -46678,19 +52046,187 @@ class SmallEngine extends Engine {
         this.fuelConsumption = .8;
 
         this.flames = this.parentObject.sprite.addChild(this.game.make.sprite(0, 0, 'blue_flame'));
-        this.flames.blendMode = PIXI.blendModes.ADD;
         this.flames.scale.set(.6);
+    }
+}class BasicBlaster extends Weapon {
+    constructor(game,parentObject) {
+        super(game,parentObject);
+
+        this.weapon = game.add.weapon(40, 'blasterBullet');
+        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+        this.weapon.bulletLifespan = 1000;
+        this.weapon.bulletSpeed = 450;
+        this.weapon.fireRate = 250;
+        this.weapon.bulletAngleVariance = 0;
+        this.weapon.bulletSpeedVariance = 10;
+        this.weapon.bullets.alpha = 1;
+        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
+        this.weapon.bullets.setAll('damage',2);
     }
 }
 
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /* Merging js: app/engines/_thruster.js begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class Thruster extends Engine {
+/* Merging js: app/planets/_planet.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+class Planet extends GameObject{
+    constructor(game,x,y) {
+        super(game);
+
+        this.minimapSize = 2.3;
+        this.distanceToPlayer;
+        
+        this.showInfoDistance = 90;
+        this.infoShowing = false;
+
+        this.isPlanet = true;
+        this.canNavigateTo = true;
+        this.canLand = true;
+        
+        this.services = [];
+        this.specs = {
+            storage : {
+                bulk : Infinity,
+                passengers : Infinity,
+                liquid : Infinity,
+                gas : Infinity,
+            }
+        }
+
+        this.itemMarkup = 1.1 // Multuplier
+        this.infoSound = game.add.audio('beep-beep');
+    }
+    
+    setupSprite(options){
+        super.setupSprite(this.sprite);
+        this.wrapper = this.game.make.group();
+        this.wrapper.add(this.sprite);
+
+        this.sprite.anchor.setTo(.5, .5);
+        this.sprite.smoothed = false;
+        this.sprite.parentObject = this;
+
+        this.game.planets.add(this.wrapper);
+
+        this.nameText = this.game.add.text( 
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top+10, 
+            this.name, 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
+            this.game.planets,
+        );
+        this.wrapper.add(this.nameText);
+        this.nameText.alpha = 0;
+
+        this.subText = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 30, 
+            this.description, 
+            { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.planets,
+        );
+        this.wrapper.add(this.subText);
+        this.subText.alpha = 0;
+
+        this.landingMessage = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 60, 
+            'Press L to Land', 
+            { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.planets,
+            this.wrapper
+        );
+        this.wrapper.add(this.landingMessage);
+        this.landingMessage.alpha = 0;
+    }
+    
+    // Info Display
+    showInfoIfNeeded(){
+        if(this.shouldShowInfo && !this.infoShowing && this.game.initialized){ 
+            if(!this.game.player.ship.hyperDriveEngaged) this.infoSound.play();
+                   
+            this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+            this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+
+            if(this.canLand){
+                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true);
+            }
+        
+            this.infoShowing = true;
+        }
+        
+        if(!this.shouldShowInfo && this.infoShowing){
+            this.hideInfo();
+            this.infoShowing = false;
+        }
+    }
+
+    get shouldShowInfo(){
+        if(this.distanceToPlayer<=this.showInfoDistance) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    hideInfo(){
+        this.game.add.tween(this.nameText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.subText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.landingMessage).to( { alpha: 0 }, 300, "Quart.easeOut", true);
+
+        this.infoShowing = false;
+    }
+        
+    // Services        
+    hasService(service){
+        return this.services.includes(service);
+    }
+    
+    get services(){
+        var services = [];
+        for (let service of PLANET_SERVICES_REQUIREMENTS)
+            if(this.stats[service.requirement]>=service.level)
+                services.push(service.service)
+        return services;
+    }
+
+    set services(services){
+        this._services = services;
+    }
+
+
+    // Planets have lots of free space. Like, a lot.
+    calculateFreeSpaceForStorageClass(storageClass){
+        return Infinity;
+    }
+
+    update() {
+        super.update();
+        if(this.sprite.exists){
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+            this.showInfoIfNeeded();
+            
+            // Paralax
+            if(this.isPlanet){
+                if(this.game.camera.deltaX || this.game.camera.deltaY){
+                    this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
+                    this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);                    
+                }
+            }
+        }
+    }
+
+}class Thruster extends Engine {
     constructor(game,options) {
         super(game,options);
+        this.game.register(this);
 
         this.engineType = ENGINE_TYPES.reactionControlThruster;
         this.thrust = 0;
@@ -46707,11 +52243,9 @@ class Thruster extends Engine {
         this.flames.angle = this.layout.angle;
         this.flames.scale.set(.9);
         this.flames.anchor.set(0,0);
-        this.flames.blendMode = PIXI.blendModes.ADD;    
 
         var smoke = {
             image: 'smoke-trail',
-            blendMode: 'HARD_LIGHT',
             lifespan: { min: 150, max: 400 },
             scale: { value: { min: .03, max: .1 } },
             vx: { value: { min: 0, max: 0 } },
@@ -46742,10 +52276,70 @@ class Thruster extends Engine {
 }
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/planets/basicPlanet.js begins */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /* Merging js: app/gameObjects/pickup.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+class BasicPlanet extends Planet {
+    constructor(game,options) {
+        super(game,options.x,options.y); 
+                
+        this.system = options.system;
+        this.index = options.index;
+        this.order = (this.index+1).toRoman()   
+
+        // Basics
+        this.stats = {
+            culture  : this.determineIntegerBetween(0,10),
+            industry : this.determineIntegerBetween(0,10),
+            science  : this.determineIntegerBetween(0,10),
+            trade    :  this.determineIntegerBetween(0,10),
+        }
+        var bestStat = Object.keys(this.stats)
+                           .sort(function(a, b) {
+                               return this.stats[b] - this.stats[a];
+                           }.bind(this))[0];  
+                                            
+        var worstStat = Object.keys(this.stats)
+                           .sort(function(a, b) {
+                               return this.stats[b] + this.stats[a];
+                           }.bind(this))[0];                   
+
+        // Specialization - determines low demand things (less expensive)
+        this.specialization = this.determineItemFromArray(PLANET_SPECIALIZATIONS[bestStat]);
+       
+        // Weakness - determines high demand things (more expensive)
+        this.weakness = this.determineItemFromArray(PLANET_SPECIALIZATIONS[worstStat]);
+
+        // Population is for passenger terminals
+        this.population = this.determineIntegerBetween(0,100000000);
+
+        this.name = `${this.system.name} ${this.order}`;
+        this.description = "Class D Planet"
+        this.welcomeTitle = "Terrestrial Planet";
+        this.welcomeText = `${this.name} is a medium-sized terrestrial planet in the ${this.system.name} system. \nSpeciality ${this.specialization} \nScience ${this.stats.science} \nCulture ${this.stats.culture} \nIndustry ${this.stats.industry} \nTrade ${this.stats.trade}`;
+
+        // Sprite
+        this.spriteImage = this.determineItemFromArray(this.game.planetImages);        
+        this.sprite = this.game.make.sprite(options.x,options.y, this.spriteImage);
+        this.sprite.exists = false;
+        this.setupSprite(options);
+        
+        // Economics
+        this.game.economy.registerMarket(this);
+    }
+
+    update() {
+        super.update();
+    }
+}
 class Pickup extends GameObject {
     constructor(game,group,x,y) {
         super(game);
@@ -46787,8 +52381,15 @@ class Pickup extends GameObject {
 }
 
 
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/gameObjects/flake.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/planets/basicMoon.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -46849,10 +52450,38 @@ class FlakePickup extends Pickup {
     }
     
 }
+class BasicMoon extends Planet {
+    constructor(game,x,y) {
+        super(game,x,y);        
+        this.sprite = this.game.add.sprite(x,y, 'moon-1');
+        this.sprite.scale.setTo(1.3, 1.3);
+
+        this.name = "Persicus"
+        this.description = "Moon of Mosisia"
+        this.welcomeText = "Persicus is an intermediately sized terrestrial moon in the Pavo system. A lot of the moon is comprised of frigid desert, while a smaller portion is frozen oceans. Plant and animal life on this planet is non existant. The moon has no atmosphere, and is breathable without advanced life support systems.";
+
+        this.services = [
+            PLANET_SERVICES.passengerTerminal,            
+        ]
+
+        this.setupSprite();
+    }
+
+    update() {
+        super.update();
+    }
+}
+
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /* Merging js: app/gameObjects/iceFlake.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/buoy.js begins */
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -46913,13 +52542,309 @@ class IceFlakePickup extends Pickup {
     }
     
 }
+class Buoy extends Planet {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'Navigation Buoy',
+            description : '',
+        }
+        
+        this.sprite = this.game.add.sprite(x,y, 'buoy');
+        this.sprite.scale.setTo(1.3, 1.3);
+
+        this.name = this.specs.name;
+        this.description = this.specs.description;
+        this.showInfoDistance = 120;
+        
+        this.canLand = false;
+        this.isPlanet = false;
+        
+        this.setupSprite();
+
+        var blink = this.sprite.animations.add('blink');
+        this.sprite.animations.play('blink', 1, true);
+    }
+}
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 /* Merging js: app/gameObjects/asteroid.js begins */
+
+
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/player.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Player extends GameObject {
+    constructor(game) {
+        super(game);
+
+        this.ship = new BasicMiner(game,this.game.world.centerX-350,this.game.world.centerY-200);
+        this.sprite = this.ship.sprite;
+
+        this.name = 'Dash Riprock';
+        
+        this._credits = 1000;
+        
+        // Settings
+        this.settings = {};
+        this.settings.autoRefuel = true;
+
+        // Keys
+        this.controlMode = CONTROL_MODE.play;
+
+        // RCS
+        this.rcsSoundCountdown = 1;
+        this.rcsSound = game.add.audio('rcs-loop');
+        this.rcsSound.onFadeComplete.add(this.rcsSoundFadeComplete, this);
+
+        this.allowHissSound = true;
+        this.allowHissSoundForReverse = true;
+        this.hissSounds = [
+            game.add.audio('hiss-1'),
+            game.add.audio('hiss-2'),
+            game.add.audio('hiss-3'),
+            game.add.audio('hiss-4'),
+            game.add.audio('hiss-5')
+        ]
+
+
+        this.cursors = this.game.input.keyboard.createCursorKeys();
+        this.fireButton = this.game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);  
+        
+        // Navigation
+        var tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
+        tabKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.nextNavigationTarget();
+        }, this);
+
+        // Landing
+        var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
+        lKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToLand();
+        }, this);
+
+        // Docking
+        var dKey = game.input.keyboard.addKey(Phaser.Keyboard.D);
+        dKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToDock();
+        }, this);
+
+        // HyperDrive
+        var jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
+        jKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
+        }, this);
+        var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
+        aKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) {
+                this.game.hud.abortFTL();
+                this.ship.abortJump();
+            }
+        }, this);
+        var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
+        hKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.toggleFTLPanel();
+        }, this);
+
+        // Inventory
+        var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
+        iKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
+        }, this);
+
+        // Map
+        var mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        mKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.mapScreen.show();
+        }, this);
+
+        // Camera
+        var cKey = game.input.keyboard.addKey(Phaser.Keyboard.C);
+        cKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.toggleCameraMode();
+        }, this);
+
+    }
+
+    enterDarkness(nebula){
+        this.currentNebula = nebula;
+        
+        if(!this.inDarkness){
+            // Wait a bit to hit the lights
+            game.time.events.add(Phaser.Timer.SECOND * 2, function(){
+                if(this.currentNebula)
+                this.game.hud.title(
+                    `${this.currentNebula.name}, ${this.game.system.name} System`,
+                    moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'),
+                );
+            }, this);
+
+            game.time.events.add(Phaser.Timer.SECOND * 3, function(){
+                if(this.currentNebula){
+                    this.game.planets.mask = this.ship.lightMask;
+                    this.game.asteroids.mask = this.ship.lightMask;
+                    this.game.stars.mask = this.ship.lightMask;
+                    // Hack to show only player ship
+                    this.ship.sprite.visible = false;
+                    this.game.ships.setAll('mask', this.ship.lightMask,false,true);
+                    this.ship.sprite.visible = true;
+                    this.ship.lightMask.visible = true;    
+                }
+            }, this);
+
+            this.inDarkness = true;
+        }
+    }
+
+    exitDarkness(nebula){
+        if(this.inDarkness){
+            game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+                this.game.planets.mask = null;
+                this.game.asteroids.mask = null;
+                this.game.stars.mask = null;
+                this.game.ships.mask = null;
+                this.ship.lightMask.visible = false;    
+            }, this);
+
+            this.currentNebula = null;
+            this.inDarkness = false;
+        }
+    }
+    
+    get credits(){
+        if(this._credits<999999){
+            return CREDIT_PREFIX.short + numeral(this._credits).format('0,0');
+        } else {
+            return CREDIT_PREFIX.short + numeral(this._credits).format('(0.00 a)');
+        }
+    }
+
+    debitCredits(amount){
+        if(this._credits>=amount){
+            this._credits-=amount;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    addCredits(amount){
+        this._credits+=amount;
+        return true;
+    }
+
+
+    autoRefuel(){
+        var fuelNeeded = this.ship.maxFuel - this.ship.fuelQuantity;
+        this.game.economy.buyFuel(fuelNeeded);
+    }
+    
+    buy(item, amount = 1){
+        debugger;
+    }
+    
+    sell(item, amount = 1){
+        
+    }
+    
+    stop(){
+        // Used when landing etc.
+        this.ship.sprite.body.setZeroVelocity();
+        this.ship.sprite.body.setZeroRotation();
+        this.ship.sprite.body.setZeroForce();
+    }
+    
+    rcsSoundFadeComplete(){
+        this.rcsSound.stop();
+    }
+    
+    hiss(){
+        if(this.allowHissSound) {
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
+            }
+        }        
+        this.allowHissSound = false;
+    }
+    
+    reverseHiss(){
+        if(this.allowHissSoundForReverse) {
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
+            }
+        }
+        this.allowHissSoundForReverse = false;
+    }
+        
+    update() {
+        super.update();
+        
+        if(this.rcsSoundCountdown>=0){
+            if(this.rcsSoundCountdown==0){
+                this.rcsSound.fadeOut(30);
+            } else {
+                this.rcsSoundCountdown--;
+            }
+        }
+
+
+        // Normal "Play" control mode"
+        if(this.controlMode == CONTROL_MODE.play && !this.ship.isDocked){
+            // Accel
+            if (this.cursors.up.isDown && !this.ship.hyperDriveEngaged) {
+                this.ship.accelerate();
+            } else if(this.cursors.down.isDown && !this.ship.hyperDriveEngaged) {
+                this.reverseHiss();
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+                this.ship.goInReverse();
+            } else {
+                this.allowHissSoundForReverse = true;
+                this.ship.deaccelerate();
+            }
+        
+            // Turning / Strafing
+            if (this.cursors.left.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+
+                if(this.cursors.left.shiftKey){
+                    this.ship.moveLeft();
+                } else {
+                    this.ship.turnLeft();
+                }
+            } else if (this.cursors.right.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+
+                if(this.cursors.right.shiftKey){
+                    this.ship.moveRight();
+                } else {
+                    this.ship.turnRight();
+                }
+            } else {
+                this.allowHissSound = true;
+                this.ship.deaccelerateTurning();
+            }
+            
+            // Firing
+            if (this.fireButton.isDown) {
+                this.ship.firePrimaryWeapon();
+            }
+        }
+    }
+}
 class Asteroid extends GameObject {
     constructor(game,group,size,x,y) {
         super(game);
@@ -47047,393 +52972,20 @@ class Asteroid extends GameObject {
     } 
        
     explode(){
-	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
-	    this.game.asteroids.add(emitter);
-        emitter.makeParticles('asteroid-flake-1',0,7);
-        emitter.gravity = 0;
-        emitter.maxRotation = 100;
-        emitter.minRotation = 30;
-        emitter.minParticleScale = .5;
-        emitter.maxParticleScale = 1;
-        emitter.explode(6000, game.rnd.integerInRange(3, 7));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles('asteroid-flake-1',0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .5;
+        this.explodeEmitter.maxParticleScale = 1;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
         this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
     }
     
     // Rendering
-    update() {
-        if(this.sprite.exists){
-            super.update();
-            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-    
-            if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
-                this.sprite.exists = true;
-            } else {
-                this.sprite.exists = false;
-            }
-    
-            if(this.soundCountdown==0){
-                this.damageSound.stop();
-            } else {
-                this.soundCountdown--;
-            }
-            
-            // Spin
-            if(this.sprite.exists){
-                this.sprite.body.angularVelocity = this.roationSpeed;                
-            }
-        }
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/gameObjects/asteroidField.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class AsteroidField extends GameObject {
-    constructor(game,options) {
-        super(game);
-        
-        var size = options.size;
-        if(size==undefined) size = 2000;
-        var densityLowerBound = 50;
-        var densityUpperBound = 60;
-        
-        this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
-        this.asteroids = this.game.asteroids;
-        for (var i = 0; i < this.asteroidsCount; i++) { 
-            var xPos = game.rnd.integerInRange(options.x-size, options.x+size);
-            var yPos = game.rnd.integerInRange(options.y-size, options.y+size);
-            
-            var bigness = game.rnd.integerInRange(0,100);
-
-            if(bigness>=70){
-                var asteroid = new Asteroid(this.game,this.asteroids,'large',xPos,yPos);
-            } else if(bigness<70 && bigness>50){
-                var asteroid = new Asteroid(this.game,this.asteroids,'medium',xPos,yPos);                
-            } else {
-                var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
-            }
-
-            // Add to system
-            options.system.stellarObjects.push(asteroid);
-        }
-
-        this.buoy = new Buoy(this.game,options.x,options.y);
-        this.buoy.description = `${Names.proper()} Asteroid Field`
-
-        options.system.stellarObjects.push(this.buoy);
-    }
-
-    cleanup(){
-        this.asteroids.forEach(function(item) {
-            item.sprite.destroy();
-            item = null;            
-        });
-    }
-    
-    update(){
-        super.update();
-        this.game.physics.arcade.collide(this.asteroids, this.asteroids);
-    }    
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/gameObjects/nebula.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Nebula extends GameObject {
-    constructor(game,options) {
-        super(game);
-
-        var x = options.x;
-        var y = options.y;
-        var size = options.size;
-        if(size==undefined) size = 2000;
-        this.size = size;
-
-        var xPos = game.rnd.integerInRange(x-this.size, x+this.size);
-        var yPos = game.rnd.integerInRange(y-this.size, y+this.size);
-
-        var densityLowerBound = 50;
-        var densityUpperBound = 60;
-
-        this.iceteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
-        this.iceteroids = this.game.asteroids;
-        for (var i = 0; i < this.iceteroidsCount; i++) { 
-            var xPos = game.rnd.integerInRange(x-size, x+size);
-            var yPos = game.rnd.integerInRange(y-size, y+size);
-            
-            var bigness = game.rnd.integerInRange(0,100);
-
-            if(bigness>=70){
-                var iceteroid = new Iceteroid(this.game,this.iceteroids,'large',xPos,yPos);
-            } else {
-                var iceteroid = new Iceteroid(this.game,this.iceteroids,'small',xPos,yPos);                
-            }
-            options.system.stellarObjects.push(iceteroid);
-        }
-
-        this.buoy = new Buoy(this.game,x,y);
-        this.buoy.description = `${Names.proper()} Ice Nebula`
-        this.name = this.buoy.description;
-        options.system.stellarObjects.push(this.buoy);
-
-  
-        this.shouldShowNebulaEffect = false;
-        this.nebulaSpawnInterval = 10;
-        this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
-
-        // Effects
-        this.nebulaOverlay = this.game.add.graphics(0, 0);
-        this.nebulaOverlay.beginFill(0x34495e);
-        this.nebulaOverlay.drawRect(0,0,screenWidth,screenHeight);
-        this.nebulaOverlay.endFill();
-        this.nebulaOverlay.alpha = 0;
-        this.nebulaOverlayTargetAlpha = .4;
-        this.game.starsTargetAlpha = .2;
-        this.nebulaOverlayStepAlpha = .002;
-        this.nebulaOverlay.visible = false;
-        this.nebulaOverlay.fixedToCamera = true;
-        
-        var smoke = {
-            lifespan: 7000,
-            image: 'nebula-cloud',
-            sendToBack: true,
-            alpha: { initial: 0, value: .06, control: [ { x: 0, y: 0 }, { x: 0.2, y: 1 }, { x: 0.5, y: 0.5 }, { x: 1, y: 0 } ] },
-            scale: { min: 1, max: 1.5 },
-            vx: { min: -0.2, max: 0.2 },
-            vy: { min: -0.2, max: -0.2 },
-            hsv: { value: 210 },
-        };
-        this.game.ps.addData('nebula-cloud', smoke);
-        this.smokeEmitter = this.game.ps.createEmitter();
-        this.smokeEmitter.addToWorld();
-
-
-    	this.particlesEmitter = game.add.emitter(0,0, 500);
-    	this.particlesEmitter.width = game.camera.width;
-    	this.particlesEmitter.height = game.camera.height;
-    	    
-    	this.particlesEmitter.makeParticles(['ice-small-1','ice-small-2','ice-small-3','ice-small-4','ice-small-5']);
-    
-    	this.particlesEmitter.setAlpha(0, 1, 2000,Phaser.Easing.Quadratic.InOut,true);
-
-    	this.particlesEmitter.minParticleScale = 0.08;
-    	this.particlesEmitter.maxParticleScale = 0.35;
-    
-    	this.particlesEmitter.setYSpeed(-10, 10);
-    	this.particlesEmitter.setXSpeed(-10, 10);
-        this.particlesEmitter.gravity = 3;
-    
-    	this.particlesEmitter.minRotation = -100;
-    	this.particlesEmitter.maxRotation = 100;
-    
-    	this.particlesEmitter.start(false, 4000, 10, 0);
-    	this.particlesEmitter.on = false;
-    	this.iceteroids.add(this.particlesEmitter);
-    	
-    	// Ambient Sounds
-        this.ambientSound = game.add.audio('nebula-ambient-1');
-    }
-    
-    update(){
-        super.update();
-        
-        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.buoy.sprite, this.game.player.sprite);
-    
-        if(this.distanceToPlayer<=this.size*1.5){
-            this.game.player.enterDarkness(this);
-            this.shouldShowNebulaEffect = true;
-        } else {
-            this.game.player.exitDarkness(this);
-            this.shouldShowNebulaEffect = false;
-        }
-        
-        if(this.shouldShowNebulaEffect){
-            
-            // Particles
-            this.particlesEmitter.on = true;   
-            this.particlesEmitter.x = this.game.camera.x + this.game.camera.width/2;
-            this.particlesEmitter.y = this.game.camera.y + this.game.camera.height/2;
-
-            // Overlay
-            this.nebulaOverlay.visible = true;
-            
-            if(this.nebulaOverlay.alpha<=this.nebulaOverlayTargetAlpha)
-                this.nebulaOverlay.alpha+=this.nebulaOverlayStepAlpha
-
-            if(this.game.stars.alpha>=this.game.starsTargetAlpha)
-                this.game.stars.alpha-=this.nebulaOverlayStepAlpha
-            
-            if(this.game.stars.alpha<=this.game.starsTargetAlpha)
-                this.game.stars.alpha=this.game.starsTargetAlpha    
-            
-            // Smoke
-            if(this.nebulaSpawnCountdown==0){
-                this.smokeEmitter.emit(
-                    'nebula-cloud',
-                    this.game.camera.x + this.game.rnd.integerInRange(0, this.game.camera.width), 
-                    this.game.camera.y + this.game.rnd.integerInRange(0, this.game.camera.height),
-                ) 
-                this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
-            } else {
-                this.nebulaSpawnCountdown--;
-            }
-            
-            // Sound
-            if(!this.ambientSound.isPlaying) {
-                console.log("Start Loop");
-                this.ambientSound.loopFull(AMBIENT_VOLUME);
-            }            
-        } else {
-            // Stop Particles
-            this.particlesEmitter.on = false;   
-            
-            // Hide overlay
-            this.nebulaOverlay.alpha-=this.nebulaOverlayStepAlpha
-            
-            if(this.nebulaOverlay.alpha<this.nebulaOverlayStepAlpha){
-                this.nebulaOverlay.alpha = 0;
-                this.nebulaOverlay.visible = false;
-            }
-            
-            // Stars
-            this.game.stars.alpha+=this.nebulaOverlayStepAlpha
-            if(this.game.stars.alpha>=1)
-                this.game.stars.alpha=1;        
-        
-            // Stop sound
-            if(this.ambientSound.isPlaying && this.ambientSound.volume == AMBIENT_VOLUME) {
-                this.ambientSound.fadeOut(3000);    
-            }
-            this.ambientSound.onFadeComplete.addOnce(function(){
-                this.ambientSound.stop();
-            }, this);
-        }
-    }
-    
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/gameObjects/iceteroid.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Iceteroid extends GameObject {
-    constructor(game,group,size,x,y) {
-        super(game);
-     
-        this.group = group
-        this.emitFlakes = false;
-        
-        
-        if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
-        if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
-        if(size==undefined) size = 'large';
-        this.size = size;
-
-        this.sprite = this.game.asteroids.create(x,y,`ice-${size}-${game.rnd.integerInRange(1, 5)}`);
-
-        this.sprite.parentObject = this;
-        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
-
-        this.sprite.body.clearShapes();
-        this.sprite.body.damping = 0;
-
-        if(size=='large'){
-            this.health = game.rnd.integerInRange(150, 200);
-            this.sprite.body.mass = 10;
-            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
-            this.sprite.body.addCircle(10);
-            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10)],0,0)
-
-            this.minimapSize = 1.2;
-        } else if(size=='small'){
-            this.health = game.rnd.integerInRange(70, 100);
-
-            this.sprite.body.mass = 5;
-            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
-            this.sprite.body.addCircle(8);
-            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-2, 2),game.rnd.integerInRange(-2, 2)],0,0)
-
-            this.minimapSize = .8;
-        }
-
-        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
-        this.sprite.anchor.set(0.5);
-
-        this.hitEmitter = this.game.add.emitter(0, 0, 100);
-        this.hitEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`);
-        this.hitEmitter.minParticleScale = .2;
-        this.hitEmitter.maxParticleScale = .4;
-        this.hitEmitter.gravity = 0;
-        this.hitEmitter.particleBringToTop = true;
-        
-        this.explodeSounds = [
-            game.add.audio('ice-crash-1'),
-            game.add.audio('ice-crash-2'),
-            game.add.audio('ice-crash-3'),
-            game.add.audio('ice-crash-4'),
-            game.add.audio('ice-crash-5'),
-            game.add.audio('ice-crash-6'),
-        ]
-        this.damageSound = game.add.audio('crunch-1');
-        this.soundCountdown = 10;
-    }
-
-    hit(bullet){
-	    this.hitEmitter.x = bullet.x;
-	    this.hitEmitter.y = bullet.y;	
-	    this.emitFlakes = true;
-	    this.soundCountdown = 10;
-	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
-    }
-        
-    kill(){
-        if(this.size=='large'){
-            var x = this.sprite.x;
-            var y = this.sprite.y;
-            this.explode();         
-            this.explode();
-            this.destroy();
-            var a1 = new Iceteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
-            var a2 = new Iceteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
-        } else if(this.size=='small'){
-            var x = this.sprite.x;
-            var y = this.sprite.y;
-            this.explode();         
-            this.destroy();
-            var flakeCount = game.rnd.integerInRange(2,5);
-
-            for (var i = 0; i < flakeCount; i++) { 
-                new IceFlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
-            }
-        }
-        this.damageSound.stop();
-    } 
-       
-    explode(){
-	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
-	    this.game.asteroids.add(emitter);
-        emitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`,0,7);
-        emitter.gravity = 0;
-        emitter.maxRotation = 100;
-        emitter.minRotation = 30;
-        emitter.minParticleScale = .2;
-        emitter.maxParticleScale = .6;
-        emitter.explode(6000, game.rnd.integerInRange(3, 7));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);
-        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
-    }
-    
-    // Rendering
-    update() {
+    update() {        
         super.update();
         this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
 
@@ -47450,1108 +53002,22 @@ class Iceteroid extends GameObject {
         }
         
         // Spin
-        this.sprite.body.angularVelocity = this.roationSpeed;                
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/items/flake.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Item_Flake extends InventoryObject {
-    constructor(game) {
-        super(game);
-
-        this.name = 'Asteroid Flake';
-        this.storageClass = CARGO_STORAGE_CLASS.bulk
-        this.rarity = RARITY.common;
-        this.mass = 10;
-        this.baseValue = 16;
-        this.type = 'Mineral';
-    }
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/items/paladium.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Item_Paladium extends InventoryObject {
-    constructor(game) {
-        super(game);
-
-        this.name = 'Raw Paladium';
-        this.storageClass = CARGO_STORAGE_CLASS.bulk
-        this.rarity = RARITY.rare;
-        this.mass = 20;
-        this.baseValue = 100;
-        this.type = 'Mineral';
-    }
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/items/metoricIron.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Item_MeteoricIron extends InventoryObject {
-    constructor(game) {
-        super(game);
-
-        this.name = 'Meteoric Iron';
-        this.storageClass = CARGO_STORAGE_CLASS.bulk
-        this.rarity = RARITY.uncommon;
-        this.mass = 15;
-        this.baseValue = 32;
-        this.type = 'Mineral';
-    }
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/items/fuel.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Item_Fuel extends InventoryObject {
-    constructor(game) {
-        super(game);
-
-        this.name = 'Rocket Fuel';
-        this.storageClass = CARGO_STORAGE_CLASS.liquid
-        this.rarity = RARITY.exotic;
-        this.mass = 1;
-        this.type = 'Liquid'
-
-        this.baseValue = 1;
-    }
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/ships/basicMiner.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class BasicMiner extends Ship {
-    constructor(game,x,y) {
-        super(game,x,y);
-        
-        this.specs = {
-            name : 'MV Fair Rosamond',
-            description : 'Cobalt Class Mining Vessel',
-            health: 130,
-            turnDecay: .03,
-            turnAccel: .1,
-            leftRightThrust: 100,
-            maxTurning: 10,
-            reverseThrust: 100,
-            maxReverse: 90,
-            maxFuel : 2200,
-            maxEnergy: 0,
-            mass: 2, // Tons
-            equipmentSlots : 4,
-            centerOfGravity : {
-                x : .5,
-                y : .5,
-            },
-            polygon: [
-                {
-                    "shape": [ 5,36, 6,7, 21,39, 20,51, 6,50 ]
-                },
-                {
-                    "shape": [ 28,38, 21,39, 6,7, 9,0, 18,0 ]
-                },
-                {
-                    "shape": [ 28,38, 20,7, 28,7 ]
-                },
-                {
-                    "shape": [ 6,7, 5,36, 0,36, 0,7 ]
-                }
-            ],
-            size : {
-                width : 45,
-                height : 45,
-                offsetX : 3,
-                offsetY : -8,
-            },
-            weaponSlots : [
-                {
-                    position : {
-                        x: 9,
-                        y: -22
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                }
-            ],
-            engineSlots : [{
-                anchor : {
-                    x: 0.57,
-                    y: -1.5
-                },
-                angle : 0,
-            }],
-            RCS :{
-                forward_left : {
-                    x: 0,
-                    y: 8,
-                    angle : 90,
-                },
-                forward_right : {
-                    x: 26,
-                    y: 14,
-                    angle : 270,                    
-                },
-                aft_left : {
-                    x : 5,
-                    y : 41,
-                    angle : 90,
-                },
-                aft_right : {
-                    x: 21,
-                    y: 46,
-                    angle : 270,                    
-                },
-                retro_a : {
-                    x: 11,
-                    y: 3,
-                    angle : 180,
-                    retro : true,                   
-                },
-                retro_b : {
-                    x: 21,
-                    y: 3,
-                    angle : 180,
-                    retro : true,                   
-                },
-            },
-            dockingConnector : {
-                position : {
-                    x: -3,
-                    y: -24,
-                    angle : 90,
-                },
-                inUse: false,
-            },
-            storage : {
-                equipment : 500,
-                bulk : 800,
-            }
-        }
-
-        // Sprites
-        this.sprite = this.game.add.sprite(x,y, 'mining_ship');
-        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
-
-        this.setupSprite(this.sprite);
-        
-        // Cargo
-        this.emptyCargoHold();
-    }
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/ships/fuelTanker.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class FuelTanker extends Ship {
-    constructor(game,x,y) {
-        super(game,x,y);
-        
-        this.specs = {
-            name : 'AOG Belvidera',
-            description : 'Fuel Tanker',
-            health : 100,
-            turnDecay: .005,
-            turnAccel: .007,
-            leftRightThrust: 100,
-            maxTurning: 10,
-            reverseThrust: 40,
-            maxReverse: 60,
-            maxFuel : 9000,
-            maxEnergy: 150,
-            mass: 10, // Tons
-            equipmentSlots : 4,
-            centerOfGravity : {
-                x : .5,
-                y : .5,
-            },
-            polygon: [
-                {
-                    "shape": [ 51,54, 37,53, 36,32, 86,32, 87,54 ]
-                },
-                {
-                    "shape": [ 36,32, 37,53, 0,54, 0,32 ]
-                },
-                {
-                    "shape": [ 36,93, 37,53, 51,54, 52,93 ]
-                },
-                {
-                    "shape": [ 37,27, 51,32, 36,32 ]
-                },
-                {
-                    "shape": [ 35,5, 50,27, 51,32, 37,27 ]
-                },
-                {
-                    "shape": [ 46,1, 51.83333206176758,4.333335876464844, 50,27, 35,5, 40,1 ]
-                }
-            ],
-            size : {
-                width : 45,
-                height : 45,
-                offsetX : 3,
-                offsetY : -8,
-            },
-            weaponSlots : [
-                {
-                    position : {
-                        x: 0,
-                        y: 0
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                },
-                {
-                    position : {
-                        x: 9,
-                        y: -22
-                    },
-                    typesAllowed: [WEAPON_TYPES.miningLaser],
-                }
-            ],
-            engineSlots : [{
-                anchor : {
-                    x: 0.55,
-                    y: -2.8
-                },
-                angle : 0,
-            }],
-            RCS :{
-                forward_left : {
-                    x: 35,
-                    y: 16,
-                    angle : 90,
-                },
-                forward_right : {
-                    x: 52,
-                    y: 22,
-                    angle : 270,                    
-                },
-                aft_left : {
-                    x: 35,
-                    y : 71,
-                    angle : 90,
-                },
-                aft_right : {
-                    x: 52,
-                    y: 76,
-                    angle : 270,                    
-                },
-                retro_a : {
-                    x: 41,
-                    y: 3,
-                    angle : 180,
-                    retro : true,                   
-                },
-                retro_b : {
-                    x: 51,
-                    y: 3,
-                    angle : 180,
-                    retro : true,                   
-                },
-            },
-            storage : {
-                bulk : 300,
-                passengers : 2,
-                gas : 0,
-                liquid : 0,
-            },
-            dockingPorts : [{
-                position : {
-                    x: 0,
-                    y: -47,
-                    angle : 90,
-                },
-                inUse: false,
-            }],
-            dockingConnector : {
-                position : {
-                    x: 0,
-                    y: -50,
-                    angle : 90,
-                },
-                inUse: false,
-            },
-            canBeDockedTo: true,
-        }
-
-        // Sprites
-        this.sprite = this.game.add.sprite(x,y, 'fuelTanker2');
-        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
-
-        this.setupSprite(this.sprite);
-
-        //var blaster = new BasicBlaster(this.game,this);
-        //this.equipWeaponInSlot(blaster,1);
-
-        // Engine
-/*
-        var engine = new BasicEngine(this.game,this);
-        this.equipEngineInSlot(engine,0);
-        this.refuel();
-
-        // Reactor
-        var reactor = new Reactor(this.game,this);
-        this.equipEquipmentInSlot(reactor,0);
-        this.recharge();
-*/
-        
-        // Cargo
-        this.emptyCargoHold();
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/ships/shuttle.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Shuttle extends Ship {
-    constructor(game,x,y) {
-        super(game,x,y);
-        
-        this.specs = {
-            name : 'Shuttle',
-            description : 'Shuttle',
-            health: 100,
-            turnDecay: .03,
-            turnAccel: .1,
-            leftRightThrust: 100,
-            maxTurning: 10,
-            reverseThrust: 100,
-            maxReverse: 90,
-            maxFuel : 2200,
-            maxEnergy: 100,
-            mass: 1, // Tons
-            equipmentSlots : 4,
-            centerOfGravity : {
-                x : .5,
-                y : .5,
-            },
-            polygon: [
-                {
-                    "shape": [   8, 24  ,  19, 24  ,  18, 33  ,  9, 33  ]
-                } ,
-                {
-                    "shape": [   27, 22  ,  19, 24  ,  8, 24  ,  0, 16  ,  7, 12  ,  21, 14  ,  27, 16  ]
-                } ,
-                {
-                    "shape": [   0, 16  ,  8, 24  ,  0, 22  ]
-                } ,
-                {
-                    "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
-                }
-            ],
-            weaponSlots : [],
-            engineSlots : [{
-                anchor : {
-                    x: 0.57,
-                    y: -1.6,
-                },
-                angle : 0,
-            }],
-            RCS :{
-                forward_left : {
-                    x: 10,
-                    y: 3,
-                    angle : 90,
-                },
-                forward_right : {
-                    x: 17,
-                    y: 8,
-                    angle : 270,                    
-                },
-                aft_left : {
-                    x : 8,
-                    y : 25,
-                    angle : 90,
-                },
-                aft_right : {
-                    x: 19,
-                    y: 31,
-                    angle : 270,                    
-                },
-                retro_a : {
-                    x: 7,
-                    y: 17,
-                    angle : 180,
-                    retro : true,                   
-                },
-                retro_b : {
-                    x: 25,
-                    y: 17,
-                    angle : 180,
-                    retro : true,                   
-                },
-            },
-            dockingConnector : {
-                position : {
-                    x: 0,
-                    y: -18,
-                    angle : 90,
-                },
-                inUse: false,
-            },
-            storage : {
-                passengers : 6,
-            }
-        }
-
-        // Sprites
-        
-        this.sprite = this.game.add.sprite(x,y, 'shuttle');
-        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
-
-        this.setupSprite(this.sprite);
-
-        // Engine
-        var engine = new SmallEngine(this.game,this);
-        this.equipEngineInSlot(engine,0);
-        this.refuel();
-
-        // Reactor
-        var reactor = new Batteries(this.game,this);
-        this.equipEquipmentInSlot(reactor,0);
-        this.recharge();
-        
-        // Cargo
-        this.emptyCargoHold();
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/weapons/focusedBeam.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class FocusedBeamWeapon extends Weapon {
-    constructor(game,options) {
-        super(game,options);
-        
-        this.baseBulletSpeed = 400;
-        this.weapon = game.add.weapon(40, 'laser-sparkle');
-        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-        this.weapon.bulletLifespan = options.data.range;
-        this.weapon.bulletSpeed = this.baseBulletSpeed;
-        this.weapon.fireRate = 20;
-        this.weapon.bulletAngleVariance = 1.5;
-        this.weapon.bulletSpeedVariance = 90;
-        this.weapon.bullets.alpha = 1;
-        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
-        this.weapon.bullets.setAll('scale.x', 0.3);
-        this.weapon.bullets.setAll('scale.y', 0.1);
-        this.weapon.bullets.setAll('damage',options.data.damage);
-        this.weapon.bullets.setAll('smoothed',false);
-        this.weapon.setBulletBodyOffset(6, 6, 50, 30);        
-        this.weapon.onFire.add(this.fire, this);
-        // Should be on the ships
-        this.game.ships.addChild(this.weapon.bullets)
-        
-        this.weapon.bullets.forEach(function(bullet){
-            bullet.weapon = this;
-            bullet.postUpdate = this.postUpdate;
-        },this);
-
-        this.energyConsumption = options.data.energyConsumption;
-
-        this.sound = game.add.audio('mining-laser')
-        this.sound.addMarker('begin',0,0.15);
-        this.sound.addMarker('loop',0.15,0.573);
-        this.sound.addMarker('end',1.123,0.45);
-        this.soundCountdown = 10;
-        this.coolingDown = false;
-        this.sound.onStop.add(this.soundStopped, this);
-    }
-    soundStopped(sound,marker){
-        if(marker=='begin'){
-            this.sound.play('loop',0,1,true);
-        }
-        if(marker=='end'){
-            this.sound.pause();
-            this.coolingDown = false;
-        }
-    }    
-    
-    fire(){
-        super.fire();
-	    this.soundCountdown = 10;
-        if(!this.sound.isPlaying) this.sound.play('begin');
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
     }
     
-    doneFiring(){
-        if(!this.coolingDown && this.sound.isPlaying) {
-            this.sound.play('end');
-            this.coolingDown = true;
-        }
-    }
-    
-    update(){
-        if(this.soundCountdown==0){
-            this.doneFiring();
-        } else {
-            this.soundCountdown--;
-        }
-
-        if(this.parentObject) this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
     }
 }
 
-
-
-
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/weapons/basicBlaster.js begins */
+/* Merging js: app/gameObjects/asteroidField.js begins */
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
-class BasicBlaster extends Weapon {
-    constructor(game,parentObject) {
-        super(game,parentObject);
-
-        this.weapon = game.add.weapon(40, 'blasterBullet');
-        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
-        this.weapon.bulletLifespan = 1000;
-        this.weapon.bulletSpeed = 450;
-        this.weapon.fireRate = 250;
-        this.weapon.bulletAngleVariance = 0;
-        this.weapon.bulletSpeedVariance = 10;
-        this.weapon.bullets.alpha = 1;
-        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
-        this.weapon.bullets.setAll('damage',2);
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/planets/_planet.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-
-class Planet extends GameObject{
-    constructor(game,x,y) {
-        super(game);
-
-        this.minimapSize = 2.3;
-        this.distanceToPlayer;
-        
-        this.showInfoDistance = 90;
-        this.infoShowing = false;
-
-        this.isPlanet = true;
-        this.canNavigateTo = true;
-        this.canLand = true;
-        
-        this.services = [];
-        this.specs = {
-            storage : {
-                bulk : Infinity,
-                passengers : Infinity,
-                liquid : Infinity,
-                gas : Infinity,
-            }
-        }
-
-        this.itemMarkup = 1.1 // Multuplier
-        this.infoSound = game.add.audio('beep-beep');
-    }
-    
-    setupSprite(){
-        super.setupSprite(this.sprite);
-        this.wrapper =  this.game.make.group();
-        this.wrapper.add(this.sprite);
-
-        this.sprite.anchor.setTo(.5, .5);
-        this.sprite.smoothed = false;
-
-        this.sprite.parentObject = this;
-
-        this.nameText = this.game.add.text( 
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y - 20, 
-            this.name, 
-            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
-            this.game.planets,
-        );
-        this.wrapper.add(this.nameText);
-        this.nameText.alpha = 0;
-
-        this.subText = this.game.add.text(
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y, 
-            this.description, 
-            { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
-            this.game.planets,
-        );
-        this.wrapper.add(this.subText);
-        this.subText.alpha = 0;
-
-        this.landingMessage = this.game.add.text(
-            20+this.sprite.x + this.sprite.width/2,this.sprite.y + 40, 
-            'Press L to Land', 
-            { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
-            this.game.planets,
-            this.wrapper
-        );
-        this.wrapper.add(this.landingMessage);
-        this.landingMessage.alpha = 0;
-    }
-    
-    // Info Display
-    showInfoIfNeeded(){
-        if(this.shouldShowInfo && !this.infoShowing){ 
-            this.infoSound.play();
-                   
-            this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
-            this.game.add.tween(this.nameText).to( { y: '-30' }, 300, "Quart.easeOut", true);    
-            
-            this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
-            this.game.add.tween(this.subText).to( { y: '-30' }, 300, "Quart.easeOut", true);                
-
-            if(this.canLand){
-                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true,400);
-                this.game.add.tween(this.landingMessage).to( { y: '-30' }, 300, "Quart.easeOut", true,400);                
-            }
-        
-            this.infoShowing = true;
-        }
-        
-        if(!this.shouldShowInfo && this.infoShowing){
-            this.hideInfo();
-            this.infoShowing = false;
-        }
-    }
-
-    get shouldShowInfo(){
-        if(this.distanceToPlayer<=this.showInfoDistance) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-    
-    hideInfo(){
-        this.game.add.tween(this.nameText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
-        this.game.add.tween(this.subText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
-        this.game.add.tween(this.landingMessage).to( { alpha: 0 }, 300, "Quart.easeOut", true);
-
-        this.game.add.tween(this.subText).to( { y: '+30' }, 0, "Quart.easeOut", true);                
-        this.game.add.tween(this.nameText).to( { y: '+30' }, 0, "Quart.easeOut", true);    
-        this.game.add.tween(this.landingMessage).to( { y: '+30' }, 0, "Quart.easeOut", true);                
-
-        this.infoShowing = false;
-    }
-        
-    // Services        
-    hasService(service){
-        return this.services.includes(service);
-    }
-    
-    get services(){
-        var services = [];
-        for (let service of PLANET_SERVICES_REQUIREMENTS)
-            if(this[service.requirement]>=service.level)
-                services.push(service.service)
-        return services;
-    }
-
-    set services(services){
-        this._services = services;
-    }
-
-
-    // Planets have lots of free space. Like, a lot.
-    calculateFreeSpaceForStorageClass(storageClass){
-        return Infinity;
-    }
-
-    update() {
-        super.update();
-        if(this.sprite.exists){
-            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
-            this.showInfoIfNeeded();
-            
-            // Paralax
-            if(this.isPlanet && this.wrapper && this.game.camera){
-                this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
-                this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);
-            }
-        }
-    }
-
-}
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/planets/basicPlanet.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class BasicPlanet extends Planet {
-    constructor(game,options) {
-        super(game,options.x,options.y); 
-        
-        this.seed = 0;
-        this.system = options.system;
-        this.index = options.index;
-        this.order = (this.index+1).toRoman()   
-
-        this.name = `${this.system.name} ${this.order}`;
-        this.description = "Class D Planet"
-        this.welcomeTitle = "Terrestrial Planet";
-        this.welcomeText = "Mosisia is a medium-sized terrestrial planet in the Pavo system, with a single moon. Most of the planet is made up of salty oceans, while a portion is grassland. Life on this planet is rare due to climate and atmosphere. The atmosphere is nitrogen based and breathable, with oxygen and trace amounts of carbon monoxide.";
-
-        // Determine what services are available
-        this.science = this.determineIntegerBetween(0,10);
-        this.culture = this.determineIntegerBetween(0,10);
-        this.industry = this.determineIntegerBetween(0,10);
-        this.trade = this.determineIntegerBetween(0,10);
-        
-        // Population is for passenger terminals
-        this.population = this.determineIntegerBetween(0,100000000);
-
-        // Sprite
-        this.spriteImage = this.determineItemFromArray(this.game.planetImages);        
-        this.sprite = this.game.make.sprite(options.x,options.y, this.spriteImage);
-        this.sprite.angle = this.determineFloatBetween(-180,180); 
-        this.sprite.exists = false;
-        this.setupSprite();
-    }
-
-    update() {
-        super.update();
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/planets/basicMoon.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class BasicMoon extends Planet {
-    constructor(game,x,y) {
-        super(game,x,y);        
-        this.sprite = this.game.add.sprite(x,y, 'moon-1');
-        this.sprite.scale.setTo(1.3, 1.3);
-
-        this.name = "Persicus"
-        this.description = "Moon of Mosisia"
-        this.welcomeText = "Persicus is an intermediately sized terrestrial moon in the Pavo system. A lot of the moon is comprised of frigid desert, while a smaller portion is frozen oceans. Plant and animal life on this planet is non existant. The moon has no atmosphere, and is breathable without advanced life support systems.";
-
-        this.services = [
-            PLANET_SERVICES.passengerTerminal,            
-        ]
-
-        this.setupSprite();
-    }
-
-    update() {
-        super.update();
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/ships/buoy.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Buoy extends Planet {
-    constructor(game,x,y) {
-        super(game,x,y);
-        
-        this.specs = {
-            name : 'Navigation Buoy',
-            description : '',
-        }
-        
-        this.sprite = this.game.add.sprite(x,y, 'buoy');
-        this.sprite.scale.setTo(1.3, 1.3);
-
-        this.name = this.specs.name;
-        this.description = this.specs.description;
-        this.showInfoDistance = 120;
-        
-        this.canLand = false;
-        this.isPlanet = false;
-        
-        this.setupSprite();
-
-        var blink = this.sprite.animations.add('blink');
-        this.sprite.animations.play('blink', 1, true);
-    }
-}
-
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-/* Merging js: app/player.js begins */
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-
-class Player extends GameObject {
-    constructor(game) {
-        super(game);
-
-        this.ship = new BasicMiner(game,this.game.world.centerX,this.game.world.centerY);
-        this.sprite = this.ship.sprite;
-
-        this.name = 'Dash Riprock';
-        
-        this._credits = 1000;
-        
-        // Settings
-        this.settings = {};
-        this.settings.autoRefuel = true;
-
-        // Keys
-        this.controlMode = CONTROL_MODE.play;
-
-        // RCS
-        this.rcsSoundCountdown = 1;
-        this.rcsSound = game.add.audio('rcs-loop');
-        this.rcsSound.onFadeComplete.add(this.rcsSoundFadeComplete, this);
-
-        this.allowHissSound = true;
-        this.allowHissSoundForReverse = true;
-        this.hissSounds = [
-            game.add.audio('hiss-1'),
-            game.add.audio('hiss-2'),
-            game.add.audio('hiss-3'),
-            game.add.audio('hiss-4'),
-            game.add.audio('hiss-5')
-        ]
-
-
-        this.cursors = this.game.input.keyboard.createCursorKeys();
-        this.fireButton = this.game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);  
-        
-        // Navigation
-        var tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
-        tabKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.ship.nextNavigationTarget();
-        }, this);
-
-        // Landing
-        var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
-        lKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToLand();
-        }, this);
-
-        // Docking
-        var dKey = game.input.keyboard.addKey(Phaser.Keyboard.D);
-        dKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToDock();
-        }, this);
-
-        // HyperDrive
-        var jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
-        jKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
-        }, this);
-        var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
-        aKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.hud.abortFTL();
-        }, this);
-        var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
-        hKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.hud.toggleFTLPanel();
-        }, this);
-
-        // Inventory
-        var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
-        iKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
-        }, this);
-
-        // Map
-        var mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
-        mKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.mapScreen.show();
-        }, this);
-
-        // Camera
-        var cKey = game.input.keyboard.addKey(Phaser.Keyboard.C);
-        cKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.toggleCameraMode();
-        }, this);
-
-    }
-
-    enterDarkness(nebula){
-        this.currentNebula = nebula;
-        
-        if(!this.inDarkness){
-            // Wait a bit to hit the lights
-            game.time.events.add(Phaser.Timer.SECOND * 2, function(){
-                this.game.hud.title(
-                    `${this.currentNebula.name}, ${this.game.system.name} System`,
-                    moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'),
-                );
-            }, this);
-
-            game.time.events.add(Phaser.Timer.SECOND * 3, function(){
-                this.game.planets.mask = this.ship.lightMask;
-                this.game.asteroids.mask = this.ship.lightMask;
-                this.game.stars.mask = this.ship.lightMask;
-                // Hack to show only player ship
-                this.ship.sprite.visible = false;
-                this.game.ships.setAll('mask', this.ship.lightMask,false,true);
-                this.ship.sprite.visible = true;
-                this.ship.lightMask.visible = true;    
-            
-            }, this);
-
-            this.inDarkness = true;
-        }
-    }
-
-    exitDarkness(nebula){
-        if(this.inDarkness){
-            game.time.events.add(Phaser.Timer.SECOND * 1, function(){
-                this.game.planets.mask = null;
-                this.game.asteroids.mask = null;
-                this.game.stars.mask = null;
-                this.game.ships.mask = null;
-                this.ship.lightMask.visible = false;    
-            }, this);
-
-            this.currentNebula = null;
-            this.inDarkness = false;
-        }
-    }
-    
-    get credits(){
-        if(this._credits<999999){
-            return CREDIT_PREFIX.short + numeral(this._credits).format('0,0');
-        } else {
-            return CREDIT_PREFIX.short + numeral(this._credits).format('(0.00 a)');
-        }
-    }
-
-    debitCredits(amount){
-        if(this._credits>=amount){
-            this._credits-=amount;
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    addCredits(amount){
-        this._credits+=amount;
-        return true;
-    }
-
-
-    autoRefuel(){
-        var fuelNeeded = this.ship.maxFuel - this.ship.fuelQuantity;
-        this.game.economy.buyFuel(fuelNeeded);
-    }
-    
-    buy(item, amount = 1){
-        debugger;
-    }
-    
-    sell(item, amount = 1){
-        
-    }
-    
-    stop(){
-        // Used when landing etc.
-        this.ship.sprite.body.setZeroVelocity();
-        this.ship.sprite.body.setZeroRotation();
-        this.ship.sprite.body.setZeroForce();
-    }
-    
-    rcsSoundFadeComplete(){
-        this.rcsSound.stop();
-    }
-    
-    hiss(){
-        if(this.allowHissSound) {
-            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
-        }        
-        this.allowHissSound = false;
-    }
-    
-    reverseHiss(){
-        if(this.allowHissSoundForReverse) {
-            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
-        }
-        this.allowHissSoundForReverse = false;
-    }
-        
-    update() {
-        super.update();
-        
-        if(this.rcsSoundCountdown>=0){
-            if(this.rcsSoundCountdown==0){
-                this.rcsSound.fadeOut(30);
-            } else {
-                this.rcsSoundCountdown--;
-            }
-        }
-
-        // Normal "Play" control mode"
-        if(this.controlMode == CONTROL_MODE.play && !this.ship.isDocked){
-            // Accel
-            if (this.cursors.up.isDown) {
-                this.ship.accelerate();
-            } else if(this.cursors.down.isDown) {
-                this.reverseHiss();
-                this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
-                this.ship.goInReverse();
-            } else {
-                this.allowHissSoundForReverse = true;
-                this.ship.deaccelerate();
-            }
-        
-            // Turning / Strafing
-            if (this.cursors.left.isDown) {
-                this.hiss();
-
-                this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
-
-                if(this.cursors.left.shiftKey){
-                    this.ship.moveLeft();
-                } else {
-                    this.ship.turnLeft();
-                }
-            } else if (this.cursors.right.isDown) {
-                this.hiss();
-
-                this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
-
-                if(this.cursors.right.shiftKey){
-                    this.ship.moveRight();
-                } else {
-                    this.ship.turnRight();
-                }
-            } else {
-                this.allowHissSound = true;
-                this.ship.deaccelerateTurning();
-            }
-            
-            // Firing
-            if (this.fireButton.isDown) {
-                this.ship.firePrimaryWeapon();
-            }
-        }
-    }
-}
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -48571,9 +53037,12 @@ class HUD {
         var width = 100;
         var borderRadius = 5;
 
+        this.tweens = {};
+
         this.masterAlarmSound = game.add.audio('master_alarm');
         this.titleNotificationSound = game.add.audio('title-notification');
         this.panelToggleSound = game.add.audio('panel-toggle');
+        this.lowFuelSound = game.add.audio('low-fuel-warning');
 
         // Updaters
         game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
@@ -48595,7 +53064,7 @@ class HUD {
         // Date
         this.stardateLabel = new Phaser.BitmapText(
             this.game.game, 
-            this.game.camera.width-8,
+            this.game.camera.width-8-140,
             10,
             'pixelmix_8',
             this.game.starDate,
@@ -48902,7 +53371,8 @@ class HUD {
         );
         this.message__subTitle.alpha = 0;
         this.group.add(this.message__subTitle)
-
+        
+        // Nav Arrow
         this.navigationArrow = this.game.make.sprite(0,0, 'nav-arrow');
         this.navigationArrow.anchor.set(-10,.5);
         this.navArrowResetPostionTween = this.game.add.tween(this.navigationArrow).to({
@@ -48913,7 +53383,67 @@ class HUD {
 
         this.group.add(this.navigationArrow);
 
+        
+        this.messageTextY = this.game.camera.height-100;
+        this.messageText = this.game.add.text(
+            0,
+            0, 
+            '', 
+            { font: `14px ${FONT}`, fill: "#FFFFFF", align: 'center',  boundsAlignH: 'center' }, 
+            this.group,
+        );
+        this.messageText.setTextBounds(0, 0, screenWidth-this.sidebarWidth, screenHeight);
+        this.messageText.stroke = '#000000';
+        this.messageText.strokeThickness = 3;
+        this.messageText.alpha = 0;
 
+        this.tweens.messageFadeIn = this.game.add.tween(this.messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+    	this.tweens.messageMoveUp = this.game.add.tween(this.messageText).to( { y: '-30' }, 300, "Quart.easeOut", false);
+     class AsteroidField extends GameObject {
+    constructor(game,options) {
+        super(game);
+        
+        this.system = options.system;
+        var size = options.size;
+        if(size==undefined) size = 2000;
+        var densityLowerBound = 50;
+        var densityUpperBound = 60;
+        
+        this.asteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
+        this.asteroids = this.game.asteroids;
+        for (var i = 0; i < this.asteroidsCount; i++) { 
+            var xPos = game.rnd.integerInRange(options.x-size, options.x+size);
+            var yPos = game.rnd.integerInRange(options.y-size, options.y+size);
+            
+            var bigness = game.rnd.integerInRange(0,100);
+
+            if(bigness>=70){
+                var asteroid = new Asteroid(this.game,this.asteroids,'large',xPos,yPos);
+            } else if(bigness<70 && bigness>50){
+                var asteroid = new Asteroid(this.game,this.asteroids,'medium',xPos,yPos);                
+            } else {
+                var asteroid = new Asteroid(this.game,this.asteroids,'small',xPos,yPos);                
+            }
+
+            // Add to system
+            this.system.stellarObjects.push(asteroid);
+        }
+
+        this.buoy = new Buoy(this.game,options.x,options.y);
+        this.buoy.description = `${Names.proper()} Asteroid Field`
+
+        this.system.stellarObjects.push(this.buoy);
+    }
+
+    update(){
+        super.update();
+        if(this.system == this.game.system){    
+            this.game.physics.arcade.collide(this.asteroids, this.asteroids);
+        }
+    }    
+}
+   this.tweens.messageFadeOut = this.game.add.tween(this.messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, 2000);
+    
         // Blinky
         this.blinkyMessageText = this.game.add.text(
             this.game.camera.width/2,
@@ -48957,24 +53487,12 @@ class HUD {
     }
 
     message(message){
-        var delay = 2000;
-        var messageText = this.game.add.text(
-            (this.game.camera.width/2)-50,
-            this.game.camera.height-100, 
-            message, 
-            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
-        );
-
-        messageText.anchor.x = .5;
-        messageText.fixedToCamera = true;
-        messageText.alpha = 0;
+        this.messageText.y =  this.messageTextY;
+        this.messageText.setText(message);
     
-        var fadeIn = this.game.add.tween(messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
-    	var moveUp = this.game.add.tween(messageText).to( { y: '-30' }, 300, "Quart.easeOut", true);
-        var fadeOut = this.game.add.tween(messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, delay);
-    
-        fadeIn.chain(fadeOut);
-        fadeIn.start();
+        this.tweens.messageFadeIn.chain(this.tweens.messageFadeOut);
+        this.tweens.messageFadeIn.start();
+        this.tweens.messageMoveUp.start();
     }
 
     warning(message){
@@ -49069,6 +53587,13 @@ class HUD {
         game.add.tween(this.o2gaugeBg).to( {x: '+100'}, 600, "Quart.easeOut", true);
         game.add.tween(this.o2gaugeArrow).to( {x: '+100'}, 600, "Quart.easeOut", true);        
     }
+
+    hideO2Panel(){
+        this.masterAlarm = false;
+        game.add.tween(this.o2gaugeBg).to( {x: '-100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '-100'}, 600, "Quart.easeOut", true);        
+    }
+
     
     set o2Percent(o2){
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
@@ -49110,6 +53635,15 @@ class HUD {
             this.updateFTLPanel(true);
         }
     }
+    
+    lowFuel(){
+        this.message("Low Fuel");
+        this.lowFuelSound.loopFull();
+    }
+    
+    hasFuel(){
+        this.lowFuelSound.stop();
+    }
         
     updateFTLPanel(force){
         if(this.ftlPanel.y == this.ftlPanelY-200 || force){ // If is showing
@@ -49148,7 +53682,7 @@ class HUD {
                     this.ftlPanelHelpText.setText('(H) Hide')
                 }
             this.ftlPanelText.setText(panelText);
-            this.ftlPanelStatusText.setText('JUMPS (3/3)');
+            this.ftlPanelStatusText.setText(`CHARGES: ${this.game.player.ship.jumpsRemaining}`);
             this.ftlPanelStatusText.x = 101;
         }
     }
@@ -49186,7 +53720,5208 @@ class HUD {
         }
         this.healthValue_cache = this.healthProgressBar.value
         this.healthMaxValue_cache = this.healthProgressBar.max
+        
+        if(this.fuelPercentage_cache!=this.game.player.ship.fuelPercentage)
+            this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
+        
+        if(this.energyPercentage_cache!=this.game.player.ship.energyPercentage)        
+            this.energyProgressBar.valuePercent = this.game.player.ship.energyPercentage;
+        
+        this.fuelPercentage_cache = this.fuelProgressBar.valuePercent;
+        this.energyPercentage_cache = this.energyProgressBar.valuePercent;
 
+        // O2
+        this.o2Percent = this.game.player.ship.o2Percent;
+    }
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/* Merging js: app/minimap.js begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/* Merging js: app/gameObjects/nebula.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Minimap {
+    constructor(game,hud) {
+        this.game = game;
+        this.phaserGame = game.game;
+        
+        this.size = 116;
+        this.width = this.size;
+        this.height = this.size;
+        this.x = this.game.camera.width - 128;
+        this.y = 30;
+        
+        this.hud = hud;
+        this.defaultScale = .03;
+        this.scale = this.defaultScale;
+        this.distanceFactor = 55;
+            
+        this.background = this.hud.group.create(this.x,this.y,'minimap-bg')
+        this.background.width = this.size;
+        this.background.height = this.size;
+        this.background.tint = 0x1A1A1A;
+
+        this.dotsBitmapData = this.phaserGame.add.bitmapData(this.width);
+        
+        this.phaserGame.cache.addBitmapData('minimap-display', this.dotsBitmapData);
+        this.mapDots = this.hud.group.create(
+            this.background.x,
+            this.background.y,
+            this.phaserGame.cache.getBitmapData('minimap-display')
+        )
+    }
+    update(){
+        this.dotsBitmapData.clear();
+        this.game.system.stellarObjects.forEach(this.drawDotsForGameObject,this);
+        this.game.system.planets.forEach(this.drawDotsForGameObject,this);
+        this.dotsBitmapData.dirty = true;        
+    }
+    
+    drawDotsForGameObject(gameObject){
+        if(gameObject.sprite!=undefined){
+            var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
+            if(distance<(this.distanceFactor/this.scale)){
+                var x = ((gameObject.sprite.x-this.game.player.ship.sprite.x)*this.scale)+this.size/2;
+                var y = ((gameObject.sprite.y-this.game.player.ship.sprite.y)*this.scale)+this.size/2;
+                var size = 1; // Default dot size
+                if(gameObject.minimapSize!=undefined){
+                    size = gameObject.minimapSize;
+                }
+                var a = Math.abs(distance*(this.distanceFactor/100000)-1)+.1
+                
+                if(this.game.player.ship.navigationTarget == gameObject){
+                    this.dotsBitmapData.circle(x,y,size+3,`rgba(255,255,255,${a})`);                            
+                    this.dotsBitmapData.circle(x,y,size+2,`#3f3c46`);                            
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                } else {
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                }
+                
+                // Player
+                this.dotsBitmapData.circle(this.size/2,this.size/2,1,`rgba(255,255,255,1)`);                            
+            }
+        }
+    }
+    
+}class Nebula extends GameObject {
+    constructor(game,options) {
+        super(game);
+
+        var x = options.x;
+        var y = options.y;
+        var size = options.size;
+        if(size==undefined) size = 2000;
+        this.size = size;
+        this.system = options.system;
+            
+        var xPos = game.rnd.integerInRange(x-this.size, x+this.size);
+        var yPos = game.rnd.integerInRange(y-this.size, y+this.size);
+
+        var densityLowerBound = 50;
+        var densityUpperBound = 60;
+
+        this.iceteroidsCount = this.game.rnd.integerInRange(size/densityLowerBound, size/densityUpperBound);
+        this.iceteroids = this.game.asteroids;
+        for (var i = 0; i < this.iceteroidsCount; i++) { 
+            var xPos = game.rnd.integerInRange(x-size, x+size);
+            var yPos = game.rnd.integerInRange(y-size, y+size);
+            
+            var bigness = game.rnd.integerInRange(0,100);
+
+            if(bigness>=70){
+                var iceteroid = new Iceteroid(this.game,this.iceteroids,'large',xPos,yPos);
+            } else {
+                var iceteroid = new Iceteroid(this.game,this.iceteroids,'small',xPos,yPos);                
+            }
+            this.system.stellarObjects.push(iceteroid);
+        }
+
+        this.buoy = new Buoy(this.game,x,y);
+        this.buoy.description = `${Names.proper()} Ice Nebula`
+        this.name = this.buoy.description;
+        this.system.stellarObjects.push(this.buoy);
+
+        this.shouldShowNebulaEffect = false;
+        this.nebulaSpawnInterval = 10;
+        this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+
+        // Effects
+        this.nebulaOverlay = this.game.add.graphics(0, 0);
+        this.nebulaOverlay.beginFill(0x34495e);
+        this.nebulaOverlay.drawRect(0,0,screenWidth,screenHeight);
+        this.nebulaOverlay.endFill();
+        this.nebulaOverlay.alpha = 0;
+        this.nebulaOverlayTargetAlpha = .4;
+        this.game.starsTargetAlpha = .2;
+        this.nebulaOverlayStepAlpha = .002;
+        this.nebulaOverlay.visible = false;
+        this.nebulaOverlay.fixedToCamera = true;
+        
+        var smoke = {
+            lifespan: 7000,
+            image: 'nebula-cloud',
+            sendToBack: true,
+            alpha: { initial: 0, value: .06, control: [ { x: 0, y: 0 }, { x: 0.2, y: 1 }, { x: 0.5, y: 0.5 }, { x: 1, y: 0 } ] },
+            scale: { min: 1, max: 1.5 },
+            vx: { min: -0.2, max: 0.2 },
+            vy: { min: -0.2, max: -0.2 },
+            hsv: { value: 210 },
+        };
+        this.game.ps.addData('nebula-cloud', smoke);
+        this.smokeEmitter = this.game.ps.createEmitter();
+        this.smokeEmitter.addToWorld();
+
+    	this.particlesEmitter = game.add.emitter(0,0, 500);
+    	this.particlesEmitter.width = game.camera.width;
+    	this.particlesEmitter.height = game.camera.height;
+    	    
+    	this.particlesEmitter.makeParticles(['ice-small-1','ice-small-2','ice-small-3','ice-small-4','ice-small-5']);
+    
+    	this.particlesEmitter.setAlpha(0, 1, 2000,Phaser.Easing.Quadratic.InOut,true);
+
+    	this.particlesEmitter.minParticleScale = 0.08;
+    	this.particlesEmitter.maxParticleScale = 0.35;
+    
+    	this.particlesEmitter.setYSpeed(-10, 10);
+    	this.particlesEmitter.setXSpeed(-10, 10);
+        this.particlesEmitter.gravity = 3;
+    
+    	this.particlesEmitter.minRotation = -100;
+    	this.particlesEmitter.maxRotation = 100;
+    
+    	this.particlesEmitter.start(false, 4000, 10, 0);
+    	this.particlesEmitter.on = false;
+    	this.iceteroids.add(this.particlesEmitter);
+    	
+    	// Ambient Sounds
+        this.ambientSound = game.add.audio('nebula-ambient-1');
+    }
+    
+    destroy(){
+        if(this.shouldShowNebulaEffect) this.game.player.exitDarkness();
+        super.destroy();
+    }
+    
+    update(){
+        super.update();
+        
+        if(this.system == this.game.system){    
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.buoy.sprite, this.game.player.sprite);
+        
+            if(this.distanceToPlayer<=this.size*1.5){
+                this.game.player.enterDarkness(this);
+                this.shouldShowNebulaEffect = true;
+            } else {
+                this.game.player.exitDarkness(this);
+                this.shouldShowNebulaEffect = false;
+            }
+            
+            if(this.shouldShowNebulaEffect){   
+                // Particles
+                this.particlesEmitter.on = true;   
+                this.particlesEmitter.x = this.game.camera.x + this.game.camera.width/2;
+                this.particlesEmitter.y = this.game.camera.y + this.game.camera.height/2;
+    
+                // Overlay
+                this.nebulaOverlay.visible = true;
+                
+                if(this.nebulaOverlay.alpha<=this.nebulaOverlayTargetAlpha)
+                    this.nebulaOverlay.alpha+=this.nebulaOverlayStepAlpha
+    
+                if(this.game.stars.alpha>=this.game.starsTargetAlpha)
+                    this.game.stars.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.game.stars.alpha<=this.game.starsTargetAlpha)
+                    this.game.stars.alpha=this.game.starsTargetAlpha    
+                
+                // Smoke
+                if(this.nebulaSpawnCountdown==0){
+                    this.smokeEmitter.emit(
+                        'nebula-cloud',
+                        this.game.camera.x + this.game.rnd.integerInRange(0, this.game.camera.width), 
+                        this.game.camera.y + this.game.rnd.integerInRange(0, this.game.camera.height),
+                    ) 
+                    this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+                } else {
+                    this.nebulaSpawnCountdown--;
+                }
+                
+                // Sound
+                if(!this.ambientSound.isPlaying) {
+                    console.log("Start Loop");
+                    this.ambientSound.loopFull(AMBIENT_VOLUME);
+                }            
+            } else {
+                // Stop Particles
+                this.particlesEmitter.on = false;   
+                
+                // Hide overlay
+                this.nebulaOverlay.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.nebulaOverlay.alpha<this.nebulaOverlayStepAlpha){
+                    this.nebulaOverlay.alpha = 0;
+                    this.nebulaOverlay.visible = false;
+                }
+                
+                // Stars
+                this.game.stars.alpha+=this.nebulaOverlayStepAlpha
+                if(this.game.stars.alpha>=1)
+                    this.game.stars.alpha=1;        
+            
+                // Stop sound
+                if(this.ambientSound.isPlaying && this.ambientSound.volume == AMBIENT_VOLUME) {
+                    this.ambientSound.fadeOut(3000);    
+                }
+                this.ambientSound.onFadeComplete.addOnce(function(){
+                    this.ambientSound.stop();
+                }, this);
+            }
+        }
+    }
+    
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/progressBar.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gameObjects/iceteroid.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class ProgressBar {
+    constructor(game,hud,title,x,y) {
+        this.game = game;
+        this.phaserGame = game.game;
+        this.x = x;
+        this.y = y;
+        this.height = 26;
+        
+        this.hud = hud;
+
+        this.valuePercent = 0;
+        this._valuePercent = 0;
+        this.value = null;
+        this._value = null;
+        this.max = 0;
+        this._max = 0;
+        this.displayTotal = false;
+        this.title = title;
+
+        this.barBitmapData = this.phaserGame.add.bitmapData(116);
+        this.barBitmapData.ctx.fillStyle = '#EEEEEE';
+
+        this.phaserGame.cache.addBitmapData('progbar', this.barBitmapData);
+        this.barSprite = this.hud.group.create(
+            x,
+            y+12,
+            this.phaserGame.cache.getBitmapData('progbar')
+        )
+
+        var label = new Phaser.BitmapText(
+            this.game.game,
+            x,
+            y, 'pixelmix_8',
+            this.title,
+            5,
+        );
+        label.tint = 0x948f9c;
+        this.hud.group.add(label)
+
+        this.amountDisplay = new Phaser.BitmapText(
+            this.game.game,
+            x+116,
+            label.y, 'pixelmix_8',
+            '',
+            5
+        );
+        this.amountDisplay.tint = 0xFFFFFF;
+        this.amountDisplay.anchor.set(1,0);
+        this.hud.group.add(this.amountDisplay)   
+    }
+
+    set valuePercent(valuePercent){
+        this._valuePercent = valuePercent;
+        this.draw();
+    }
+    
+    get valuePercent(){
+        return this._valuePercent;
+    }
+
+    set value(value){
+        this._value = value;
+        this.draw();
+    }
+    
+    get value(){
+        return this._value;
+    }
+
+    set max(max){
+        this._max = max;
+        this.draw();
+    }
+    
+    get max(){
+        return this._max;
+    }
+
+    draw(){
+        if(this.barBitmapData!=undefined){
+            this.barBitmapData.clear();
+            this.barBitmapData.ctx.fillStyle = '#504d54';
+            this.barBitmapData.rect(0,0,116,10);
+            if(this.value){
+                this.barBitmapData.ctx.fillStyle = '#EEEEEE';
+                this.barBitmapData.rect(0,0,Math.round(((this.value/this.max)*100)*1.16),10);
+                this.amountDisplay.setText(`${Math.round(this.value)}/${Math.round(this.max)}`); 
+            } else {
+                if(isNaN(this.valuePercent)) this.valuePercent = 0;
+                this.barBitmapData.ctx.fillStyle = '#EEEEEE';
+                this.barBitmapData.rect(0,0,Math.round(this.valuePercent*1.16),10);
+                this.amountDisplay.setText(this.valuePercent+"%");
+            }
+    
+            this.barBitmapData.dirty = true;                    
+        }
+    }
+
+    update(){    
+    
+    }
+    
+}class Iceteroid extends GameObject {
+    constructor(game,group,size,x,y) {
+        super(game);
+     
+        this.group = group
+        this.emitFlakes = false;
+        
+        if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
+        if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
+        if(size==undefined) size = 'large';
+        this.size = size;
+
+        this.sprite = this.game.asteroids.create(x,y,`ice-${size}-${game.rnd.integerInRange(1, 5)}`);
+
+        this.sprite.parentObject = this;
+        this.game.physics.p2.enable(this.sprite,P2BODY_DEBUG);
+
+        this.sprite.body.clearShapes();
+        this.sprite.body.damping = 0;
+
+        if(size=='large'){
+            this.health = game.rnd.integerInRange(150, 200);
+            this.sprite.body.mass = 10;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(10);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-10, 10),game.rnd.integerInRange(-10, 10)],0,0)
+
+            this.minimapSize = 1.2;
+        } else if(size=='small'){
+            this.health = game.rnd.integerInRange(70, 100);
+
+            this.sprite.body.mass = 5;
+            this.roationSpeed = game.rnd.integerInRange(-.10, .10);            
+            this.sprite.body.addCircle(8);
+            this.sprite.body.applyImpulseLocal([game.rnd.integerInRange(-2, 2),game.rnd.integerInRange(-2, 2)],0,0)
+
+            this.minimapSize = .8;
+        }
+
+        this.sprite.body.rotation = game.rnd.integerInRange(0, 360)
+        this.sprite.anchor.set(0.5);
+
+        this.hitEmitter = this.game.add.emitter(0, 0, 100);
+        this.hitEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`);
+        this.hitEmitter.minParticleScale = .2;
+        this.hitEmitter.maxParticleScale = .4;
+        this.hitEmitter.gravity = 0;
+        this.hitEmitter.particleBringToTop = true;
+        
+        this.explodeSounds = [
+            game.add.audio('ice-crash-1'),
+            game.add.audio('ice-crash-2'),
+            game.add.audio('ice-crash-3'),
+            game.add.audio('ice-crash-4'),
+            game.add.audio('ice-crash-5'),
+            game.add.audio('ice-crash-6'),
+        ]
+        this.damageSound = game.add.audio('crunch-1');
+        this.soundCountdown = 10;
+    }
+
+    hit(bullet){
+	    this.hitEmitter.x = bullet.x;
+	    this.hitEmitter.y = bullet.y;	
+	    this.emitFlakes = true;
+	    this.soundCountdown = 10;
+	    if(!this.damageSound.isPlaying) this.damageSound.loopFull(.5);
+    }
+        
+    kill(){
+        if(this.size=='large'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.explode();
+            this.destroy();
+            var a1 = new Iceteroid(this.game,this.group,'small',x-15,y-game.rnd.integerInRange(0,10));            
+            var a2 = new Iceteroid(this.game,this.group,'small',x+15,y+game.rnd.integerInRange(0,10));
+        } else if(this.size=='small'){
+            var x = this.sprite.x;
+            var y = this.sprite.y;
+            this.explode();         
+            this.destroy();
+            var flakeCount = game.rnd.integerInRange(2,5);
+
+            for (var i = 0; i < flakeCount; i++) { 
+                new IceFlakePickup(this.game,this.group,this.sprite.x,this.sprite.y)
+            }
+        }
+        this.damageSound.stop();
+    } 
+       
+    explode(){
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`,0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .2;
+        this.explodeEmitter.maxParticleScale = .6;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
+        this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
+    }
+    
+    // Rendering
+    update() {
+        super.update();
+        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite);
+
+        if(this.distanceToPlayer<Math.max(screenWidth,screenHeight)){
+            this.sprite.exists = true;
+        } else {
+            this.sprite.exists = false;
+        }
+
+        if(this.soundCountdown==0){
+            this.damageSound.stop();
+        } else {
+            this.soundCountdown--;
+        }
+        
+        // Spin
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
+    }
+
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
+    }
+}
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/flake.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/_guiScreen.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class GuiScreen {
+    constructor(game,group) {                
+        this.game = game;
+        this.screen = this.game.add.group();
+    
+        this.screen.visible = false;
+        this.parentScreen = null;
+
+        this.fontFamily = FONT;
+        this.fontFamilyLarge = FONT;
+        this.fontSizeOffset = 0;
+        this.textResolution = 2;
+        
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom; // Default
+        
+        this.collapseSound = game.add.audio('gui_collapse');
+        this.expandSound = game.add.audio('gui_expand');
+        
+        this.styles = {
+            borderRadius: 5,
+            darkGrey: 0x282731,
+            midGrey: 0x3f3c46,
+            lightGrey: 0x4d4b56,
+            veryLightGrey : 0x948f9c,
+            red: 0xc03b2b,
+            green: 0x1aae5c,
+            baseText : { font: `${14+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
+            smallWhiteText : { font: `${13+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
+            smallGreyText : { font: `italic ${13+this.fontSizeOffset}px ${this.fontFamilyLarge}`, fill: '#948f9c', align: 'left'},
+            title : { font: `${18}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'left'},
+        }
+    }
+    
+    // Showing
+    show(){
+        this.previousControlMode = this.game.player.controlMode;
+        this.screen.visible = true;
+
+        switch(this.transitionStyle) {
+            case SCREEN_TRANSITION_STYLE.fromBottom:
+                this.expandSound.play();
+                this.screen.y = this.game.camera.height;
+                var transition = this.game.add.tween(this.screen.position).to({y: 0}, 500, Phaser.Easing.Back.InOut, true);
+                break;
+            case SCREEN_TRANSITION_STYLE.fromRight:
+                this.screen.x = this.game.camera.width;
+                var transition = this.game.add.tween(this.screen.position).to({x: 0}, 500, "Quart.easeOut", true);
+                break;
+            default:
+                // None
+        }
+        if(transition!=undefined) transition.onComplete.add(this.didShow, this);
+    }
+
+    didShow(){
+        if(this.parentScreen) this.parentScreen.childScreenDidShow();
+    }
+    
+    // Hiding
+    hide(){
+        switch(this.transitionStyle) {
+            case SCREEN_TRANSITION_STYLE.fromBottom:
+                this.collapseSound.play();
+                var transition = this.game.add.tween(this.screen.position).to({y: this.game.camera.height}, 500, Phaser.Easing.Back.InOut, true);
+                break;
+            case SCREEN_TRANSITION_STYLE.fromRight:
+                var transition = this.game.add.tween(this.screen.position).to({x: this.game.camera.width}, 500, "Quart.easeOut", true);
+                break;
+            default:
+                // None
+        }
+        transition.onComplete.add(this.didHide, this);
+
+        if(this.parentScreen) this.parentScreen.childScreenWillHide();
+    }
+ 
+    didHide(){
+        this.screen.visible = false;        
+        this.game.player.controlMode = this.previousControlMode;
+        
+        this.cleanup();
+
+        if(this.parentScreen) this.parentScreen.childScreenDidHide();
+    }
+    
+    cleanup(){
+        
+    }
+    
+    childScreenDidHide(){
+        
+    }
+
+    childScreenWillHide(){
+        
+    }
+
+    childScreenWillShow(){
+        
+    }
+
+    childScreenDidShow(){
+        
+    }
+
+    update(){
+
+    }
+
+}class Item_Flake extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Asteroid Flake';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.common;
+        this.mass = 10;
+        this.baseValue = 16;
+        this.type = 'Mineral';
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/* Merging js: app/gui/arrival.js begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/* Merging js: app/items/paladium.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class ArrivalScreen extends GuiScreen {
+    constructor(game,group) {
+        super(game,group);
+
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom;
+
+        this._destination = null;
+        this.serviceButtons = [];
+        this.serviceScreens = {};      
+        this.serviceSelectedIndex = null;
+        
+        this.setupKeys();
+        this.setupScreen();
+                
+        this.wrapper = group;
+        this.wrapper.add(this.screen);
+        this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
+
+        this.controlGroup = this.game.add.group();
+        this.screen.add(this.controlGroup);
+    }
+    
+    setupKeys(){
+        var upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        upKey.onUp.add(this.upKeyPressed, this);
+        
+        var downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+        downKey.onUp.add(this.downKeyPressed, this);
+
+        var leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
+        leftKey.onUp.add(this.leftKeyPressed, this);
+
+        var rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+        rightKey.onUp.add(this.rightKeyPressed, this);
+
+        var escKey = game.input.keyboard.addKey(Phaser.Keyboard.ESC);
+        escKey.onUp.add(function(){
+            if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
+        }, this);
+
+        var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
+        lKey.onUp.add(function(){
+            if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
+        }, this);
+    }
+    
+    upKeyPressed(){
+        // Later
+    }
+    
+    downKeyPressed(){
+        // Later
+    }
+    
+    leftKeyPressed(){
+        this.selectPreviousService();
+    }
+    
+    rightKeyPressed(){
+        this.selectNextService();
+    }
+    
+    selectNextService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+
+        this.serviceSelectedIndex++;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    selectPreviousService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+        
+        this.serviceSelectedIndex--;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    clickSelectedService(){
+        
+    }
+    
+    setupScreen(){
+        // BG
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.panelBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(this.styles.darkGrey);
+        this.bg.drawRect(0,0,
+            this.game.camera.width,
+            this.game.camera.height*2,
+            0
+        )
+        this.bg.endFill();
+
+        // Panel
+        this.panelHeight = this.game.scale.height-126;
+        this.panelTop = 94;
+        this.panelBg.clear();
+        this.panelBg.beginFill(this.styles.midGrey);
+        this.panelBg.drawRoundedRect(36,this.panelTop,
+            this.game.camera.width-(36*2),
+            this.panelHeight,
+            this.styles.borderRadius
+        )
+        this.panelBg.endFill();
+
+        
+        // Title / Details / Date
+        this.destDesc = this.game.add.text(
+            36,24, 
+            '', 
+            this.styles.smallGreyText, 
+            this.screen
+        )
+        this.destDesc.resolution = this.textResolution;
+
+        this.destName = this.game.add.text(
+            36,43, 
+            '', 
+            this.styles.title, 
+            this.screen
+        )
+        this.destName.resolution = this.textResolution;
+ 
+        this.destBreadcrumb = this.game.add.text(
+            -1,43, 
+            '', 
+            this.styles.title, 
+            this.screen
+        )
+        this.destBreadcrumb.tint = 0x948f9c;
+        this.destBreadcrumb.resolution = this.textResolution;
+
+        
+        this.currentDate = this.game.add.text(
+            36,68, 
+            '', 
+            this.styles.smallWhiteText, 
+            this.screen
+        )
+        this.currentDate.resolution = this.textResolution;
+
+        // Exit button
+        this.exitButton = new Button(this.game,'exit-button',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        { font: `${13+this.fontSizeOffset}px ${FONT}`, fill: '#FFFFFF', align: 'center'}
+        );
+        this.exitButton.buttonX = this.game.camera.width - this.exitButton.buttonWidth - 36;
+        this.exitButton.buttonY = 24;
+        this.exitButton.text = "Takeoff (L)";
+        this.exitButton.color = this.styles.red;
+        this.screen.add(this.exitButton);
+
+        // Credits
+        this.creditsLabel = this.game.add.text(
+            this.game.camera.width-36,68, 
+            '', 
+            this.styles.baseText, 
+            this.screen
+        );
+        this.creditsLabel.anchor.set(1,0);
+        this.creditsLabel.addColor('#948f9c', 0);
+        this.creditsLabel.addColor('#FFFFFF', 7);
+        this.creditsLabel.resolution = this.textResolution;
+
+        // Photo
+        this.picture = this.game.add.sprite(36, this.panelTop, 'planet-arrival-1');
+        var cropRect = new Phaser.Rectangle(0, 0, 300, this.panelHeight);
+        this.picture.crop(cropRect);
+        this.screen.add(this.picture);
+        this.innerColX = this.picture.width+36+24
+
+        // Message
+        this.innerColWidth = this.game.camera.width - (this.picture.width+36+24) - 36-24; 
+        this.welcomeText = this.game.add.text(
+            this.innerColX,this.panelTop+16, 
+            '', 
+            { font: ` ${12+this.fontSizeOffset}px Fira Code`, fill: '#FFFFFF', align: 'left', wordWrap: true, wordWrapWidth: this.innerColWidth }, 
+            this.screen
+        );
+        this.welcomeText.lineSpacing = -4;
+        this.welcomeText.resolution = this.textResolution;        
+    }
+    
+    layout(){        
+        this.cleanup();
+        
+        console.log(this.serviceSelectedIndex);
+        
+        // Description
+        this.destDesc.setText(this.destination.description);
+
+        // Name
+        this.destName.setText(this.destination.name);
+        
+        // Breadcrumb
+        this.destBreadcrumb.setText('');
+        this.destBreadcrumb.alpha = 0;
+        this.destBreadcrumb.x = this.destName.x + this.destName.width + 10
+        
+        // Date
+        this.currentDate.setText(moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'));
+
+        // Text
+        this.welcomeText.setText(this.destination.welcomeText);      
+    
+        // Services Buttons/
+        this.controlGroup.visible = true;
+        var servicesIndex = 0;
+        var serviceRow = 1;
+        for (let service of this.destination.services) {
+            var serviceButton = new TwoLineButton(this.game,'service-button');
+            serviceButton.screen = this;
+            serviceButton.service = service;
+
+            if(servicesIndex==this.serviceSelectedIndex){
+                serviceButton.over = true;
+            }
+
+            serviceButton.callbacks = {
+                onDown : function() {
+                    this.screen.serviceButtonClicked(this);
+                }.bind(serviceButton)
+            }
+
+            serviceButton.buttonWidth = (this.innerColWidth/2)-8
+            if(isEven(servicesIndex)){
+                serviceButton.buttonX = this.innerColX;
+            } else {
+                serviceButton.buttonX = this.innerColX + serviceButton.buttonWidth+16;
+            }
+            
+            serviceButton.buttonY = (this.panelHeight+this.panelTop)-((serviceButton.buttonHeight+16)*serviceRow);
+            serviceButton.text = PLANET_SERVICES_TITLE[service];
+            serviceButton.subText = PLANET_SERVICES_DESC[service];
+            serviceButton.color = this.styles.lightGrey;
+            this.controlGroup.add(serviceButton);            
+            
+            servicesIndex++;
+            if(servicesIndex % 2 === 0) serviceRow++class Item_Paladium extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Raw Paladium';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.rare;
+        this.mass = 20;
+        this.baseValue = 100;
+        this.type = 'Mineral';
+    }
+};
+            this.serviceButtons.push(serviceButton);
+        }            
+
+        this.updateCredits();    
+    }
+        
+    serviceButtonClicked(button){
+        this.presentScreenForService(button.service)
+    }
+    
+    presentScreenForService(service){
+        // Present Screen
+        if(service==PLANET_SERVICES.market){
+            this.serviceScreens[PLANET_SERVICES.market] = new ExchangeScreen(this.game,this.screen,this.destination);
+            this.serviceScreens[PLANET_SERVICES.market].parentScreen = this;
+            this.screen.add(this.serviceScreens[PLANET_SERVICES.market].screen);            
+        }
+
+        var screenToPresent = this.serviceScreens[service]
+        screenToPresent.show();          
+
+        // Update Breadcrumb
+        this.destBreadcrumb.setText('/ ' + PLANET_SERVICES_TITLE[service]);
+        this.destBreadcrumb.alpha = 0;
+        var transition = this.game.add.tween(this.destBreadcrumb).to({alpha: 1}, 600, "Quart.easeOut", true);
+
+        // Disable buttons
+        this.controlGroup.forEach(function(control){
+            control.sprite.input.enabled = false;
+        }, this)
+    }
+
+    childScreenWillHide(){
+        super.childScreenWillHide();
+        this.game.add.tween(this.destBreadcrumb).to({alpha: 0}, 600, "Quart.easeOut", true);
+
+        // Enable buttons
+        this.controlGroup.forEach(function(control){
+            control.sprite.input.enabled = true;
+        }, this)
+
+        this.updateCredits();   
+    }
+    
+    childScreenDidHide(){
+        super.childScreenDidHide();
+    }
+    
+    show(){
+        super.show();
+
+        this.wrapper.visible = true;
+        
+        // Arrival Specific 
+        this.game.player.stop();                
+    }
+
+    didShow(){
+        super.didShow();        
+        this.game.player.controlMode = CONTROL_MODE.landed;
+        this.controlGroup.visible = true;        
+    }
+    
+    hide(){
+        super.hide();
+
+        // Arrivial Specific
+        this.game.player.ship.takeOff();
+
+        // Wait a second then show where we are.
+        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+            this.game.hud.showSystemInfo();
+        }, this);
+    }
+
+    didHide(){
+        super.didHide();
+    }
+    
+    cleanup(){
+        for (let button of this.serviceButtons) {
+            button.destroy(true);
+        }
+        
+        Object.keys(this.serviceScreens).forEach(function(key,index) {
+            var screen = this.serviceScreens[key];
+            screen.cleanup();
+            screen.screen.destroy(true);
+        }.bind(this));
+    }
+    
+    get destination(){
+        return this._destination;
+    }
+
+    set destination(destination){
+        this._destination = destination;
+        this.layout();
+    }
+
+    updateCredits(){
+        this.creditsLabel.setText('CREDITS ' + this.game.player.credits);
+    }
+
+
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/metoricIron.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/inventory.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Item_MeteoricIron extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Meteoric Iron';
+        this.storageClass = CARGO_STORAGE_CLASS.bulk
+        this.rarity = RARITY.uncommon;
+        this.mass = 15;
+        this.baseValue = 32;
+        this.type = 'Mineral';
+    }
+}class InventoryScreen extends GuiScreen {
+    constructor(game,group) {
+        super(game,group);
+
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom;
+        
+        this.setupScreen();
+                
+        this.wrapper = group;
+        this.wrapper.add(this.screen);
+        this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
+
+        this.helpTexts = {
+            default : '(UP/DOWN) Select Item   (J) Jettison',
+            equipment : '(UP/DOWN) Select Item   (J) Jettison   (E) Equip/Unequip',
+            consumable : '(UP/DOWN) Select Item   (J) Jettison   (SPACE) Use',
+        }
+
+        this.jettisonSound = game.add.audio('jettison');
+
+    }
+    
+    setupKeys(){
+        this.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);       
+        this.downKeyOnUp = function(){
+            this.myList.selectNextItem();
+            this.update();
+        }
+        this.downKey.onUp.add(this.downKeyOnUp, this);
+
+        this.upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        this.upKeyOnUp = function(){
+            this.myList.selectPreviousItem();
+            this.update();
+        }
+        this.upKey.onUp.add(this.upKeyOnUp, this);
+
+        this.escKey = game.input.keyboard.addKey(Phaser.Keyboard.ESC);
+        this.escKeyOnUp = function(){
+            this.hide();
+        }
+        this.escKey.onUp.add(this.escKeyOnUp, this);
+
+        this.iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
+        this.iKeyOnUp = function(){
+            this.hide();
+        }
+        this.iKey.onUp.add(this.iKeyOnUp, this);
+
+        this.eKey = game.input.keyboard.addKey(Phaser.Keyboard.E);
+        this.eKeyOnUp = function(){
+            this.toggleEquipForSelectedItem();
+        }
+        this.eKey.onUp.add(this.eKeyOnUp, this);
+
+        this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.spaceKeyOnUp = function(){
+            this.consumeSelectedItem();
+        }
+        this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
+
+        this.jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
+        this.jKeyOnUp = function(){
+            this.jettisonSelectedItem();
+        }
+        this.jKey.onUp.add(this.jKeyOnUp, this);
+    }
+    
+    setupScreen(){
+        this.screenWidth = this.game.camera.width-this.game.hud.sidebarWidth;
+
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.tabBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.bottomBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(0x111111);
+        this.bg.drawRect(0,0,
+            this.screenWidth,
+            this.game.camera.height*2,
+            0
+        )
+        this.bg.endFill();
+        
+        // Tab Bar
+        this.tabBarHeight = 45;
+        this.tabBar.clear();
+        this.tabBar.beginFill(0x111111);
+        this.tabBar.drawRect(0,0,
+            this.screenWidth,
+            this.tabBarHeight,
+        )
+        this.bottomBar.endFill();
+
+        // Tabs
+        this.shipTab = new TabItem(this.game,'ship-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.shipTab.buttonX = 0;
+        this.shipTab.buttonY = 0;
+        this.shipTab.text = "Ship";
+        this.screen.add(this.shipTab);
+        
+        this.inventoryTab = new TabItem(this.game,'inv-tab');
+        this.inventoryTab.buttonX = this.shipTab.buttonWidth + 1;
+        this.inventoryTab.buttonY = 0;
+        this.inventoryTab.text = "Inventory";
+        this.inventoryTab.active = true;
+        this.screen.add(this.inventoryTab);
+
+        this.mapTab = new TabItem(this.game,'map-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.mapTab.buttonX = this.inventoryTab.buttonX + this.inventoryTab.buttonWidth + 1;
+        this.mapTab.buttonY = 0;
+        this.mapTab.text = "Map";
+        this.screen.add(this.mapTab);
+
+        this.statsTab = new TabItem(this.game,'stats-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.statsTab.buttonX = this.mapTab.buttonX + this.mapTab.buttonWidth + 1;
+        this.statsTab.buttonY = 0;
+        this.statsTab.text = "Stats";
+        this.screen.add(this.statsTab);
+
+        // Bottom Bar
+        this.bottomBarHeight = 38;
+        this.bottomBar.clear();
+        this.bottomBar.beginFill(this.styles.darkGrey);
+        this.bottomBar.drawRect(0,this.game.camera.height-this.bottomBarHeight,
+            this.screenWidth,
+            this.bottomBarHeight+100, // Overlap for animation
+        )
+        this.bottomBar.endFill();
+
+        this.helpText = this.game.add.text(
+            16,this.game.camera.height - 26, 
+            '', 
+            { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+
+        // Lists
+        this.myList = new GuiInventoryList(this.game,this.screen);
+        this.myList.title = 'All Items'
+        this.myList.x = 0;
+        this.myList.y = this.tabBarHeight;
+        this.myList.listWidth = this.screenWidth/2;
+        this.myList.listHeight = this.game.camera.height-this.bottomBarHeight-this.tabBarHeight;
+        this.myList.itemCursorStyle = INVENTORY_LIST_CURSOR_STYLE.flat;
+        this.myList.focus = true;
+        this.myList.itemsPerPage = 12;
+        this.myList.allowFilter = true;
+        this.screen.add(this.myList);
+
+        // Item Info
+        // Background
+        this.infoMargin = 16;
+        this.infoWidth = (this.screenWidth/2)-1;
+
+        this.itemInfoBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.itemInfoTitleBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.infoTitleLabel = this.game.add.text(
+            0,0, 
+            'Item', 
+            { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+            this.screen
+        )
+        this.infoTitleLabel.resolution = 2;
+
+        this.infoSubtitleLabel = this.game.add.text(
+            0,0, 
+            'Item', 
+            { font: `13px ${FONT}`, fill: '#929292', align: 'right'},
+            this.screen
+        )
+        this.infoSubtitleLabel.anchor.set(1,0);
+        this.infoSubtitleLabel.resolution = 2;
+
+
+        this.infoDescription = this.game.add.text(
+            0,0, 
+            '', 
+            { font: `12px Fira Code`, fill: '#FFFFFF', align: 'left', }, 
+            this.screen
+        );
+        this.infoDescription.setStyle({ font: `12px Fira Code`, fill: '#FFFFFF', align: 'left', wordWrap: true, wordWrapWidth: this.infoWidth-(this.infoMargin*2) })
+        this.infoDescription.lineSpacing = -4;
+        this.infoDescription.resolution = this.textResolution;        
+        
+        // Props
+        this.propsGroup = this.game.add.group();
+        this.screen.add(this.propsGroup);
+    
+        this.update();
+    }
+    
+    layout(){        
+        this.cleanup();
+    }
+
+    update(){
+        this.updateItemInfo();        
+    }
+
+    updateItemInfo(){                        
+        var infoX = this.myList.x + this.myList.listWidth+1;
+        var infoY = 45;
+
+        // Properites
+        this.itemInfoBg.clear();
+        this.itemInfoTitleBg.clear();
+        var infoBgHeight = 100;
+        this.propsGroup.removeAll(true);
+
+        if(this.myList.selectedItem){
+            // HelpTexts
+            this.helpText.setText(this.helpTexts.default);
+            if(this.myList.selectedItem.isEquippable) this.helpText.setText(this.helpTexts.equipment);
+            if(this.myList.selectedItem.isConsumable) this.helpText.setText(this.helpTexts.consumable);
+
+            // Description
+            if(this.myList.selectedItem.description!=undefined){
+                this.infoDescription.x = infoX+this.infoMargin;
+                this.infoDescription.y = infoY + 40;
+                this.infoDescription.setText(this.myList.selectedItem.description)
+            } else {
+                this.infoDescription.setText('');                
+            }
+
+            var props = this.myList.selectedItem.infoFields
+            var labels = this.myList.selectedItem.infoFieldLabels
+
+            var propIndex = 0;
+            var propLineHeight = 20;
+            for (let prop of props) {
+                var propY = (propIndex*propLineHeight)+infoY+40+this.infoDescription.height+16;
+                
+                var propTitle = this.game.add.text(
+                    infoX+16,propY, 
+                    labels[propIndex], 
+                    { font: `13px ${FONT}`, fill: '#929292', align: 'left'},
+                    this.propsGroup
+                )
+                propTitle.resolution = 2;
+    
+                var value = this.myList.selectedItem[props[propIndex]];
+                if(props[propIndex]=='baseValue') value = CREDIT_PREFIX.short + numeral(value).format(`0,0[.]00`);
+                if(props[propIndex]=='rarity') value = RARITY_NAMES[this.myList.selectedItem[props[propIndex]]];
+                if(props[propIndex]=='storageClass') value = CARGO_STORAGE_CLASS_NAMES[this.myList.selectedItem[props[propIndex]]];
+                if(props[propIndex]=='mass') value = this.myList.selectedItem.readableMass;
+                if(props[propIndex]=='energyConsumption') value = `${numeral(value).format('0,0')} kW`;
+                if(props[propIndex]=='fuelConsumption') value = `${numeral(value).format('0,0.0')} units/sec`;
+                if(props[propIndex]=='thrust') value = `${numeral(value).format('0,0')} kN`;
+                if(props[propIndex]=='range') value = `${numeral(value).format('0,0')} m`;
+                if(props[propIndex]=='capacity') value = `${numeral(value).format('0,0')} kWh`;
+                if(props[propIndex]=='fuelCapacity') value = `${numeral(value).format('0,0')} units`;
+                if(props[propIndex]=='fuelAmount') value = `${numeral(value).format('0,0')} units`;
+    
+                var propValue = this.game.add.text(
+                    infoX+this.infoWidth-16,propY,
+                    value, 
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'right'},
+                    this.propsGroup
+                )
+                if(props[propIndex]=='rarity') propValue.tint = RARITY_COLOR[this.myList.selectedItem[props[propIndex]]];
+                propValue.anchor.set(1,0);
+                propValue.resolution = 2;
+                
+                propIndex++;
+            };
+            infoBgHeight = this.game.camera.height - 83;            
+            this.infoTitleLabel.x = infoX+16;
+            this.infoTitleLabel.y = infoY+8;
+            this.infoTitleLabel.visible = true;
+            this.infoTitleLabel.setText(this.myList.selectedItem.name);
+
+            this.infoSubtitleLabel.x = infoX+this.infoWidth-16;
+            this.infoSubtitleLabel.y = this.infoTitleLabel.y;
+
+            if(this.myList.selectedItem.type!=undefined) this.infoSubtitleLabel.setText(this.myList.selectedItem.type);
+            if(this.myList.selectedItem.equipped) this.infoSubtitleLabel.setText('Equipped');
+            if(!this.myList.selectedItem.equipped) this.infoSubtitleLabel.setText('Unequipped');
+            if(this.myList.selectedItem.isConsumable) this.infoSubtitleLabel.setText('Consumable');
+            
+        } else {
+            // Item Empty
+            this.infoTitleLabel.visible = false;
+            this.infoDescription.setText('');
+            infoBgHeight = this.game.camera.height-83;
+        }
+
+        this.itemInfoBg.beginFill(0x3F3C46);
+        this.itemInfoBg.drawRect(infoX,infoY,
+            this.infoWidth,
+            infoBgHeight,
+            0
+        )
+        this.itemInfoBg.endFill();
+
+        this.itemInfoTitleBg.beginFill(0x4D4B56);
+        this.itemInfoTitleBg.drawRect(infoX,infoY,
+            this.itemInfoBg.width,
+            30,
+        )
+        this.itemInfoTitleBg.endFill(); 
+    }
+    
+    toggleEquipForSelectedItem(){
+        if(this.myList.selectedItem.isEquippable){
+            if(this.myList.selectedItem.equipped){
+               this.myList.selectedItem.unequip(); 
+            } else {
+               this.myList.selectedItem.equipTo(this.game.player.ship); 
+            }
+        }
+        this.update();
+        this.myList.layout();
+    }
+    
+    consumeSelectedItem(){        
+        if(this.myList.selectedItem.isConsumable){
+           this.myList.selectedItem.consume(); 
+        }
+        this.refreshItems();
+        this.myList.layout();
+    }
+
+    jettisonSelectedItem(){        
+        this.jettisonSound.play();
+        this.myList.selectedItem.remove();         
+        
+        this.refreshItems();
+        this.myList.layout();
+    }
+    
+    refreshItems(){
+        this.myList.items = this.game.player.ship.inventory;
+    }
+
+        
+    show(){
+        super.show();
+
+        this.refreshItems();
+        this.wrapper.visible = true;
+        this.setupKeys();
+        this.update();
+    }
+
+    didShow(){
+        super.didShow();        
+        this.game.player.controlMode = CONTROL_MODE.inventory;
+    }
+    
+    hide(){
+        super.hide();
+        this.cleanup();
+        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+            this.game.hud.showSystemInfo();
+        }, this);
+    }
+
+    didHide(){
+        super.didHide();
+    }
+    
+    cleanup(){
+        this.escKey.onUp.remove(this.escKeyOnUp, this);
+        this.upKey.onUp.remove(this.upKeyOnUp, this);
+        this.downKey.onUp.remove(this.downKeyOnUp, this);
+        this.iKey.onUp.remove(this.iKeyOnUp, this);
+        this.eKey.onUp.remove(this.eKeyOnUp, this);
+        this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
+        this.jKey.onUp.remove(this.jKeyOnUp, this);
+    }    
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/items/fuel.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/exchange.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class ExchangeScreen extends GuiScreen {
+    constructor(game,group,destination) {
+        super(game,group);
+
+        this.destination = destination;
+        this.serviceButtons = [];
+      
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromRight;
+
+        this.setupKeys();
+
+        this.insetX = 32;
+        this.insetBottom = 32;
+        this.top = 94;
+
+        this.helpTexts = {
+            default : '(UP/DOWN) Select Item   (SPACEBAR) Buy/Sell Item   (TAB) Switch List   (RETURN) Accept',
+            shift : '(UP/DOWN) Select Item   (SHIFT+SPACEBAR) Buy/Sell All   (TAB) Switch List   (RETURN) Accept',
+        }
+
+        // BG
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.panelBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(this.styles.darkGrey);
+        this.bg.drawRect(0,this.top,
+            this.game.camera.width,
+            this.game.camera.height,
+            0
+        )
+        this.bg.endFill();
+        
+        // Lists
+        this.myList = new GuiInventoryList(this.game,this.screen);
+        this.myList.title = 'My Ship'
+        this.myList.x = this.insetX;
+        this.myList.y = this.top;
+        this.myList.itemCursorStyle = INVENTORY_LIST_CURSOR_STYLE.right;
+        
+        this.exchangeList = new GuiInventoryList(this.game);
+        this.exchangeList.title =  `${this.destination.name} ${PLANET_SERVICES_TITLE.market}` 
+        this.exchangeList.x = (this.game.camera.width - this.insetX) - this.exchangeList.listWidth; 
+        this.exchangeList.y = this.top;
+        this.exchangeList.itemCursorStyle = INVENTORY_LIST_CURSOR_STYLE.left;
+        
+        this.screen.add(this.myList);
+        this.screen.add(this.exchangeList);
+        
+        this.myListDelta = []
+        this.exchangeListDelta = [];
+
+        this.activeList = this.myList;
+        this.activeList.focus = true;
+
+        // Item Info
+        // Background
+        this.itemInfoBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.itemInfoTitleBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.infoTitleLabel = this.game.add.text(
+            0,0, 
+            'Item', 
+            { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+            this.screen
+        )
+        this.infoTitleLabel.resolution = 2;
+        
+        // Props
+        this.propsGroup = this.game.add.group();
+        this.screen.add(this.propsGroup);
+
+        // Back Button
+        this.backButton = new Button(this.game,'back-button',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        { font: `${13+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'center'}
+        );
+        this.backButton.buttonX = this.insetX;
+        this.backButton.buttonY = this.myList.listHeight+this.top+16;
+        this.backButton.text = `${String.fromCharCode(0x2190)} Back`;
+        this.screen.add(this.backButton);
+
+        // Help Text
+        this.helpText = this.game.add.text(
+            this.insetX,this.game.camera.height - this.insetBottom-16, 
+            this.helpTexts.default, 
+            { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+        this.helpText.resolution = 2;
+
+
+        // Sale Amount
+        // Background
+        this.saleAmountBg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.saleTotalLabel = this.game.add.text(
+            0,0,
+            'Total', 
+            { font: `14px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+        this.saleTotalLabel.resolution = 2;
+
+        this.saleAmountLabel = this.game.add.text(
+            0,0,
+            '', 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+            this.screen
+        )
+        this.saleAmountLabel.anchor.set(1,0);
+        this.saleAmountLabel.resolution = 2;
+
+        this.acceptButton = new Button(this.game,'accept-button'class Item_Fuel extends InventoryObject {
+    constructor(game) {
+        super(game);
+
+        this.name = 'Rocket Fuel';
+        this.storageClass = CARGO_STORAGE_CLASS.liquid
+        this.rarity = RARITY.exotic;
+        this.mass = 1;
+        this.type = 'Liquid'
+
+        this.baseValue = 1;
+    }
+},{
+            onReleased : function() {
+                this.acceptTransaction();
+            }.bind(this),
+        },
+        { font: `${13+this.fontSizeOffset}px ${this.fontFamily}`, fill: '#FFFFFF', align: 'center'}
+        );
+        this.screen.add(this.acceptButton);
+    }
+
+    update(){
+        super.update();
+        this.updateItemInfo();        
+    }
+    
+    updateSaleAmount(){
+        var saleAmountMargin = 16;
+        var saleAmountHeight = 70;
+        var saleAmountX = this.myList.x+this.myList.listWidth+saleAmountMargin;
+        var saleAmountY = this.exchangeList.listHeight + this.top - saleAmountHeight;
+        var saleAmountWidth = this.game.camera.width-(this.exchangeList.listWidth*2)-(this.insetX*2)-(saleAmountMargin*2);
+            
+        // Labels
+        this.saleTotalLabel.x = saleAmountX + 8;
+        this.saleTotalLabel.y = saleAmountY + 8;
+
+        this.saleAmountLabel.x = saleAmountX - 8 + saleAmountWidth;
+        this.saleAmountLabel.y = saleAmountY + 8;
+        
+        var saleAmount = this.calculateSaleAmount();
+
+        var formattedSaleAmount = CREDIT_PREFIX.short + numeral(Math.abs(saleAmount)).format('0,0');
+        if(saleAmount>0) formattedSaleAmount = '+' + formattedSaleAmount
+        if(saleAmount<0) formattedSaleAmount = '-' + formattedSaleAmount
+        if(saleAmount!=0){
+            // BG
+            this.saleAmountBg.clear();
+            this.saleAmountBg.beginFill(0x3F3C46);
+            this.saleAmountBg.drawRect(saleAmountX,saleAmountY,
+                saleAmountWidth,
+                saleAmountHeight,
+                0
+            )
+            this.saleAmountBg.endFill();
+            this.saleTotalLabel.visible = true;
+            this.saleAmountBg.visible = true;
+            this.acceptButton.visible = true;
+        } else {
+            this.saleTotalLabel.visible = false;
+            this.saleAmountBg.visible = false;
+            this.acceptButton.visible = false;
+        }
+        
+        // Is there enough room?
+        this.hasEnoughSpace = true;
+        this.massNeeded = {};
+        if(this.myListDelta.length>0){
+            // Zero each type of storage
+            Object.keys(CARGO_STORAGE_CLASS).forEach(function(key,index) {
+                this.massNeeded[key] = 0
+            }.bind(this));
+
+            // Add mass per storage class
+            for (let item of this.myListDelta) {
+                this.massNeeded[item.storageClass] += this.massNeeded[item.storageClass] + item.mass;
+            }
+
+            // Verify for each storage class there is enough room
+            for (let storageClass of Object.keys(CARGO_STORAGE_CLASS)) {
+                var massNeeded = this.massNeeded[storageClass];
+                if(massNeeded>0){
+                    if(!this.game.player.ship.hasEnoughSpaceForItemOfStorageClassWithMass(storageClass,massNeeded))
+                        this.hasEnoughSpace = false;
+                }
+            }
+        }
+
+        // Button setup
+        this.acceptButton.buttonX = saleAmountX + 8;
+        this.acceptButton.buttonY = saleAmountY + 8 + 24;
+        this.acceptButton.buttonWidth = saleAmountWidth-16;
+
+        if(this.hasEnoughSpace){
+            this.acceptButton.text = `Accept ${formattedSaleAmount}`;
+            this.acceptButton.color = this.styles.green;
+        } else {
+            this.acceptButton.text = `Not Enough Space`;
+            this.acceptButton.color = this.styles.red;
+        }
+        
+
+        
+    }
+    
+    calculateSaleAmount(){
+        var myListDeltaTotal = 0;
+        var exchangeListDeltaTotal = 0;
+        for (let item of this.myListDelta) {
+            if(item.containedIn == this.destination){
+                myListDeltaTotal += item.buyValue
+            } else {
+                myListDeltaTotal += item.baseValue
+            }               
+        } 
+
+        for (let item of this.exchangeListDelta) {
+            if(item.containedIn == this.destination){
+                exchangeListDeltaTotal += item.buyValue;
+            } else {
+                exchangeListDeltaTotal += item.baseValue;
+            }               
+        } 
+
+
+        return exchangeListDeltaTotal - myListDeltaTotal;        
+    }
+    
+    updateItemInfo(){
+        var item = this.activeList.selectedItem;
+                        
+        var infoMargin = 16;
+        var infoWidth = this.game.camera.width-(this.exchangeList.listWidth*2)-(this.insetX*2)-(infoMargin*2)
+        var infoX = this.myList.x+this.myList.listWidth+infoMargin;
+        var infoY = this.top;
+
+        // Properites
+        this.itemInfoBg.clear();
+        this.itemInfoTitleBg.clear();
+        var infoBgHeight = 100;
+        this.propsGroup.removeAll(true);
+        if(item){
+            var props = ['baseValue','mass','rarity','storageClass'];
+            var labels = ['Value','Weight','Rarity','Container'];
+            var propIndex = 0;
+            var propLineHeight = 20;
+            for (let prop of props) {
+                var propY = (propIndex*propLineHeight)+infoY+40;
+                if(item[prop]==undefined) return;
+                
+                var propTitle = this.game.add.text(
+                    infoX+8,propY, 
+                    labels[propIndex], 
+                    { font: `13px ${FONT}`, fill: '#929292', align: 'left'},
+                    this.propsGroup
+                )
+                propTitle.resolution = 2;
+    
+                var value = item[props[propIndex]];
+                if(props[propIndex]=='baseValue') {
+                    if(item.containedIn == this.destination){
+                        // Prices are higher when buying ;)
+                        value = CREDIT_PREFIX.short + numeral(item.buyValue).format(`0,0[.]00`);
+                    } else {
+                        value = CREDIT_PREFIX.short + numeral(value).format(`0,0[.]00`);
+                    }   
+                }
+                if(props[propIndex]=='rarity') value = RARITY_NAMES[item[props[propIndex]]];
+                if(props[propIndex]=='storageClass') value = CARGO_STORAGE_CLASS_NAMES[item[props[propIndex]]];
+                if(props[propIndex]=='mass') value = item.readableMass;
+    
+                var propValue = this.game.add.text(
+                    infoX+infoWidth-8,propY,
+                    value, 
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'right'},
+                    this.propsGroup
+                )
+                if(props[propIndex]=='rarity') propValue.tint = RARITY_COLOR[item[props[propIndex]]];
+                propValue.anchor.set(1,0);
+                propValue.resolution = 2;
+                
+                propIndex++;
+            };
+            infoBgHeight = propIndex*propLineHeight+30+16
+
+            this.itemInfoBg.beginFill(0x3F3C46);
+            this.itemInfoBg.drawRect(infoX,infoY,
+                infoWidth,
+                infoBgHeight,
+                0
+            )
+            this.itemInfoBg.endFill();
+    
+            this.itemInfoTitleBg.beginFill(0x4D4B56);
+            this.itemInfoTitleBg.drawRect(infoX,infoY,
+                this.itemInfoBg.width,
+                30,
+            )
+            this.itemInfoTitleBg.endFill(); 
+            
+            this.infoTitleLabel.x = infoX+8;
+            this.infoTitleLabel.y = infoY+8;
+            this.infoTitleLabel.visible = true;
+            this.infoTitleLabel.setText(item.name);
+        } else {
+            // Item Empty
+            this.infoTitleLabel.visible = false;
+        }
+
+        this.updateSaleAmount();
+    }
+    
+    transferAllOfSelectedItem(){
+        var amount = this.activeList.amountOfSelectedItem;
+        for (var i = 0; i < amount; i++) { 
+            this.transferSelectedItem();
+        }
+    }
+    
+    transferSelectedItem(){
+        var item = this.activeList.selectedItem; 
+               
+        if(item) {
+            if(this.activeList==this.myList){
+                this.exchangeList.addItem(item);
+                this.exchangeListDelta.push(item);
+                
+                this.myList.removeItem(item);
+
+                var index = this.myListDelta.indexOf(item);
+                if (index > -1) this.myListDelta.splice(index, 1);
+            }
+            if(this.activeList==this.exchangeList){
+                this.myList.addItem(item);
+                this.myListDelta.push(item);
+                
+                this.exchangeList.removeItem(item);
+
+                var index = this.exchangeListDelta.indexOf(item);
+                if (index > -1) this.exchangeListDelta.splice(index, 1);
+            }
+        }        
+    }
+    
+    toggleActiveList(){
+        this.activeList.focus = false;
+        if(this.activeList==this.myList){
+            this.activeList=this.exchangeList
+        } else {
+            this.activeList=this.myList            
+        }
+        this.activeList.focus = true;
+        this.update();
+    }
+    
+    acceptTransaction(){
+        if(!this.hasEnoughSpace) {
+            this.showNotEnoughSpaceNotification();
+            return;
+        }
+
+        var saleAmount = this.calculateSaleAmount();
+        if(saleAmount!=0){
+            if(saleAmount<0){
+                // Buy. We will deduct credits.
+                if(this.game.player.debitCredits(Math.abs(saleAmount))){
+                    // Valid transaction
+                    this.completeTransaction(saleAmount);
+                } else {
+                    // Not Enough.
+                    this.showNotEnoughCreditsNotification();
+                }
+            }
+            if(saleAmount>0){
+                // Sell. We will add credits.
+                this.game.player.addCredits(Math.abs(saleAmount))
+                this.completeTransaction(saleAmount);
+            }
+        }
+    }
+
+    completeTransaction(saleAmount){
+        
+        var myItems = [].concat.apply([], this.myList.items);
+        this.game.player.ship.emptyCargoHold();        
+        for (let item of myItems) {
+            this.game.player.ship.addItemsToInventory(1,item);
+        }
+    
+        var destinationItems = [].concat.apply([], this.exchangeList.items);
+        this.destination.emptyCargoHold();
+        for (let item of destinationItems) {
+            item.equipped = false;
+            this.destination.addItemsToInventory(1,item);
+        }
+        
+        // Clear deltas
+        this.myListDelta = [];
+        this.exchangeListDelta = [];
+        
+        // Notify
+        this.showPurchaseNotification(saleAmount);
+
+        // Cleanup
+        this.hide();        
+    }
+    
+
+    showPurchaseNotification(amount){
+        var notification = new Notification(this.game);
+        notification.text = 'Transaction Complete';
+        notification.subText = 'Items have been transferred.';
+        notification.accessoryText = numeral(amount).format('$0,0[.]00');
+        notification.show();
+    }
+
+    showNotEnoughCreditsNotification(){
+        var notification = new Notification(this.game);
+        notification.text = 'Not Enough Credits';
+        notification.subText = 'Cannot accept this transaction.';
+        notification.show();
+    }
+
+    showNotEnoughSpaceNotification(){
+        var notification = new Notification(this.game);
+        notification.text = 'Not Enough Cargo Space';
+        notification.subText = 'Free up space in your cargo hold.';
+        notification.show();
+    }
+    
+    setupKeys(){
+        this.downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+        this.upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
+        this.enterKey = game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
+        this.shiftKey = game.input.keyboard.addKey(Phaser.Keyboard.SHIFT);
+
+        this.downKeyOnUp = function(){
+            this.activeList.selectNextItem();
+            this.update();
+        }
+        this.downKey.onUp.add(this.downKeyOnUp, this);
+
+        this.upKeyOnUp = function(){
+            this.activeList.selectPreviousItem();
+            this.update();
+        }
+        this.upKey.onUp.add(this.upKeyOnUp, this);
+
+        this.spaceKeyOnUp = function(){
+            if(this.spaceKey.shiftKey){
+                this.transferAllOfSelectedItem();
+            } else {
+                this.transferSelectedItem();
+            }
+            this.update();
+        }
+        this.spaceKey.onUp.add(this.spaceKeyOnUp, this);
+
+        this.tabKeyOnUp = function(){
+            this.toggleActiveList();
+            this.update();
+        }
+        this.tabKey.onUp.add(this.tabKeyOnUp, this);
+
+        this.enterKeyOnUp = function(){
+            this.acceptTransaction();
+            this.update();
+        }
+        this.enterKey.onUp.add(this.enterKeyOnUp, this);
+
+        // Help Text Changes with shift key
+        this.shiftKeyOnDown = function(){
+            this.helpText.setText(this.helpTexts.shift)
+        }
+        this.shiftKey.onDown.add(this.shiftKeyOnDown, this);
+        this.shiftKeyOnUp = function(){
+            this.helpText.setText(this.helpTexts.default);
+        }
+        this.shiftKey.onUp.add(this.shiftKeyOnUp, this);
+    }
+        
+    layout(){        
+        this.cleanup();
+    }
+    
+    show(){
+        super.show();
+
+        this.myList.items = this.game.player.ship.inventory.slice(0);
+        this.exchangeList.items = this.destination.inventory.slice(0);
+
+        this.update();        
+    }
+
+    didShow(){
+        super.didShow();        
+
+        this.game.player.controlMode = CONTROL_MODE.exchange;
+    }
+    
+    hide(){
+        super.hide();
+    }
+
+    didHide(){
+        super.didHide();
+    }    
+    
+    cleanup(){
+        this.downKey.onUp.remove(this.downKeyOnUp, this);
+        this.upKey.onUp.remove(this.upKeyOnUp, this);
+        this.spaceKey.onUp.remove(this.spaceKeyOnUp, this);
+        this.tabKey.onUp.remove(this.tabKeyOnUp, this);
+        this.enterKey.onUp.remove(this.enterKeyOnUp, this);
+
+        this.shiftKey.onUp.remove(this.shiftKeyOnUp, this);
+        this.shiftKey.onDown.remove(this.shiftKeyOnDown, this);
+   }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/* Merging js: app/ships/basicMiner.js begins */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/* Merging js: app/gui/button.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Button extends Phaser.Group {
+    constructor(game,key,callbacks,textStyle = null) {
+        super(game.game);
+        this.phaserGame = game.game;
+        this.callbacks = callbacks;
+            
+        this.bg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.label = this.phaserGame.add.text(
+            0,0, 
+            this._text, 
+            this.buttonTextStyle,
+            this
+        )
+        this.label.resolution = 2;
+        this.label.anchor.set(0.5)
+
+        this.subLabel = this.phaserGame.add.text(
+            0,0, 
+            this._subText, 
+            this.buttonTextStyle,
+            this
+        )
+        this.subLabel.resolution = 2;
+        this.subLabel.anchor.set(0.5)
+
+        this._text = '';
+        this._subText = '';
+        this._buttonX = 0;
+        this._buttonY = 0;
+        this._color = 0x4d4b56;
+
+        this.buttonWidth = 100;
+        this.buttonHeight = 27;
+        this.lineHeight = 3;
+        this.padding = 8;
+
+        this.key = 'button_'+key;
+
+        this.buttonTextStyle = textStyle || { font: `12px ${FONT}`, fill: '#FFFFFF', align: 'center'};
+
+        this.sprite = this.create(this.buttonX,this.buttonY,'null') 
+        this.sprite.inputEnabled = true;
+        this.sprite.events.onInputUp.add(this.onReleased, this);
+        this.sprite.events.onInputDown.add(this.onDown, this);
+        this.sprite.events.onInputOver.add(this.onOver, this);
+        this.sprite.events.onInputOut.add(this.onOut, this);
+    }
+    
+    onOver(){
+        this.over = true;   
+        this.layout();
+    }
+
+    onOut(){
+        this.over = false;
+        this.layout();
+    }
+    
+    onDown() {
+        if(this.callbacks.onDown) this.callbacks.onDown(this);
+    }
+
+    onReleased() {
+        if(this.callbacks.onReleased) this.callbacks.onReleased(this);
+    }
+    
+    set buttonX(x){
+        this._buttonX = x
+        this.layout();
+    }
+
+    set buttonY(y){
+        this._buttonY = y
+        this.layout();
+    }
+
+    get buttonX(){
+        return this._buttonX;
+    }
+
+    get buttonY(){
+        return this._buttonY;
+    }
+
+    set text(text){
+        this._text = text;
+        this.layout();
+    }
+    
+    get text(){
+        return this._text;
+    }
+
+    set subText(subText){
+        this._subText = subText;
+        this.layout();
+    }
+    
+    get subText(){
+        return this._subText;
+    }
+
+    set color(color){
+        this._color = color;
+        this.layout();
+    }
+    
+    get color(){
+        return this._color;
+    }
+        
+    layout(){
+        this.bg.clear();
+        if(this.over){
+            var c = tinycolor(this._color.toString(16)).darken().toHex();
+            this.bg.beginFill(parseInt(c,16));
+        } else {
+            this.bg.beginFill(this.color);
+        }
+        this.bg.drawRoundedRect(this.buttonX,this.buttonY,
+            this.buttonWidth,
+            this.buttonHeight,
+            5
+        )
+        this.bg.endFill();  
+
+        this.sprite.width = this.buttonWidth;
+        this.sprite.height = this.buttonHeight;
+        this.sprite.x = this.buttonX;
+        this.sprite.y = this.buttonY;
+        
+        this.label.x = this.buttonX+this.buttonWidth/2;
+        this.label.y = this.buttonY+this.buttonHeight/2+this.lineHeight
+        this.label.setStyle(this.buttonTextStyle)
+        this.label.setText(this.text);
+    }
+}class BasicMiner extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'MV Fair Rosamond',
+            description : 'Cobalt Class Mining Vessel',
+            health: 130,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
+            maxFuel : 2200,
+            maxEnergy: 0,
+            mass: 2, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [ 5,36, 6,7, 21,39, 20,51, 6,50 ]
+                },
+                {
+                    "shape": [ 28,38, 21,39, 6,7, 9,0, 18,0 ]
+                },
+                {
+                    "shape": [ 28,38, 20,7, 28,7 ]
+                },
+                {
+                    "shape": [ 6,7, 5,36, 0,36, 0,7 ]
+                }
+            ],
+            size : {
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
+            },
+            weaponSlots : [
+                {
+                    position : {
+                        x: 9,
+                        y: -22
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                }
+            ],
+            engineSlots : [{
+                anchor : {
+                    x: 0.57,
+                    y: -1.5
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 0,
+                    y: 8,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 26,
+                    y: 14,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 5,
+                    y : 41,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 21,
+                    y: 46,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 11,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 21,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: -3,
+                    y: -24,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            storage : {
+                equipment : 500,
+                bulk : 800,
+            }
+        }
+
+        // Sprites
+        this.sprite = this.game.add.sprite(x,y, 'mining_ship');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/tabItem.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/fuelTanker.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class FuelTanker extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'AOG Belvidera',
+            description : 'Fuel Tanker',
+            health : 100,
+            turnDecay: .005,
+            turnAccel: .007,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 40,
+            maxReverse: 60,
+            maxFuel : 9000,
+            maxEnergy: 150,
+            mass: 10, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [ 51,54, 37,53, 36,32, 86,32, 87,54 ]
+                },
+                {
+                    "shape": [ 36,32, 37,53, 0,54, 0,32 ]
+                },
+                {
+                    "shape": [ 36,93, 37,53, 51,54, 52,93 ]
+                },
+                {
+                    "shape": [ 37,27, 51,32, 36,32 ]
+                },
+                {
+                    "shape": [ 35,5, 50,27, 51,32, 37,27 ]
+                },
+                {
+                    "shape": [ 46,1, 51.83333206176758,4.333335876464844, 50,27, 35,5, 40,1 ]
+                }
+            ],
+            size : {
+                width : 45,
+                height : 45,
+                offsetX : 3,
+                offsetY : -8,
+            },
+            weaponSlots : [
+                {
+                    position : {
+                        x: 0,
+                        y: 0
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                },
+                {
+                    position : {
+                        x: 9,
+                        y: -22
+                    },
+                    typesAllowed: [WEAPON_TYPES.miningLaser],
+                }
+            ],
+            engineSlots : [{
+                anchor : {
+                    x: 0.55,
+                    y: -2.8
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 35,
+                    y: 16,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 52,
+                    y: 22,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x: 35,
+                    y : 71,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 52,
+                    y: 76,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 41,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 51,
+                    y: 3,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            storage : {
+                bulk : 300,
+                passengers : 2,
+                gas : 0,
+                liquid : 0,
+            },
+            dockingPorts : [{
+                position : {
+                    x: 0,
+                    y: -47,
+                    angle : 90,
+                },
+                inUse: false,
+            }],
+            dockingConnector : {
+                position : {
+                    x: 0,
+                    y: -50,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            canBeDockedTo: true,
+        }
+
+        // Sprites
+        this.sprite = this.game.add.sprite(x,y, 'fuelTanker2');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+
+        //var blaster = new BasicBlaster(this.game,this);
+        //this.equipWeaponInSlot(blaster,1);
+
+        // Engine
+/*
+        var engine = new BasicEngine(this.game,this);
+        this.equipEngineInSlclass TabItem extends Phaser.Group {
+    constructor(game,key,callbacks,textStyle = null) {
+        super(game.game);
+        this.phaserGame = game.game;
+        this.callbacks = callbacks;
+            
+        this.bg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.label = this.phaserGame.add.text(
+            0,0, 
+            this._text, 
+            this.buttonTextStyle,
+            this
+        )
+        this.label.resolution = 2;
+        this.label.anchor.set(0.5)
+
+        this._text = '';
+        this._active = false;
+        this._buttonX = 0;
+        this._buttonY = 0;
+        this.color = 0x282731;
+        this.activeColor = 0x3F3C46;
+
+        this.buttonWidth = 100;
+        this.buttonHeight = 45;
+        this.lineHeight = 3;
+        this.padding = 8;
+
+        this.key = 'tab_item'+key;
+
+        this.buttonTextStyle = textStyle || { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'center'};
+
+        this.sprite = this.create(this.buttonX,this.buttonY,'null') 
+        this.sprite.inputEnabled = true;
+        this.sprite.events.onInputUp.add(this.onReleased, this);
+        this.sprite.events.onInputDown.add(this.onDown, this);
+        this.sprite.events.onInputOver.add(this.onOver, this);
+        this.sprite.events.onInputOut.add(this.onOut, this);
+    }
+    
+    onOver(){
+        this.over = true;   
+        this.layout();
+    }
+
+    onOut(){
+        this.over = false;
+        this.layout();
+    }
+    
+    onDown() {
+        if(this.callbacks.onDown) this.callbacks.onDown(this);
+    }
+
+    onReleased() {
+        if(this.callbacks.onReleased) this.callbacks.onReleased(this);
+    }
+    
+    set buttonX(x){
+        this._buttonX = x
+        this.layout();
+    }
+
+    set buttonY(y){
+        this._buttonY = y
+        this.layout();
+    }
+
+    get buttonX(){
+        return this._buttonX;
+    }
+
+    get buttonY(){
+        return this._buttonY;
+    }
+
+    set text(text){
+        this._text = text;
+        this.layout();
+    }
+    
+    get text(){
+        return this._text;
+    }
+
+    set active(active){
+        this._active = active;
+        this.layout();
+    }
+    
+    get active(){
+        return this._active;
+    }
+        
+    layout(){
+        this.bg.clear();
+        if(!this.active){
+            if(this.over){
+                this.bg.beginFill(this.activeColor);
+            } else {
+                this.bg.beginFill(this.color);
+            }            
+        } else {
+            this.bg.beginFill(this.activeColor);
+        }
+
+        this.bg.drawRect(this.buttonX,this.buttonY,
+            this.buttonWidth,
+            this.buttonHeight,
+        )
+        this.bg.endFill();  
+
+        this.sprite.width = this.buttonWidth;
+        this.sprite.height = this.buttonHeight;
+        this.sprite.x = this.buttonX;
+        this.sprite.y = this.buttonY;
+        
+        this.label.x = this.buttonX+this.buttonWidth/2;
+        this.label.y = this.buttonY+this.buttonHeight/2+this.lineHeight
+        this.label.setStyle(this.buttonTextStyle)
+        this.label.setText(this.text);
+    }
+}ot(engine,0);
+        this.refuel();
+
+        // Reactor
+        var reactor = new Reactor(this.game,this);
+        this.equipEquipmentInSlot(reactor,0);
+        this.recharge();
+*/
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/gui/twoLineButton.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/shuttle.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class TwoLineButton extends Button {
+    constructor(game,key,callbacks,textStyle = null) {        
+        super(game,key,callbacks,textStyle);
+        this.buttonHeight = 50;
+    }
+            
+    layout(){
+        this.bg.clear();
+        if(this.over){
+            var c = tinycolor(this._color.toString(16)).darken().toHex();
+            this.bg.beginFill(parseInt(c,16));
+        } else {
+            this.bg.beginFill(this.color);
+        }
+        this.bg.drawRoundedRect(this.buttonX,this.buttonY,
+            this.buttonWidth,
+            this.buttonHeight,
+            5
+        )
+        this.bg.endFill();  
+
+        this.sprite.width = this.buttonWidth;
+        this.sprite.height = this.buttonHeight;
+        this.sprite.x = this.buttonX;
+        this.sprite.y = this.buttonY;
+        
+        this.label.x = this.buttonX+this.padding;
+        this.label.y = this.buttonY+this.padding;
+        this.label.setStyle({ font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left'})
+        this.label.setText(this.text);
+        this.label.anchor.set(0);
+
+        this.subLabel.x = this.buttonX+this.padding;
+        this.subLabel.y = this.buttonY+this.buttonHeight/2+this.lineHeight
+        this.subLabel.setStyle({ font: `11px ${FONT}`, fill: '#948f9c', align: 'left'})
+        this.subLabel.setText(this.subText);
+        this.subLabel.anchor.set(0);
+    }
+}class Shuttle extends Ship {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'Shuttle',
+            description : 'Shuttle',
+            health: 100,
+            turnDecay: .03,
+            turnAccel: .1,
+            leftRightThrust: 100,
+            maxTurning: 10,
+            reverseThrust: 100,
+            maxReverse: 90,
+            maxFuel : 2200,
+            maxEnergy: 100,
+            mass: 1, // Tons
+            equipmentSlots : 4,
+            centerOfGravity : {
+                x : .5,
+                y : .5,
+            },
+            polygon: [
+                {
+                    "shape": [   8, 24  ,  19, 24  ,  18, 33  ,  9, 33  ]
+                } ,
+                {
+                    "shape": [   27, 22  ,  19, 24  ,  8, 24  ,  0, 16  ,  7, 12  ,  21, 14  ,  27, 16  ]
+                } ,
+                {
+                    "shape": [   0, 16  ,  8, 24  ,  0, 22  ]
+                } ,
+                {
+                    "shape": [   7, 12  ,  12, 0  ,  17, 2  ,  21, 14  ]
+                }
+            ],
+            weaponSlots : [],
+            engineSlots : [{
+                anchor : {
+                    x: 0.57,
+                    y: -1.6,
+                },
+                angle : 0,
+            }],
+            RCS :{
+                forward_left : {
+                    x: 10,
+                    y: 3,
+                    angle : 90,
+                },
+                forward_right : {
+                    x: 17,
+                    y: 8,
+                    angle : 270,                    
+                },
+                aft_left : {
+                    x : 8,
+                    y : 25,
+                    angle : 90,
+                },
+                aft_right : {
+                    x: 19,
+                    y: 31,
+                    angle : 270,                    
+                },
+                retro_a : {
+                    x: 7,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+                retro_b : {
+                    x: 25,
+                    y: 17,
+                    angle : 180,
+                    retro : true,                   
+                },
+            },
+            dockingConnector : {
+                position : {
+                    x: 0,
+                    y: -18,
+                    angle : 90,
+                },
+                inUse: false,
+            },
+            storage : {
+                passengers : 6,
+            }
+        }
+
+        // Sprites
+        
+        this.sprite = this.game.add.sprite(x,y, 'shuttle');
+        this.sprite.anchor.set(this.specs.centerOfGravity.x,this.specs.centerOfGravity.y);
+
+        this.setupSprite(this.sprite);
+
+        // Engine
+        var engine = new SmallEngine(this.game,this);
+        this.equipEngineInSlot(engine,0);
+        this.refuel();
+
+        // Reactor
+        var reactor = new Batteries(this.game,this);
+        this.equipEquipmentInSlot(reactor,0);
+        this.recharge();
+        
+        // Cargo
+        this.emptyCargoHold();
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/* Merging js: app/gui/notification.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/weapons/focusedBeam.js begins */
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Notification extends Phaser.Group {
+    constructor(game) {
+        super(game.game);
+        this.phaserGame = game.game;
+        game.notificationGroup.add(this)
+        
+        this.sound = game.add.audio('success');
+
+        this.buttonTextStyle = {font: `12px ${FONT}`, fill: '#FFFFFF', align: 'center'};
+
+        this.bg2 = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.bg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+                
+        this.label = this.phaserGame.add.text(
+            0,0, 
+            '', 
+            this.buttonTextStyle,
+            this
+        )
+        this.label.resolution = 2;
+
+        this.subLabel = this.phaserGame.add.text(
+            0,0, 
+            '', 
+            this.buttonTextStyle,
+            this
+        )
+        this.subLabel.resolution = 2;
+
+        this.accessoryLabel = this.phaserGame.add.text(
+            0,0, 
+            '', 
+            this.buttonTextStyle,
+            this
+        )
+        this.accessoryLabel.resolution = 2;
+
+        this._text = '';
+        this._subText = '';
+        this._accessoryText = '';
+        this._color = 0x4d4b56;
+
+        this.notificationWidth = 250;
+        this.notificationHeight = 50;
+        this.lineHeight = 3;
+        this.padding = 8;
+
+        this._notificationX = (this.game.camera.width/2)-(this.notificationWidth/2);
+        this._notificationY = 0;
+    }
+
+    set text(text){
+        this._text = text;
+        this.layout();
+    }
+    
+    get text(){
+        return this._text;
+    }
+
+    set subText(subText){
+        this._subText = subText;
+        this.layout();
+    }
+    
+    get subText(){
+        return this._subText;
+    }
+
+    set accessoryText(accessoryText){
+        this._accessoryText = accessoryText;
+        this.layout();
+    }
+    
+    get accessoryText(){
+        return this._accessoryText;
+    }
+
+    show(){
+        var delay = 3000;
+        
+        var fadeIn = this.game.add.tween(this).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+    	var moveUp = this.game.add.tween(this).to( { y: '+'+this.notificationHeight/2 }, 300, "Quart.easeOut", true);
+        var fadeOut = this.game.add.tween(this).to( { alpha: 0 }, 300, "Quart.easeOut", false, delay);
+    
+        fadeIn.chain(fadeOut);
+        fadeIn.start();
+
+        game.time.events.add(Phaser.Timer.SECOND * 5, this.destroy, this);
+        
+        this.sound.play();
+    }
+
+    destroyObject(){
+        this.destroy();        
+    } 
+
+    layout(){
+        this.bg2.clear();
+        this.bg2.beginFill(0x948f9c);
+        this.bg2.drawRoundedRect(this._notificationX-1,this._notificationY-1,
+            this.notificationWidth+2,
+            this.notificationHeight+2,
+            5
+        )
+        this.bg2.endFill();  
+
+        this.bg.clear();
+        this.bg.beginFill(this._color);
+        this.bg.drawRoundedRect(this._notificationX,this._notificationY,
+            this.notificationWidth,
+            this.notificationHeight,
+            5
+        )
+        this.bg.endFill();  
+
+        this.label.x = this._notificationX+this.padding;
+        this.label.y = this._notificationY+this.padding;
+        this.label.setStyle({ font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'})
+        this.label.setText(this.text);
+        this.label.anchor.set(0);
+
+        this.subLabel.x = this._notificationX+this.padding;
+        this.subLabel.y = this._notificationY+this.padding+20;
+        this.subLabel.setStyle({ font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left'})
+        this.subLabel.setText(this.subText);
+        this.subLabel.anchor.set(0);
+
+        this.accessoryLabel.x = this._notificationX + this.notificationWidth - this.padding;
+        this.accessoryLabel.y = this._notificationY + 3 + this.notificationHeight/2;
+        this.accessoryLabel.setStyle({ font: `15px ${FONT}`, fill: '#FFFFFF', align: 'right'})
+        this.accessoryLabel.setText(this.accessoryText);
+        this.accessoryLabel.anchor.set(1,.5);
+
+    }
+}class FocusedBeamWeapon extends Weapon {
+    constructor(game,options) {
+        super(game,options);
+        
+        this.baseBulletSpeed = 400;
+        this.weapon = game.add.weapon(40, 'laser-sparkle');
+        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+        this.weapon.bulletLifespan = options.data.range;
+        this.weapon.bulletSpeed = this.baseBulletSpeed;
+        this.weapon.fireRate = 20;
+        this.weapon.bulletAngleVariance = 1.5;
+        this.weapon.bulletSpeedVariance = 90;
+        this.weapon.bullets.alpha = 1;
+        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
+        this.weapon.bullets.setAll('scale.x', 0.3);
+        this.weapon.bullets.setAll('scale.y', 0.1);
+        this.weapon.bullets.setAll('damage',options.data.damage);
+        this.weapon.bullets.setAll('smoothed',false);
+        this.weapon.setBulletBodyOffset(6, 6, 50, 30);        
+        this.weapon.onFire.add(this.fire, this);
+        // Should be on the ships
+        this.game.ships.addChild(this.weapon.bullets)
+        
+        this.weapon.bullets.forEach(function(bullet){
+            bullet.weapon = this;
+            bullet.postUpdate = this.postUpdate;
+        },this);
+
+        this.energyConsumption = options.data.energyConsumption;
+
+        this.sound = game.add.audio('mining-laser')
+        this.sound.addMarker('begin',0,0.15);
+        this.sound.addMarker('loop',0.15,0.573);
+        this.sound.addMarker('end',1.123,0.45);
+        this.soundCountdown = 10;
+        this.coolingDown = false;
+        this.sound.onStop.add(this.soundStopped, this);
+    }
+    soundStopped(sound,marker){
+        if(marker=='begin'){
+            this.sound.play('loop',0,1,true);
+        }
+        if(marker=='end'){
+            this.sound.pause();
+            this.coolingDown = false;
+        }
+    }    
+    
+    fire(){
+        super.fire();
+	    this.soundCountdown = 10;
+        if(!this.sound.isPlaying) this.sound.play('begin');
+    }
+    
+    doneFiring(){
+        if(!this.coolingDown && this.sound.isPlaying) {
+            this.sound.play('end');
+            this.coolingDown = true;
+        }
+    }
+    
+    update(){
+        if(this.soundCountdown==0){
+            this.doneFiring();
+        } else {
+            this.soundCountdown--;
+        }
+
+        if(this.parentObject) this.weapon.bulletSpeed = this.parentObject.speed + this.baseBulletSpeed;
+    }
+}
+
+
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/weapons/basicBlaster.js begins */
+/* Merging js: app/gui/inventoryList.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+class GuiInventoryList extends Phaser.Group {
+    constructor(game) {
+        super(game.game);
+        this.phaserGame = game.game;
+
+        this._title = '';
+        this._items = [];
+        this._focus = false;
+        this._allowFilter = false;
+        this._listWidth = 250;
+
+        this.clickSound = game.add.audio('gui_click_soft');
+        this.txSound = game.add.audio('gui_click');
+
+        this.selectedItemIndex = 0;
+        this.currentPage = 1;
+        this.itemsPerPage = 8;
+
+        this.itemCursorHeight = 32;
+        this.listHeight = this.itemCursorHeight*(this.itemsPerPage+1);
+        this.headerHeight = 30;
+
+        // Background            
+        this.bg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        
+        // Title Label
+        this.titleBg = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.titleLabel = this.phaserGame.add.text(
+            16,8, 
+            '', 
+            { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+            this
+        )
+        this.titleLabel.resolution = 2;
+
+        // Empty Label
+        this.emptyLabel = this.phaserGame.add.text(
+            0,0,
+            'No Items', 
+            { font: `16px ${FONT}`, fill: '#948f9c', align: 'center'},
+            this
+        )
+        this.emptyLabel.resolution = 2;
+        this.add(this.emptyLabel);
+
+        // Cursor
+        this.itemCursor = this.add(new Phaser.Graphics(this.phaserGame,0,0));
+        this.setupCursors();
+        
+        // Lables
+        this.labels = this.game.add.group();
+        this.add(this.labels);
+
+        this.layout();
+    }
+    setupCursors(){
+        this.itemCursorLeftPolygon = new Phaser.Polygon(
+            0,0,
+            -8,this.itemCursorHeight/2, 
+            0,this.itemCursorHeight,
+            0,this.itemCursorHeight,
+            this.listWidth,this.itemCursorHeight,
+            this.listWidth,0,
+        );
+        this.itemCursorRightPolygon = new Phaser.Polygon(
+            0,0,
+            this.listWidth,0, 
+            this.listWidth+8,this.itemCursorHeight/2,
+            this.listWidth,this.itemCursorHeight,
+            0,this.itemCursorHeight,
+        );
+        this.itemCursorFlatPolygon = new Phaser.Polygon(
+            0,0,
+            this.listWidth,0, 
+            this.listWidth,this.itemCursorHeight,
+            0,this.itemCursorHeight,
+        );
+    }
+    set listWidth(listWidth){
+        this._listWidth = listWidth;
+        this.setupCursors();
+        this.layout();
+    }
+
+    get listWidth(){
+        return this._listWidth;
+    }
+
+    set focus(focus){ 
+        if(focus) this.clickSound.play();
+               
+        this._focus = focus
+        this.selectedItemIndex = 0;
+        this.layout();
+    }
+
+    get focus(){
+        return this._focus;
+    }
+        
+    set title(title){
+        this._title = title
+        this.layout();
+    }
+
+    get title(){
+        return this._title;
+    }
+
+    set allowFilter(allowFilter){
+        this._allowFilter = allowFilter
+        this.layout();
+    }
+
+    get allowFilter(){
+        return this._allowFilter;
+    }
+
+    set items(items){
+        this._items = [];
+        items.sort((a, b) => a.name.localeCompare(b.name));
+        
+        this._groupedItems = _.groupBy(items, item => item.key);
+        Object.keys(this._groupedItems).forEach(function(key,index) {
+            var group = this._groupedItems[key];
+            this._items.push(group)
+        }.bind(this));
+
+        this.layout();
+    }
+
+    get items(){
+        return this._items;
+    }
+    
+    get valueOfAllItems(){
+        var totalValue = 0;
+        if(this._items.length>0){
+            for (let item of this._items) {
+                totalValue += item.baseValue;
+            }
+        }
+        return totalValue;
+    }
+    
+    addItem(addedItem){
+        this.txSound.play();
+
+        var allItems = [].concat.apply([], this._items); // Flatten
+        allItems.push(addedItem);
+        this.items = allItems;
+        
+        this.layout();
+    }
+
+    removeItem(item){
+        // Find + Remove Item
+        var allItems = [].concat.apply([], this._items); // Flatten
+
+        var index = allItems.indexOf(item);
+        if (index > -1) allItems.splice(index, 1);
+
+        this.items = allItems;        
+        
+        // Update Selected Index for last item
+        if(this.selectedItemIndex == this._items.length) this.selectedItemIndex--;
+        
+        this.layout();
+    }
+    
+    get selectedItem(){
+        if(this.items.length>0) {
+            try{
+                if(this.currentPage>1){
+                    return this._items[(this.selectedItemIndex+this.itemsPerPage*(this.currentPage-1))-2][0]                            
+                } else {
+                    return this._items[this.selectedItemIndex][0]            
+                }                
+            } catch(e){
+                return null;
+            }
+            
+        } else {
+            return null;
+        }
+    }
+
+    get amountOfSelectedItem(){
+        return this._groupedItems[this.selectedItem.key].length;
+    }
+
+
+    get colorForSelectedItem(){
+        if(this.selectedItem) return RARITY_COLOR[this.selectedItem.rarity];
+    }
+    
+    selectNextItem(){
+        this.clickSound.play();
+
+        try {
+            if(this.selectedItem==this.items[this.items.length-1][0]) return;
+        } catch(e){}
+            
+        if(this.selectedItemIndex<=this.items.length) this.selectedItemIndex++;
+        if(this.selectedItemIndex>=this.itemsPerPage-1) {
+            this.currentPage++;
+            this.selectedItemIndex=0;
+        }
+        
+        this.layout();
+    }
+
+    selectPreviousItem(){
+        this.clickSound.play();
+        
+        if(this.selectedItemIndex>0) this.selectedItemIndex--;
+        if(this.selectedItemIndex==0 && this.currentPage>1){
+            this.selectedItemIndex=this.itemsPerPage-2;
+            this.currentPage--;
+        }
+        if(this.selectedItemIndex==0 && this.currentPage==1){
+            this.selectedItemIndex=0;
+        }
+        this.layout();
+    }
+       
+    updateCursorPosition(){
+        if(this.currentPage>1 && this.selectedItemIndex==0){
+            this.selectedItemIndex++;
+        }
+
+        this.itemCursor.clear();
+        this.itemCursor.beginFill(this.colorForSelectedItem);
+        if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.left){
+            this.itemCursor.drawPolygon(this.itemCursorLeftPolygon);
+        }
+        if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.right){
+            this.itemCursor.drawPolygon(this.itemCursorRightPolygon);
+        }
+        if(this.itemCursorStyle == INVENTORY_LIST_CURSOR_STYLE.flat){
+            this.itemCursor.drawPolygon(this.itemCursorFlatPolygon);
+        }
+        this.itemCursor.endFill();
+        this.itemCursor.visible = true;
+    
+        this.itemCursor.y = this.itemCursorHeight*this.selectedItemIndex + this.headerHeight;        
+    }
+    
+    layout(){    
+        // BG
+        this.bg.clear();
+        this.bg.beginFill(0x3F3C46);
+        this.bg.drawRect(0,0,
+            this.listWidth,
+            this.listHeight,
+        )
+        this.bg.endFill();  
+                
+        // Title
+        this.titleBg.clear();
+        this.titleBg.beginFill(0x4D4B56);
+        this.titleBg.drawRect(0,0,
+            this.listWidth,
+            this.headerHeight,
+        )
+        this.titleBg.endFill();
+
+        // Title Label
+        if(!this.allowFilter){
+            this.titleLabel.setText(this._title);
+        } else {
+            this.titleLabel.setText(`${String.fromCharCode(0x2039)} ${this._title} ${String.fromCharCode(0x203a)}`);            
+        }
+        
+        // Items
+        this.labels.removeAll(true);
+        var index = 0;
+
+        // Cursor
+        if(this.selectedItem && this.focus){
+            this.updateCursorPosition();
+        } else {
+            this.itemCursor.visible = false;
+        }
+
+        // Empty Label
+        this.emptyLabel.visible = false;
+        if(this.items.length==0) this.emptyLabel.visible = true;
+        this.emptyLabel.x = (this.listWidth/2)-(this.emptyLabel.width/2);
+        this.emptyLabel.y = (this.listHeigclass BasicBlaster extends Weapon {
+    constructor(game,parentObject) {
+        super(game,parentObject);
+
+        this.weapon = game.add.weapon(40, 'blasterBullet');
+        this.weapon.bulletKillType = Phaser.Weapon.KILL_LIFESPAN;
+        this.weapon.bulletLifespan = 1000;
+        this.weapon.bulletSpeed = 450;
+        this.weapon.fireRate = 250;
+        this.weapon.bulletAngleVariance = 0;
+        this.weapon.bulletSpeedVariance = 10;
+        this.weapon.bullets.alpha = 1;
+        this.weapon.bullets.blendMode = PIXI.blendModes.ADD;
+        this.weapon.bullets.setAll('damage',2);
+    }
+}
+ht/2)-(this.emptyLabel.height/2);
+
+        var indexStart = (this.currentPage-1)*this.itemsPerPage;
+        var indexEnd = this.currentPage*this.itemsPerPage;
+        var indexOffset = 0;
+
+        if(this.items.length>this.itemsPerPage){
+            //indexEnd--;
+        }
+        if(this.currentPage>1){
+            indexOffset =-2;
+            indexStart-=2
+            indexEnd-=2;
+        }
+
+        // Items
+        for (var i = indexStart; i < indexEnd; i++) {
+            if(this.items[i]!=undefined){
+                var text = this.items[i][0].name
+
+                if(this.items[i][0].isEquippable) {                    
+                    if(this.items[i][0].equipped) {
+                        text = `${String.fromCharCode(0x25cf)} ${this.items[i][0].name}`;
+                    } else {
+                        text = `${String.fromCharCode(0x25cb)} ${this.items[i][0].name}`                    
+                    }
+                }
+
+                if(this.items[i].length>1){
+                    text += ` (${this.items[i].length})`;
+                }
+                
+                var arrow = false;
+        
+                // Arrows
+                if(index==this.itemsPerPage-1){
+                    text = String.fromCharCode(0x2193);
+                    arrow = true;
+                }
+                if(index==0 && this.currentPage>1){
+                    text = String.fromCharCode(0x2191);
+                    arrow = true;
+                }
+                
+                // Label
+                var itemLabel = this.phaserGame.add.text(
+                    16,this.itemCursorHeight*(index) + this.headerHeight + 8, 
+                    text, 
+                    { font: `13px ${FONT}`, fill: '#FFFFFF', align: 'left'},
+                    this
+                )
+                this.labels.add(itemLabel);
+                
+                if(index==this.selectedItemIndex && this.focus){
+                    itemLabel.addColor("#000000", 0)
+                } else {
+                    if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
+                }
+                
+                if(!arrow) itemLabel.tint = RARITY_COLOR[this.items[i][0].rarity];
+                itemLabel.resolution = 2;
+                index++;
+            }
+       }
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/planets/_planet.js begins */
+/* Merging js: app/gui/map.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+class GalacticMap extends GameObject{
+    constructor(game,options) {
+        super(game);
+        
+        this.x = options.x || 0;
+        this.y = options.y || 0;
+        this.width = options.width || screenWidth;
+        this.height = options.height || screenHeight;
+        this.isActive = false;
+        
+        // Navigation
+        this.starSystems = this.game.galaxy.starSystems;
+        this.currentPath = [];
+        this.navigationTarget = null;
+        this.navigationTargetCache = null;
+        this.navigationDestination = null;
+        this.navArrow = game.make.sprite(0, 0, 'nav-arrow');
+        this.navArrow.angle = 90;
+        this.navArrow.anchor.set(1,.5);
+        
+        // Zooming
+        this.mapZoom = 1;
+        this.mapZoomCache = 0;
+        this.mapZoomIncrement = .0025;
+        this.mapZoomStep = 0;
+        this.mapZoomMax = 2;
+        this.mapZoomMin = .5;
+        this.didZoom = false;
+        
+        // Scrolling
+        this.mapScrollIncrement = .5;
+        this.mapScrollDecay = 1.0;
+        this.mapScrollMax = 1;
+        this.mapScrollXStep = 0;
+        this.mapScrollYStep = 0;
+        this.mapScrollX = 0;
+        this.mapScrollY = 0;
+        this.mapScrollOffsetX = 0;
+        this.mapScrollOffsetY = 0;
+
+        // Sprite / Bitmap data
+        this.bmd = game.add.bitmapData(this.width, this.height);    
+        this.sprite = game.add.sprite(this.x, this.y, this.bmd);
+        if(options.group) options.group.add(this.sprite);
+
+        // Sounds
+        this.navTargetChangedSound = game.add.audio('blorp');
+        this.navDestinationAddedSound = game.add.audio('beep-beep');
+        this.navDestinationClearedSound = game.add.audio('cancel');
+        this.navTargetInvalidSound = game.add.audio('invalid');
+    }
+    
+    setupKeys(){
+        // Keys
+        this.cursors = this.game.input.keyboard.createCursorKeys();
+        this.plusKey = game.input.keyboard.addKey(Phaser.Keyboard.EQUALS);
+        this.minusKey = game.input.keyboard.addKey(Phaser.Keyboard.UNDERSCORE);
+        this.spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+        this.spaceKey.onUp.add(this.setDestination,this);
+    }
+    
+    centerOnSystem(system){
+        this.mapScrollX = ((this.width/this.mapZoom)/2)-system.position.x;
+        this.mapScrollY = ((this.height/this.mapZoom)/2)-system.position.y;    
+    }
+    
+    findPathFromSystemToSystem(originSystem,destinationSystem){
+        var path = [originSystem];
+        var maxJumpDistance = 150;
+        var angleToDestination = originSystem.angleToStarSystem(destinationSystem);
+        var distanceToDestination = originSystem.distanceToStarSystem(destinationSystem);
+
+        var validatePath = function(){
+            if(path[path.length-1]!=destinationSystem) {
+                getNextJump();
+            }
+        }
+
+        var getNextJump = function(){
+            if(path[path.length-1]){
+                var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
+                if(path.includes(nextJump)) return null;
+                path.push(nextJump);
+                validatePath();                
+            } else {
+                return null;
+            }
+        }
+
+        if(distanceToDestination<=maxJumpDistance){
+            // Destination is within one jump away. 
+            path.push(destinationSystem);
+        } else {
+            getNextJump();
+        }
+         
+        path.clean(null); // remove all nulls;
+                
+        return path;        
+    }
+    
+    distanceOfPath(path){
+        var distance = 0;
+        var previousSystem = null;
+
+        for(let system of path){
+            if(previousSystem && system!=null){
+                distance+= system.distanceToStarSystem(previousSystem);
+            }
+            previousSystem = system;
+        }        
+        
+        return distance;
+    }
+    
+    setDestination(){
+        // Makes current target the destination.
+        if(this.navigationDestination){
+            this.navigationDestination = null;
+            this.navDestinationClearedSound.play();
+        } else {            
+            this.navigationDestination = this.navigationTarget;
+            this.navDestinationAddedSound.play();
+        }
+    }
+    
+    drawMap(){      
+        this.bmd.ctx.clearRect(0,0,this.width,this.height);
+        var zoom = this.mapZoom;        
+        // Lines
+        for(let system of this.starSystems){
+            // Save distnce for later
+            system.distanceFromMapCenter = Math.sqrt(
+                Math.pow(
+                    ((system.position.x+this.mapScrollX)*zoom)-this.width/2,
+                2) + 
+                Math.pow(
+                    ((system.position.y+this.mapScrollY)*zoom)-this.height/2,
+                2)
+            );
+
+            if(system.neighbors.length>0){
+                for(let neighbor of system.neighbors){
+                    if(neighbor!=null){
+                    	this.bmd.ctx.strokeStyle = "#ffffff";
+                    	this.bmd.ctx.lineWidth = 1;
+                    	this.bmd.ctx.beginPath();
+                    	this.bmd.ctx.moveTo((system.position.x+this.mapScrollX)*zoom, (system.position.y+this.mapScrollY)*zoom);
+                    	this.bmd.ctx.lineTo((neighbor.position.x+this.mapScrollX)*zoom,(neighbor.position.y+this.mapScrollY)*zoom);
+                    	this.bmd.ctx.stroke();
+                    }
+            	}
+            }
+        }
+
+        this.drawGridLines({
+            major : 100,
+            minor : 25,
+            color : '#333333',
+        })
+
+        for (var i = 0; i < this.currentPath.length; i++) {
+            if(i<this.currentPath.length-1){
+            	this.bmd.ctx.strokeStyle = "#1aae5c";
+            	this.bmd.ctx.lineWidth = 4;
+            	this.bmd.ctx.beginPath();
+            	this.bmd.ctx.moveTo((this.currentPath[i].position.x+this.mapScrollX)*zoom, (this.currentPath[i].position.y+this.mapScrollY)*zoom);
+            	this.bmd.ctx.lineTo((this.currentPath[i+1].position.x+this.mapScrollX)*zoom,(this.currentPath[i+1].position.y+this.mapScrollY)*zoom);
+            	this.bmd.ctx.stroke();
+            }
+        }
+
+        // Stars
+        for(let system of this.starSystems){                  
+            // Black Space
+            this.bmd.ctx.fillStyle='#111111'
+            this.bmd.ctx.beginPath();
+            this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
+            this.bmd.ctx.fill();
+
+            // Current System Highlight
+            if(system.isCurrentSystem || system==this.navigationDestination){
+                this.bmd.ctx.strokeStyle='#1aae5c';
+                this.bmd.ctx.lineWidth = 1.5;
+                this.bmd.ctx.beginPath();
+                this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
+                this.bmd.ctx.stroke();  
+            }
+
+            // Star
+            this.bmd.ctx.lineWidth = 1.5;
+            this.bmd.ctx.beginPath();
+            this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size,0,2*Math.PI);
+            if(system.planetCount>0) {
+                this.bmd.ctx.fillStyle = system.type.color;
+	            this.bmd.ctx.fill();
+            } else {
+                this.bmd.ctx.strokeStyle='#AAAAAA';
+	            this.bmd.ctx.stroke();
+            }
+            
+            // Navigation Arrow
+            if(system==this.navigationTarget) {
+                this.bmd.draw(this.navArrow, (system.position.x+this.mapScrollX)*zoom, (system.position.y+this.mapScrollY)*zoom-10 );
+            }
+        }
+
+        // Names/Labels
+        for(let system of this.starSystems){
+            var textMarginX = system.size+8;
+            var textMarginY = 3;
+            var lineSpacing = 15;
+            
+            var labelString = `${system.name}`
+            this.bmd.ctx.font = `12px ${FONT}`;
+            this.bmd.ctx.strokeStyle='#111111'
+            this.bmd.ctx.fillStyle='#FFFFFF'
+            this.bmd.ctx.lineWidth = 3;
+            
+         
+class Planet extends GameObject{
+    constructor(game,x,y) {
+        super(game);
+
+        this.minimapSize = 2.3;
+        this.distanceToPlayer;
+        
+        this.showInfoDistance = 90;
+        this.infoShowing = false;
+
+        this.isPlanet = true;
+        this.canNavigateTo = true;
+        this.canLand = true;
+        
+        this.services = [];
+        this.specs = {
+            storage : {
+                bulk : Infinity,
+                passengers : Infinity,
+                liquid : Infinity,
+                gas : Infinity,
+            }
+        }
+
+        this.itemMarkup = 1.1 // Multuplier
+        this.infoSound = game.add.audio('beep-beep');
+    }
+    
+    setupSprite(options){
+        super.setupSprite(this.sprite);
+        this.wrapper = this.game.make.group();
+        this.wrapper.add(this.sprite);
+
+        this.sprite.anchor.setTo(.5, .5);
+        this.sprite.smoothed = false;
+        this.sprite.parentObject = this;
+
+        this.game.planets.add(this.wrapper);
+
+        this.nameText = this.game.add.text( 
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top+10, 
+            this.name, 
+            { font: `14px ${FONT}`, fill: '#FFFFFF', align: 'left' },
+            this.game.planets,
+        );
+        this.wrapper.add(this.nameText);
+        this.nameText.alpha = 0;
+
+        this.subText = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 30, 
+            this.description, 
+            { font: `11px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.planets,
+        );
+        this.wrapper.add(this.subText);
+        this.subText.alpha = 0;
+
+        this.landingMessage = this.game.add.text(
+            20+this.sprite.x + this.sprite.width/2,this.sprite.top + 60, 
+            'Press L to Land', 
+            { font: `10px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+            this.game.planets,
+            this.wrapper
+        );
+        this.wrapper.add(this.landingMessage);
+        this.landingMessage.alpha = 0;
+    }
+    
+    // Info Display
+    showInfoIfNeeded(){
+        if(this.shouldShowInfo && !this.infoShowing && this.game.initialized){ 
+            if(!this.game.player.ship.hyperDriveEngaged) this.infoSound.play();
+                   
+            this.game.add.tween(this.nameText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+            this.game.add.tween(this.subText).to( { alpha: 1 }, 300, "Quart.easeOut", true);
+
+            if(this.canLand){
+                this.game.add.tween(this.landingMessage).to( { alpha: .5 }, 300, "Quart.easeOut", true);
+            }
+        
+            this.infoShowing = true;
+        }
+        
+        if(!this.shouldShowInfo && this.infoShowing){
+            this.hideInfo();
+            this.infoShowing = false;
+        }
+    }
+
+    get shouldShowInfo(){
+        if(this.distanceToPlayer<=this.showInfoDistance) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    hideInfo(){
+        this.game.add.tween(this.nameText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.subText).to( { alpha: 0 }, 300, "Quart.easeOut", true);        
+        this.game.add.tween(this.landingMessage).to( { alpha: 0 }, 300, "Quart.easeOut", true);
+
+        this.infoShowing = false;
+    }
+        
+    // Services        
+    hasService(service){
+        return this.services.includes(service);
+    }
+    
+    get services(){
+        var services = [];
+        for (let service of PLANET_SERVICES_REQUIREMENTS)
+            if(this.stats[service.requirement]>=service.level)
+                services.push(service.service)
+        return services;
+    }
+
+    set services(services){
+        this._services = services;
+    }
+
+
+    // Planets have lots of free space. Like, a lot.
+    calculateFreeSpaceForStorageClass(storageClass){
+        return Infinity;
+    }
+
+    update() {
+        super.update();
+        if(this.sprite.exists){
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.sprite, this.game.player.sprite)   var labelX = ((system.position.x+this.mapScrollX)*zoom)+textMarginX;
+            var labelY = ((system.position.y+this.mapScrollY)*zoom)+textMarginY;
+
+            this.drawShadowText(labelString, labelX, labelY);
+            
+            // Subtext
+            this.bmd.ctx.font = `10px ${FONT}`;
+            if(system.isCurrentSystem){
+                this.bmd.ctx.fillStyle='#1aae5c'
+                this.drawShadowText('Current System', labelX, labelY+lineSpacing);
+            }
+            
+            if(this.currentPath){
+                if(system==this.currentPath.lastItem() && !system.isCurrentSystem){
+                    if(system==this.navigationDestination){
+                        this.bmd.ctx.fillStyle='#1aae5c'
+                    } else {
+                        this.bmd.ctx.fillStyle='#FFFFFF'
+                    }
+                    var formattedDistance = numeral(this.distanceToNavigationTarget*PIXEL_TO_LIGHTYEAR).format('0,0.0a');                    
+                    if(this.currentPath.length==2){
+                        var jumpText = 'Jump'
+                    } else {
+                        var jumpText = 'Jumps'
+                    }
+                    
+                    this.drawShadowText(`${this.currentPath.length-1} ${jumpText} / ${formattedDistance} ly`, labelX, labelY+lineSpacing);
+                } else if(system==this.navigationTarget) {
+                    this.bmd.ctx.fillStyle='#c03b2b'
+                    this.drawShadowText(`Out of Range`, labelX, labelY+lineSpacing);
+                    
+                }
+            }
+        }        
+    }
+
+    updateNavigation(){
+        if(!this.navigationDestination){
+            // 'Cursor' sort of...
+            // Find the star closest to the center of the screen
+            var lowest = Number.POSITIVE_INFINITY;
+            var tmp;
+            for (var i=this.starSystems.length-1; i>=0; i--) {
+                tmp = this.starSystems[i].distanceFromMapCenter;
+                if (tmp < lowest) {
+                    lowest = tmp;
+                    this.navigationTarget = this.starSystems[i];
+                }
+            }
+            if(this.game.system!=this.navigationTarget){
+                if(this.navigationTarget!=this.navigationTargetCache){
+                    this.currentPath = this.findPathFromSystemToSystem(this.game.system,this.navigationTarget);
+                    this.distanceToNavigationTarget = this.distanceOfPath(this.currentPath)
+                    
+                    if(this.currentPath.includes(this.navigationTarget)){
+                        this.navTargetChangedSound.play();
+                    } else {
+                        this.navTargetInvalidSound.play();
+                    }
+                }
+            } else {
+                this.currentPath = false;
+            }
+            this.navigationTargetCache = this.navigationTarget;
+        }
+    }
+    
+    
+    drawShadowText(text,x,y){
+        this.bmd.ctx.strokeText(text,x,y);
+        this.bmd.ctx.fillText(text,x,y);            
+    }
+    
+    drawGridLines(options){
+        var zoom = this.mapZoom;
+        var major = options.major || 100*zoom;
+        var minor = options.minor || 25*zoom;            
+    	this.bmd.ctx.strokeStyle = options.color || "#333333";
+    	
+        // Verticle
+        for (var x = 0; x <= this.game.galaxy.settings.mapWidth; x+=minor) {
+            if (x % major == 0) {
+                this.bmd.ctx.lineWidth = 2;
+            } else {
+                this.bmd.ctx.lineWidth = 1;                
+            }
+        	this.bmd.ctx.beginPath();
+        	this.bmd.ctx.moveTo((x+this.mapScrollX)*zoom,this.mapScrollY*zoom);
+        	this.bmd.ctx.lineTo((x+this.mapScrollX)*zoom,(this.mapScrollY*zoom)+(this.game.galaxy.settings.mapHeight*zoom));
+            this.bmd.ctx.stroke();
+        }
+
+
+        // Horizontal
+        for (var y = 0; y <= this.game.galaxy.settings.mapHeight; y+=minor) {
+            if (y % major == 0) {
+                this.bmd.ctx.lineWidth = 2;
+            } else {
+                this.bmd.ctx.lineWidth = 1;      ;
+            this.showInfoIfNeeded();
+            
+            // Paralax
+            if(this.isPlanet){
+                if(this.game.camera.deltaX || this.game.camera.deltaY){
+                    this.wrapper.addAll('x', this.game.camera.deltaX - this.game.camera.deltaX/2, true, true);
+                    this.wrapper.addAll('y', this.game.camera.deltaY - this.game.camera.deltaY/2, true, true);                    
+                }
+            }
+        }
+    }
+
+}          
+            }
+        	this.bmd.ctx.beginPath();
+        	this.bmd.ctx.moveTo(this.mapScrollX*zoom,(y+this.mapScrollY)*zoom);
+        	this.bmd.ctx.lineTo((this.mapScrollX*zoom)+(this.game.galaxy.settings.mapWidth*zoom),(y+this.mapScrollY)*zoom);
+            this.bmd.ctx.stroke();
+        }
+    }
+    
+    update(){
+        if(this.isActive){
+            this.updateNavigation();
+    
+            if (this.cursors.up.isDown) {
+                this.mapScrollYStep+=this.mapScrollIncrement;
+            } else if(this.cursors.down.isDown){
+                this.mapScrollYStep-=this.mapScrollIncrement;            
+            } else {
+                // Y
+                if(this.mapScrollYStep>0)this.mapScrollYStep-=this.mapScrollDecay;
+                if(this.mapScrollYStep<0)this.mapScrollYStep+=this.mapScrollDecay;
+                if(Math.abs(this.mapScrollYStep)<this.mapScrollDecay) this.mapScrollYStep=0;
+            }
+    
+            if (this.cursors.left.isDown) {
+                this.mapScrollXStep+=this.mapScrollIncrement;
+            } else if(this.cursors.right.isDown){
+                this.mapScrollXStep-=this.mapScrollIncrement;            
+            } else {
+                // X
+                if(this.mapScrollXStep>0)this.mapScrollXStep-=this.mapScrollDecay;
+                if(this.mapScrollXStep<0)this.mapScrollXStep+=this.mapScrollDecay;
+                if(Math.abs(this.mapScrollXStep)<this.mapScrollDecay) this.mapScrollXStep=0;
+            }
+    
+            if (this.plusKey.isDown && this.didZoom==false) {
+                if(this.mapZoom==.5){
+                    this.mapZoom = 1
+                    this.mapScrollX -= (this.width/2);
+                    this.mapScrollY -= (this.height/2);
+                } else if(this.mapZoom==1) {
+                    this.mapZoom = 2
+                    this.mapScrollX -= (this.width/4);
+                    this.mapScrollY -= (this.height/4);
+                }
+    
+                this.didZoom = true;
+    
+                game.time.events.add(Phaser.Timer.SECOND * .15, function(){
+                    this.didZoom = false;
+                }, this);
+    
+            } else if(this.minusKey.isDown && this.didZoom==false){
+                if(this.mapZoom==1){
+                    this.mapZoom = .5
+                    this.mapScrollX += (this.width/2);
+                    this.mapScrollY += (this.height/2);
+                } else if(this.mapZoom==2) {
+                    this.mapZoom = 1
+                    this.mapScrollX += (this.width/4);
+                    this.mapScrollY += (this.height/4);
+                }
+    
+                this.didZoom = true;
+    
+                game.time.events.add(Phaser.Timer.SECOND * .15, function(){
+                    this.didZoom = false;
+                }, this);
+    
+            } else {            
+                if(this.mapZoomStep>0)this.mapZoomStep-=this.mapZoomIncrement;            
+                if(this.mapZoomStep<0)this.mapZoomStep+=this.mapZoomIncrement;            
+    
+                if(this.mapZoomStep>0 && this.mapZoomStep<this.mapZoomIncrement)this.mapZoomStep=0;            
+                if(this.mapZoomStep<0 && this.mapZoomStep>this.mapZoomIncrement)this.mapZoomStep=0;
+            }
+            
+            this.mapScrollX += this.mapScrollXStep/this.mapZoom;
+            this.mapScrollY += this.mapScrollYStep/this.mapZoom;        
+            
+                    
+            if(this.mapZoom>this.mapZoomMax) {
+                this.mapZoom = this.mapZoomMax;
+                this.mapZoomStep = 0;
+            }
+    
+            if(this.mapZoom<this.mapZoomMin) {
+                this.mapZoom = this.mapZoomMin;
+                this.mapZoomStep = 0;
+            }
+                    
+            if(this.mapZoom>=this.mapZoomMin && this.mapZoom<=this.mapZoomMax && this.mapZoomStep!=this.mapZoomCache) {
+                this.mapZoom += this.mapZoomStep;
+                this.mapZoomCache = this.mapZoomStep;
+                
+                this.mapScrollX += this.mapScrollX*(this.mapZoom/2);
+            }
+            this.drawMap();
+        }
+    }
+    
+    cleanup(){
+        this.plusKey = null;
+        this.minusKey = null;
+        this.spaceKey.onUp.remove(this.setDestination, this);
+        this.spaceKey = null;
+    }
+}
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/planets/basicPlanet.js begins */
+/* Merging js: app/gui/mapScreen.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+class MapScreen extends GuiScreen {
+    constructor(game,group) {
+        super(game,group);
+
+        this.transitionStyle = SCREEN_TRANSITION_STYLE.fromBottom;
+        
+        this.setupScreen();
+                
+        this.wrapper = group;
+        this.wrapper.add(this.screen);
+        this.wrapper.fixedToCamera = true;
+        this.wrapper.visible = false;
+        
+        this.destination = null;
+        this.destinationCache = null;
+        
+        this.map = new GalacticMap(this.game,{
+            width : this.game.camera.width-this.game.hud.sidebarWidth,
+            height : screenHeight-46-38,
+            x : 0,
+            y : 46,
+            group : this.screen,
+        });
+    }
+    
+    setupKeys(){
+        this.mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        this.mKeyOnUp = function(){
+            this.hide();
+        }
+        this.mKey.onUp.add(this.mKeyOnUp, this);
+    }
+    
+    setupScreen(){
+        this.screenWidth = this.game.camera.width-this.game.hud.sidebarWidth;
+
+        this.bg = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.tabBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+        this.bottomBar = this.screen.add(new Phaser.Graphics(this.game.game,0,0));
+
+        // Background
+        this.bg.clear();
+        this.bg.beginFill(0x111111);
+        this.bg.drawRect(0,0,
+            this.screenWidth,
+            this.game.camera.height*2,
+            0
+        )
+        this.bg.endFill();
+
+        // Bottom Bar
+        this.bottomBarHeight = 38;
+        this.bottomBar.clear();
+        this.bottomBar.beginFill(this.styles.darkGrey);
+        this.bottomBar.drawRect(0,this.game.camera.height-this.bottomBarHeight,
+            this.screenWidth,
+            this.bottomBarHeight+100, // Overlap for animation
+        )
+        this.bottomBar.endFill();
+
+        this.helpText = this.game.add.text(
+            16,this.game.camera.height - 26, 
+            '(ARROWS) Move Map   (SPACE) Select Destination    (+/-) Zoom', 
+            { font: `12px ${FONT}`, fill: '#929292', align: 'left'},
+            this.screen
+        )
+
+
+        // Tabs
+        this.shipTab = new TabItem(this.game,'ship-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.shipTab.buttonX = 0;
+        this.shipTab.buttonY = 0;
+        this.shipTab.text = "Ship";
+        this.screen.add(this.shipTab);
+        
+        this.inventoryTab = new TabItem(this.game,'inv-tab');
+        this.inventoryTab.buttonX = this.shipTab.buttonWidth + 1;
+        this.inventoryTab.buttonY = 0;
+        this.inventoryTab.text = "Inventory";
+        this.screen.add(this.inventoryTab);
+
+        this.mapTab = new TabItem(this.game,'map-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.mapTab.buttonX = this.inventoryTab.buttonX + this.inventoryTab.buttonWidth + 1;
+        this.mapTab.buttonY = 0;
+        this.mapTab.text = "Map";
+        this.mapTab.active = true;
+        this.screen.add(this.mapTab);
+
+        this.statsTab = new TabItem(this.game,'stats-tab',{
+            onReleased : function() {
+                this.hide();
+            }.bind(this),
+        },
+        );
+        this.statsTab.buttonX = this.mapTab.buttonX + this.mapTab.buttonWidth + 1;
+        this.statsTab.buttonY = 0;
+        this.statsTab.text = "Stats";
+        this.screen.add(this.statsTab);
+
+        this.tabBar.clear();
+        this.tabBar.beginFill(0x3F3C46);
+        this.tabBar.drawRect(0,45,
+            this.screenWidth,
+            1,
+            0
+        )
+        this.tabBar.endFill();
+
+    }
+        
+    show(){
+        super.show();
+
+        this.wrapper.visible = true;
+        this.setupKeys();
+
+        this.map.setupKeys();
+        this.map.isActive = true;
+        this.map.centerOnSystem(this.game.system);
+    }
+
+    didShow(){
+        super.didShow();        
+        this.game.player.controlMode = CONTROL_MODE.inventory;
+    }
+    
+    hide(){
+        super.hide();
+        this.cleanup();
+
+        this.map.isActive = false;
+        this.map.cleanup();
+    }
+
+    didHide(){
+        super.didHide();
+        
+        this.destination = this.map.navigationDestination;
+        
+        if(this.destination!=this.destinationCache && this.destination){
+            this.game.hud.showFTLPanel();
+        }
+
+        this.destinationCache = this.destination;
+    }
+    
+    cleanup(){
+        this.mKey.onUp.remove(this.mKeyOnUp, this);
+    }
+}class BasicPlanet extends Planet {
+    constructor(game,options) {
+        super(game,options.x,options.y); 
+                
+        this.system = options.system;
+        this.index = options.index;
+        this.order = (this.index+1).toRoman()   
+
+        // Basics
+        this.stats = {
+            culture  : this.determineIntegerBetween(0,10),
+            industry : this.determineIntegerBetween(0,10),
+            science  : this.determineIntegerBetween(0,10),
+            trade    :  this.determineIntegerBetween(0,10),
+        }
+        var bestStat = Object.keys(this.stats)
+                           .sort(function(a, b) {
+                               return this.stats[b] - this.stats[a];
+                           }.bind(this))[0];  
+                                            
+        var worstStat = Object.keys(this.stats)
+                           .sort(function(a, b) {
+                               return this.stats[b] + this.stats[a];
+                           }.bind(this))[0];                   
+
+        // Specialization - determines low demand things (less expensive)
+        this.specialization = this.determineItemFromArray(PLANET_SPECIALIZATIONS[bestStat]);
+       
+        // Weakness - determines high demand things (more expensive)
+        this.weakness = this.determineItemFromArray(PLANET_SPECIALIZATIONS[worstStat]);
+
+        // Population is for passenger terminals
+        this.population = this.determineIntegerBetween(0,100000000);
+
+        this.name = `${this.system.name} ${this.order}`;
+        this.description = "Class D Planet"
+        this.welcomeTitle = "Terrestrial Planet";
+        this.welcomeText = `${this.name} is a medium-sized terrestrial planet in the ${this.system.name} system. \nSpeciality ${this.specialization} \nScience ${this.stats.science} \nCulture ${this.stats.culture} \nIndustry ${this.stats.industry} \nTrade ${this.stats.trade}`;
+
+        // Sprite
+        this.spriteImage = this.determineItemFromArray(this.game.planetImages);        
+        this.sprite = this.game.make.sprite(options.x,options.y, this.spriteImage);
+        this.sprite.exists = false;
+        this.setupSprite(options);
+        
+        // Economics
+        this.game.economy.registerMarket(this);
+    }
+
+    update() {
+        super.update();
+    }
+}
+
+
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/economy/_economy.js begins */
+/* Merging js: app/planets/basicMoon.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+
+
+class BasicMoon extends Planet {
+    constructor(game,x,y) {
+        super(game,x,y);        
+        this.sprite = this.game.add.sprite(x,y, 'moon-1');
+        this.sprite.scale.setTo(1.3, 1.3);
+
+        this.name = "Persicus"
+        this.description = "Moon of Mosisia"
+        this.welcomeText = "Persicus is an intermediately sized terrestrial moon in the Pavo system. A lot of the moon is comprised of frigid desert, while a smaller portion is frozen oceans. Plant and animal life on this planet is non existant. The moon has no atmosphere, and is breathable without advanced life support systems.";
+
+        this.services = [
+            PLANET_SERVICES.passengerTerminal,            
+        ]
+
+        this.setupSprite();
+    }
+
+    update() {
+        super.update();
+    }
+}
+class Economy {
+    constructor(game) {
+        this.game = game;    
+        this.markets = [];
+
+        // Updates
+        this.game.time.events.loop(5000, this.updateAllMarkets, this);
+    }
+    
+    // Markets
+    registerMarket(market,restock = true){
+        market['stockItem'] = this.stockItem;
+
+        this.markets.push(market);
+        if(restock) this.restockMarket(market);
+    }
+    restockMarket(market){
+        // Based on certain properites, determine the items for sale in a given market.
+        if(market.hasService(PLANET_SERVICES.fuelDepot)){
+            market.stockItem('small_fuel_drum',tombola.range(1,2));
+            market.stockItem('theta_crystal',tombola.range(1,5));
+        }   
+        if(market.hasService(PLANET_SERVICES.shipyard)){
+            market.stockItem('med_repair_kit',tombola.range(1,2));
+            market.stockItem('light_repair_kit',tombola.range(1,2));
+            market.stockItem('basic_engine',tombola.range(0,1));
+        }   
+
+
+        
+
+    }
+    updateMarket(market){
+        
+    }
+    updateAllMarkets(){
+
+    }
+
+    stockItem(itemKey, amount = 1){
+        this.addItemsToInventory(amount, InventoryObject.make(itemKey,this.game));
+    }
+    
+    // Fuel
+    get globalFuelPrice(){
+        return .033;
+    }
+
+    buyFuel(amount){
+        if(amount>0){
+            var purchaseCost = amount * this.globalFuelPrice;
+            if(this.game.player.debitCredits(purchaseCost)){
+                this.game.player.ship.addFuel(amount);
+                
+                var roundedAmt = numeral(amount).format('0.0a')
+                var readablePrice = numeral(this.globalFuelPrice).format('$0,0.00')
+                
+                this.game.hud.purchaseReceipt('Auto Refuel',`${roundedAmt} units @ ${readablePrice}`,purchaseCost);
+            } else {
+                // Sorry
+            }
+        } else {
+            // Nothing to buy
+            return false;
+        }
+    }
+
+    tick(){
+        // Change prices of stuff
+        // Spawn stuff   
+    }
+}
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/ships/buoy.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Buoy extends Planet {
+    constructor(game,x,y) {
+        super(game,x,y);
+        
+        this.specs = {
+            name : 'Navigation Buoy',
+            description : '',
+        }
+        
+        this.sprite = this.game.add.sprite(x,y, 'buoy');
+        this.sprite.scale.setTo(1.3, 1.3);
+
+        this.name = this.specs.name;
+        this.description = this.specs.description;
+        this.showInfoDistance = 120;
+        
+        this.canLand = false;
+        this.isPlanet = false;
+        
+        this.setupSprite();
+
+        var blink = this.sprite.animations.add('blink');
+        this.sprite.animations.play('blink', 1, true);
+    }
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/player.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class Player extends GameObject {
+    constructor(game) {
+        super(game);
+
+        this.ship = new BasicMiner(game,this.game.world.centerX-350,this.game.world.centerY-200);
+        this.sprite = this.ship.sprite;
+
+        this.name = 'Dash Riprock';
+        
+        this._credits = 1000;
+        
+        // Settings
+        this.settings = {};
+        this.settings.autoRefuel = true;
+
+        // Keys
+        this.controlMode = CONTROL_MODE.play;
+
+        // RCS
+        this.rcsSoundCountdown = 1;
+        this.rcsSound = game.add.audio('rcs-loop');
+        this.rcsSound.onFadeComplete.add(this.rcsSoundFadeComplete, this);
+
+        this.allowHissSound = true;
+        this.allowHissSoundForReverse = true;
+        this.hissSounds = [
+            game.add.audio('hiss-1'),
+            game.add.audio('hiss-2'),
+            game.add.audio('hiss-3'),
+            game.add.audio('hiss-4'),
+            game.add.audio('hiss-5')
+        ]
+
+
+        this.cursors = this.game.input.keyboard.createCursorKeys();
+        this.fireButton = this.game.input.keyboard.addKey(Phaser.KeyCode.SPACEBAR);  
+        
+        // Navigation
+        var tabKey = game.input.keyboard.addKey(Phaser.Keyboard.TAB);
+        tabKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.nextNavigationTarget();
+        }, this);
+
+        // Landing
+        var lKey = game.input.keyboard.addKey(Phaser.Keyboard.L);
+        lKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToLand();
+        }, this);
+
+        // Docking
+        var dKey = game.input.keyboard.addKey(Phaser.Keyboard.D);
+        dKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.attemptToDock();
+        }, this);
+
+        // HyperDrive
+        var jKey = game.input.keyboard.addKey(Phaser.Keyboard.J);
+        jKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.ship.toggleHyperDrive();
+        }, this);
+        var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
+        aKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) {
+                this.game.hud.abortFTL();
+                this.ship.abortJump();
+            }
+        }, this);
+        var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
+        hKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.hud.toggleFTLPanel();
+        }, this);
+
+        // Inventory
+        var iKey = game.input.keyboard.addKey(Phaser.Keyboard.I);
+        iKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.inventoryScreen.show();
+        }, this);
+
+        // Map
+        var mKey = game.input.keyboard.addKey(Phaser.Keyboard.M);
+        mKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.mapScreen.show();
+        }, this);
+
+        // Camera
+        var cKey = game.input.keyboard.addKey(Phaser.Keyboard.C);
+        cKey.onUp.add(function(){
+            if(this.controlMode == CONTROL_MODE.play) this.game.toggleCameraMode();
+        }, this);
+
+    }
+
+    enterDarkness(nebula){
+        this.currentNebula = nebula;
+        
+        if(!this.inDarkness){
+            // Wait a bit to hit the lights
+            game.time.events.add(Phaser.Timer.SECOND * 2, function(){
+                if(this.currentNebula)
+                this.game.hud.title(
+                    `${this.currentNebula.name}, ${this.game.system.name} System`,
+                    moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'),
+                );
+            }, this);
+
+            game.time.events.add(Phaser.Timer.SECOND * 3, function(){
+                if(this.currentNebula){
+                    this.game.planets.mask = this.ship.lightMask;
+                    this.game.asteroids.mask = this.ship.lightMask;
+                    this.game.stars.mask = this.ship.lightMask;
+                    // Hack to show only player ship
+                    this.ship.sprite.visible = false;
+                    this.game.ships.setAll('mask', this.ship.lightMask,false,true);
+                    this.ship.sprite.visible = true;
+                    this.ship.lightMask.visible = true;    
+                }
+            }, this);
+
+            this.inDarkness = true;
+        }
+    }
+
+    exitDarkness(nebula){
+        if(this.inDarkness){
+            game.time.events.add(Phaser.Timer.SECOND * 1, function(){
+                this.game.planets.mask = null;
+                this.game.asteroids.mask = null;
+                this.game.stars.mask = null;
+                this.game.ships.mask = null;
+                this.ship.lightMask.visible = false;    
+            }, this);
+
+            this.currentNebula = null;
+            this.inDarkness = false;
+        }
+    }
+    
+    get credits(){
+        if(this._credits<999999){
+            return CREDIT_PREFIX.short + numeral(this._credits).format('0,0');
+        } else {
+            return CREDIT_PREFIX.short + numeral(this._credits).format('(0.00 a)');
+        }
+    }
+
+    debitCredits(amount){
+        if(this._credits>=amount){
+            this._credits-=amount;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    addCredits(amount){
+        this._credits+=amount;
+        return true;
+    }
+
+
+    autoRefuel(){
+        var fuelNeeded = this.ship.maxFuel - this.ship.fuelQuantity;
+        this.game.economy.buyFuel(fuelNeeded);
+    }
+    
+    buy(item, amount = 1){
+        debugger;
+    }
+    
+    sell(item, amount = 1){
+        
+    }
+    
+    stop(){
+        // Used when landing etc.
+        this.ship.sprite.body.setZeroVelocity();
+        this.ship.sprite.body.setZeroRotation();
+        this.ship.sprite.body.setZeroForce();
+    }
+    
+    rcsSoundFadeComplete(){
+        this.rcsSound.stop();
+    }
+    
+    hiss(){
+        if(this.allowHissSound) {
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
+            }
+        }        
+        this.allowHissSound = false;
+    }
+    
+    reverseHiss(){
+        if(this.allowHissSoundForReverse) {
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
+            }
+        }
+        this.allowHissSoundForReverse = false;
+    }
+        
+    update() {
+        super.update();
+        
+        if(this.rcsSoundCountdown>=0){
+            if(this.rcsSoundCountdown==0){
+                this.rcsSound.fadeOut(30);
+            } else {
+                this.rcsSoundCountdown--;
+            }
+        }
+
+
+        // Normal "Play" control mode"
+        if(this.controlMode == CONTROL_MODE.play && !this.ship.isDocked){
+            // Accel
+            if (this.cursors.up.isDown && !this.ship.hyperDriveEngaged) {
+                this.ship.accelerate();
+            } else if(this.cursors.down.isDown && !this.ship.hyperDriveEngaged) {
+                this.reverseHiss();
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+                this.ship.goInReverse();
+            } else {
+                this.allowHissSoundForReverse = true;
+                this.ship.deaccelerate();
+            }
+        
+            // Turning / Strafing
+            if (this.cursors.left.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+
+                if(this.cursors.left.shiftKey){
+                    this.ship.moveLeft();
+                } else {
+                    this.ship.turnLeft();
+                }
+            } else if (this.cursors.right.isDown) {
+                this.hiss();
+
+                this.rcsSoundCountdown = 1;
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
+
+                if(this.cursors.right.shiftKey){
+                    this.ship.moveRight();
+                } else {
+                    this.ship.turnRight();
+                }
+            } else {
+                this.allowHissSound = true;
+                this.ship.deaccelerateTurning();
+            }
+            
+            // Firing
+            if (this.fireButton.isDown) {
+                this.ship.firePrimaryWeapon();
+            }
+        }
+    }
+}
+
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+/* Merging js: app/hud.js begins */
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+
+class HUD {
+    constructor(game) {
+        this.game = game;
+        this.group = this.game.hudGroup;
+        this.group.fixedToCamera = true;
+        var x = this.game.camera.width - 120;
+        var y = 160;
+        var lineHeight = 12;
+        var padding = 8;
+        var width = 100;
+        var borderRadius = 5;
+
+        this.tweens = {};
+
+        this.masterAlarmSound = game.add.audio('master_alarm');
+        this.titleNotificationSound = game.add.audio('title-notification');
+        this.panelToggleSound = game.add.audio('panel-toggle');
+        this.lowFuelSound = game.add.audio('low-fuel-warning');
+
+        // Updaters
+        game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
+        game.time.events.loop(Phaser.Timer.SECOND * 1, this.verySlowUpdate, this);
+
+        // Sidebar
+        this.sidebarWidth = 140;
+        this.sidebar = this.group.add(new Phaser.Graphics(this.game.game,0,0));
+        this.sidebar.beginFill(0x111111);
+        this.sidebar.drawRect(
+            x-20,
+            0,
+            this.sidebarWidth,
+            this.game.camera.height,
+            
+        )
+        this.sidebar.endFill();
+
+        // Date
+        this.stardateLabel = new Phaser.BitmapText(
+            this.game.game, 
+            this.game.camera.width-8-140,
+            10,
+            'pixelmix_8',
+            this.game.starDate,
+            5
+        );
+        this.stardateLabel.anchor.set(1,0);
+        this.stardateLabel.tint = 0x948f9c;
+        this.group.add(this.stardateLabel)
+
+        // System 
+        this.systemLabel = new Phaser.BitmapText(
+            this.game.game, 
+            x-8,
+            10,
+            'pixelmix_8',
+            `${this.game.system.name}`,
+            5
+        );
+        this.systemLabel.anchor.set(0,0);
+        this.group.add(this.systemLabel)
+
+        // Minimap        
+        this.minimap = new Minimap(this.game,this);
+        
+        // Navigation
+        this.navigationGroup = this.game.add.group()
+        this.group.add(this.navigationGroup)
+
+        this.navDestDisplay = new Phaser.BitmapText(
+            this.game.game, 
+            20,
+            20,
+            'pixelmix_8',
+            'USS Ajax (Fuel Tanker)',
+            5
+        );  
+        this.navigationGroup.add(this.navDestDisplay)
+
+        // ETA
+        this.navETALabel = new Phaser.BitmapText(
+            this.game.game, 
+            20,
+            34,
+            'pixelmix_8',
+            'ETA',
+            5
+        );  
+        this.navETALabel.tint = 0x948f9c;
+        this.navigationGroup.add(this.navETALabel)
+
+        this.navETADisplay = new Phaser.BitmapText(
+            this.game.game, 
+            70,
+            34,
+            'pixelmix_8',
+            '59:59',
+            5
+        );  
+        this.navETADisplay.anchor.set(1,0);
+        this.navigationGroup.add(this.navETADisplay)
+
+        // Distance
+        this.navDistanceLabel = new Phaser.BitmapText(
+            this.game.game, 
+            90,
+            34,
+            'pixelmix_8',
+            'Dist.',
+            5
+        );  
+        this.navDistanceLabel.tint = 0x948f9c;
+        this.navigationGroup.add(this.navDistanceLabel)
+
+        this.navDistanceDisplay = new Phaser.BitmapText(
+            this.game.game, 
+            120,
+            34,
+            'pixelmix_8',
+            '9999m',
+            5
+        );  
+        this.navDistanceDisplay.anchor.set(0,0);
+        this.navigationGroup.add(this.navDistanceDisplay)
+
+        // EFI
+        this.healthProgressBar = new ProgressBar(this.game,this,'HULL',x-8,y+8);
+        this.fuelProgressBar = new ProgressBar(this.game,this,'FUEL',x-8,y+43);
+        this.energyProgressBar = new ProgressBar(this.game,this,'ENERGY',x-8,y+78);
+
+
+        // Credits
+        this.creditsText = new Phaser.BitmapText(
+            this.game.game, 
+            x+108,
+            this.energyProgressBar.y + this.energyProgressBar.height + 11,
+            'pixelmix_8',
+            '',
+            5
+        );  
+        this.group.add(this.creditsText);
+        this.creditsText.anchor.set(1,0);
+        this.creditsLabel = new Phaser.BitmapText(
+            this.game.game, 
+            x-8,
+            this.creditsText.y,
+            'pixelmix_8',
+            CREDIT_PREFIX.long.toUpperCase(),
+            5
+        );  
+        this.creditsLabel.tint = 0x948f9c;
+        this.group.add(this.creditsLabel)
+
+        // Cargo
+        this.cargoText = {};
+        var cargoHeight = 0;
+        this.cargoLabel = new Phaser.BitmapText(
+            this.game.game, 
+            x-8,
+            y+142,
+            'pixelmix_8',
+            'CARGO (kg)',
+            5
+        );  
+        this.cargoLabel.tint = 0x948f9c;
+        this.group.add(this.cargoLabel)
+        Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
+            var cargoType = this.game.player.ship.specs.storage[key];
+            this.cargoText[key] = new Phaser.BitmapText(
+                this.game.game, 
+                x+108,
+                (this.cargoLabel.y+padding)+(lineHeight*index)+padding,
+                'pixelmix_8',
+                '0',
+                5
+            );
+            
+            this.group.add(this.cargoText[key]);
+            this.cargoText[key].anchor.set(1,0);
+    
+            var cargoTypeLabel = new Phaser.BitmapText(
+                this.game.game, 
+                x-8,
+                this.cargoText[key].y,
+                'pixelmix_8',
+                key.charAt(0).toUpperCase() + key.slice(1),
+                5
+            );
+            cargoTypeLabel.tint = 0x948f9c;
+            this.group.add(cargoTypeLabel);
+            cargoHeight = (index*lineHeight)+padding*4;
+        }.bind(this));
+
+        // Equipment
+        this.equipmentText = {};
+        var eIndex = 0;
+        var equipmentHeight = 0;
+/*
+        this.equipmentLabel = new Phaser.BitmapText(
+            this.game.game, 
+            x-8,
+            this.cargoLabel.y + cargoHeight + padding,
+            'pixelmix_8',
+            'EQUIPMENT',
+            5
+        );  
+        this.equipmentLabel.tint = 0x948f9c;
+        this.group.add(this.equipmentLabel)
+*/
+        var equipmentList = this.game.player.ship.equipment.concat(this.game.player.ship.weapons);        
+/*
+        for (let equipment of equipmentList) {
+            var name = equipment.name;
+            if(equipment.equipped){
+                var equipmentNameLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    (this.equipmentLabel.y+padding)+(lineHeight*eIndex)+padding,
+                    'pixelmix_8',
+                    name,
+                    5
+                );
+                this.group.add(equipmentNameLabel);
+                equipmentNameLabel.anchor.set(0,0);
+    
+                var equipmentStatusLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x+108,
+                    equipmentNameLabel.y,
+                    'pixelmix_8',
+                    equipment.status,
+                    5
+                );
+                equipmentStatusLabel.tint = 0x948f9c;
+                this.group.add(equipmentStatusLabel);
+                equipmentStatusLabel.anchor.set(1,0);
+            }
+            eIndex++;
+        }
+*/
+
+        // Master Alarm
+        this.masterAlarmSprite = this.game.add.sprite(this.game.camera.width-200,10, 'master-alarm');
+        this.masterAlarmSprite.animations.add('blink');    
+        this.masterAlarmSprite.animations.play('blink', 5, true);
+        this.masterAlarmSprite.visible = false;
+        this.masterAlarmSprite.inputEnabled = true;
+        this.masterAlarmSprite.events.onInputUp.add(this.masterAlarmClicked, this);
+        this.group.add(this.masterAlarmSprite);
+
+        // O2
+        this.o2gauge = this.game.add.group();
+        this.group.add(this.o2gauge);
+        
+        this.o2gaugeBg = this.game.add.sprite(0,0, 'oxygen-gauge');
+        this.o2gaugeArrow = this.game.add.sprite(0,0, 'gauge-arrow');
+        this.group.add(this.o2gaugeBg);
+        this.group.add(this.o2gaugeArrow);
+        
+        this.o2gaugeBg.x = 32 - 100
+        this.o2gaugeArrow.x = this.o2gaugeBg.x + 8;
+        this.o2gaugeBg.y = this.game.camera.height - this.o2gaugeBg.height - 100;
+        this.o2gaugeArrow.y = this.o2gaugeBg.y + 29;
+
+        // FTL
+        this.ftlPanel = this.game.add.group();
+        this.group.add(this.ftlPanel);
+        this.ftlPanelBg = this.game.add.sprite(0,0, 'ftl-panel');
+        this.ftlPanel.add(this.ftlPanelBg);
+
+        this.ftlPanelText = new Phaser.BitmapText(
+            this.game.game, 
+            25,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        this.ftlPanelText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelText);
+
+        this.ftlPanelStatusText = new Phaser.BitmapText(
+            this.game.game, 
+            132,
+            17,
+            'pixelmix_8_leaded',
+            '',
+            5
+        );
+        
+        this.ftlPanelStatusText.tint = 0x15ae5c;
+        this.ftlPanel.add(this.ftlPanelStatusText);
+        this.ftlPanelStatusBlink = game.add.tween(this.ftlPanelStatusText).to(
+            { alpha:0 }, 1000, Phaser.Easing.Quadratic.InOut, false, 0, -1)
+        this.ftlPanelHelpText = new Phaser.BitmapText(
+            this.game.game, 
+            18,
+            135,
+            'pixelmix_8',
+            '(H) Hide',
+            5
+        );
+        this.ftlPanel.add(this.ftlPanelHelpText);
+
+        this.ftlPanelX = this.game.camera.width-150-this.ftlPanelBg.width;
+        this.ftlPanelY = this.game.camera.height-this.ftlPanelBg.height-10+200;
+        
+        this.ftlPanel.y = this.ftlPanelY;
+        this.ftlPanel.x = this.ftlPanelX;
+
+        // Storage
+        Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
+            if(this.equipmentText[key]){
+                var equipmentType = this.game.player.ship.specs.storage[key];    
+                var equipmentTypeLabel = new Phaser.BitmapText(
+                    this.game.game, 
+                    x-8,
+                    this.equipmentText[key].y,
+                    'pixelmix_8',
+                    key.charAt(0).toUpperCase() + key.slice(1),
+                    5
+                );
+                equipmentTypeLabel.tint = 0x948f9c;
+                this.group.add(equipmentTypeLabel);
+                equipmentHeight = (index*lineHeight)+padding*4;
+            }
+        }.bind(this));
+
+
+        // MESSAGES
+        // Title
+        this.message__title = this.game.add.text(
+            0,0,
+            '', 
+            { font: `16px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+        );
+        this.message__title.alpha = 0;
+        this.group.add(this.message__title)
+        
+        // Subtitle
+        this.message__subTitle = this.game.add.text(
+            0,0, 
+            '', 
+            { font: `12px ${FONT}`, fill: '#FFFFFF', align: 'left' }, 
+        );
+        this.message__subTitle.alpha = 0;
+        this.group.add(this.message__subTitle)
+        
+        // Nav Arrow
+        this.navigationArrow = this.game.make.sprite(0,0, 'nav-arrow');
+        this.navigationArrow.anchor.set(-10,.5);
+        this.navArrowResetPostionTween = this.game.add.tween(this.navigationArrow).to({
+            angle: 0,
+            x: 0,
+            y: 0,
+        }, 300, "Quart.easeOut", false);
+
+        this.group.add(this.navigationArrow);
+
+        
+        this.messageTextY = this.game.camera.height-100;
+        this.messageText = this.game.add.text(
+            0,
+            0, 
+            '', 
+            { font: `14px ${FONT}`, fill: "#FFFFFF", align: 'center',  boundsAlignH: 'center' }, 
+            this.group,
+        );
+        this.messageText.setTextBounds(0, 0, screenWidth-this.sidebarWidth, screenHeight);
+        this.messageText.stroke = '#000000';
+        this.messageText.strokeThickness = 3;
+        this.messageText.alpha = 0;
+
+        this.tweens.messageFadeIn = this.game.add.tween(this.messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+    	this.tweens.messageMoveUp = this.game.add.tween(this.messageText).to( { y: '-30' }, 300, "Quart.easeOut", false);
+        this.tweens.messageFadeOut = this.game.add.tween(this.messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, 2000);
+    
+        // Blinky
+        this.blinkyMessageText = this.game.add.text(
+            this.game.camera.width/2,
+            this.game.camera.height-70, 
+            '', 
+            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
+        );
+        this.blinkyMessageText.anchor.x = .5;
+        this.blinkyMessageText.fixedToCamera = true;
+        this.blinkyMessageText.tint = 0xe74c3c;
+
+        this.verySlowUpdate();
+        this.slowUpdate();
+    }
+    
+    title(message,submessage){
+        this.titleNotificationSound.play();
+
+        var delay = 2000;        
+        
+        this.message__title.x = 32;
+        this.message__title.y = this.game.camera.height-50;
+        this.message__subTitle.x = 32;
+        this.message__subTitle.y = this.game.camera.height-25;
+        
+        this.message__title.setText(message);
+        this.message__subTitle.setText(submessage);
+                    
+        var fadeIn1 = this.game.add.tween(this.message__title).to( { alpha: 1 }, 1000, "Quart.easeOut", false);
+    	var moveUp1 = this.game.add.tween(this.message__title).to( { y: '-30' }, 300, "Quart.easeOut", true);
+        var fadeOut1 = this.game.add.tween(this.message__title).to( { alpha: 0 }, 1500, "Quart.easeOut", false, delay);
+        fadeIn1.chain(fadeOut1);
+        fadeIn1.start();
+
+        var submessageDelay = 300;
+        var fadeIn2 = this.game.add.tween(this.message__subTitle).to( { alpha: 1 }, 1000, "Quart.easeOut", false, submessageDelay);
+    	var moveUp2 = this.game.add.tween(this.message__subTitle).to( { y: '-30' }, 300, "Quart.easeOut", true, submessageDelay);
+        var fadeOut2 = this.game.add.tween(this.message__subTitle).to( { alpha: 0 }, 1500, "Quart.easeOut", false, delay-submessageDelay);    
+        fadeIn2.chain(fadeOut2);
+        fadeIn2.start();
+    }
+
+    message(message){
+        this.messageText.y =  this.messageTextY;
+        this.messageText.setText(message);
+    
+        this.tweens.messageFadeIn.chain(this.tweens.messageFadeOut);
+        this.tweens.messageFadeIn.start();
+        this.tweens.messageMoveUp.start();
+    }
+
+    warning(message){
+        var delay = 2000;
+        var messageText = this.game.add.text(
+            this.game.camera.width/2,
+            this.game.camera.height-100, 
+            message, 
+            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
+        );
+
+        messageText.anchor.x = .5;
+        messageText.fixedToCamera = true;
+        messageText.alpha = 0;
+    
+        var fadeIn = this.game.add.tween(messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+    	var moveUp = this.game.add.tween(messageText).to( { y: '-30' }, 300, "Quart.easeOut", true);
+        var fadeOut = this.game.add.tween(messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, delay);
+    
+        fadeIn.chain(fadeOut);
+        fadeIn.start();
+    }
+    blinkingWarning(message){
+        var delay = 2000;
+        this.blinkyMessageText.setText(message);
+            
+        var blink = this.game.add.tween(this.blinkyMessageText).to({
+            alpha: .5,
+        }, 300, "Quart.easeOut", true, 0, 0, true).loop(true);
+    }
+    
+    updateNavigationDisplay(){
+        if(this.navDestDisplay!=undefined){
+            var player = this.game.player.ship;
+            var target = player.navigationTarget;
+            if(target==null){
+                this.navDestDisplay.setText('Navigation Off');
+                this.navigationGroup.visible = false;
+                this.navigationArrow.visible = false;
+            } else {
+                this.navDestDisplay.setText(`> ${target.name} (${target.description})`);
+                this.navETADisplay.setText(`${this.game.player.ship.formattedTimeToCurrentNavigationTarget}`);
+                this.navDistanceDisplay.setText(`${this.game.player.ship.formattedDistanceToCurrentNavigationTarget}`);        
+                this.navigationGroup.visible = true;
+                            
+                if(player.distanceToCurrentNavigationTarget>150){
+                    this.navigationArrow.visible = true;
+                    this.navigationArrow.angle = player.angleToCurrentNavigationTarget;
+                    this.navigationArrow.x = this.game.player.ship.sprite.x - this.game.camera.x;
+                    this.navigationArrow.y = this.game.player.ship.sprite.y - this.game.camera.y;                
+                } else {        
+                    this.game.add.tween(this.navigationArrow).to({
+                        angle: 90,
+                        x: target.sprite.x - this.game.camera.x,
+                        y: ((target.sprite.y - target.sprite.height/2) - this.game.camera.y)-100,
+                    }, 300, "Quart.easeOut", true);
+                }
+            }
+        }
+    }
+    
+
+    purchaseReceipt(title,message,amount){
+        var notification = new Notification(this.game);
+        notification.text = title;
+        notification.subText = message;
+        notification.accessoryText = numeral(-amount).format('$0,0[.]00');
+        this.game.notificationGroup.add(notification);
+
+        notification.show();
+    }
+    
+    showSystemInfo(){
+        this.title(`${this.game.system.name} System`,moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'));
+    }
+    
+    set masterAlarm(alarm){
+        this.masterAlarmSprite.visible = alarm;
+        if(alarm){
+            this.masterAlarmSound.loopFull();
+        } else {
+            this.masterAlarmSound.stop();            
+        }
+    }
+    
+    masterAlarmClicked(){
+        this.masterAlarm = false;
+    }
+    
+    showO2Panel(){
+        this.masterAlarm = true;
+        game.add.tween(this.o2gaugeBg).to( {x: '+100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '+100'}, 600, "Quart.easeOut", true);        
+    }
+
+    hideO2Panel(){
+        this.masterAlarm = false;
+        game.add.tween(this.o2gaugeBg).to( {x: '-100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '-100'}, 600, "Quart.easeOut", true);        
+    }
+
+    
+    set o2Percent(o2){
+        this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
+    }
+    
+    toggleFTLPanel(){
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.showFTLPanel();
+        } else {
+            this.hideFTLPanel();
+        }
+    }
+    
+    showFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY){
+            this.panelToggleSound.play();
+            this.ftlPanel.visible = true;
+            var showPanelTween = game.add.tween(this.ftlPanel).to( {y: '-200'}, 400, "Quart.easeOut", true);
+        }
+    }
+
+    hideFTLPanel(){
+        this.updateFTLPanel(true);
+        if(this.ftlPanel.y == this.ftlPanelY-200){
+            this.panelToggleSound.play();
+            var hidePanelTween = game.add.tween(this.ftlPanel).to( {y: '+200'}, 400, "Quart.easeOut", true);
+            hidePanelTween.onComplete.add(function(){
+                this.ftlPanel.visible = false;
+            }, this);
+        }
+    }
+    
+    abortFTL(){
+        if(this.game.mapScreen.map.currentPath){
+            this.panelToggleSound.play();
+            this.game.mapScreen.map.currentPath = false;
+            this.game.mapScreen.map.navigationDestination = null;
+            this.updateFTLPanel(true);
+        }
+    }
+    
+    lowFuel(){
+        this.message("Low Fuel");
+        this.lowFuelSound.loopFull();
+    }
+    
+    hasFuel(){
+        this.lowFuelSound.stop();
+    }
+        
+    updateFTLPanel(force){
+        if(this.ftlPanel.y == this.ftlPanelY-200 || force){ // If is showing
+            var panelText = '';
+            var path = this.game.mapScreen.map.currentPath
+            if(!this.game.mapScreen.map.navigationDestination) path = false;
+                if(path.length>0 || path!=false){
+                    if(path.length==2) {
+                        var destination = path[path.length-1];
+                        var destinationName = destination.name.substring(0,12);
+                        var formattedDistance = numeral(this.game.system.distanceToStarSystem(destination)*PIXEL_TO_LIGHTYEAR).format('0,0.0a');                    
+                        panelText = `FTL DRIVE\nDESTINATION\n${destinationName} (${formattedDistance} ly)\n\nPRESS J TO JUMP`;
+                    } else {
+                        panelText = 'FTL DRIVE\nCOURSE SET\n';
+                        for (var i = 0; i < path.length; i++) {
+                            var system;
+                            if(path[i+1]!=undefined) {
+                                system = path[i+1];
+                            } else {
+                                system = false;
+                            }
+                            if(i<4 && system){
+                                panelText += `${i+1}. ${system.name.substring(0,18)}\n`;                            
+                            }
+                            if(i==5){
+                                panelText += `... ${path.length-i} more`;                            
+                            }
+                        }
+                    }
+
+                    this.ftlPanelHelpText.setText('(J) Jump  (A) Abort  (H) Hide')
+                } else {
+                    panelText = 'FTL DRIVE\n';
+                    panelText += `NO DESTINATION\n\nPRESS M TO VIEW MAP`;
+
+                    this.ftlPanelHelpText.setText('(H) Hide')
+                }
+            this.ftlPanelText.setText(panelText);
+            this.ftlPanelStatusText.setText(`CHARGES: ${this.game.player.ship.jumpsRemaining}`);
+            this.ftlPanelStatusText.x = 101;
+        }
+    }
+
+    slowUpdate(){
+        this.minimap.update();
+    }
+
+    verySlowUpdate(){
+        // Credits
+        this.creditsText.setText(`${this.game.player.credits}`);
+
+        // Cargo
+        Object.keys(this.game.player.ship.specs.storage).forEach(function(key,index) {
+            var usedSpace = this.game.player.ship.usedSpaceForStorageClass(key);
+            var maxSpace = this.game.player.ship.maxSpaceForStorageClass(key);
+            this.cargoText[key].setText(`${usedSpace}/${maxSpace}`);
+        }.bind(this));
+
+        // FTL
+        this.updateFTLPanel();
+    
+        // System
+        this.systemLabel.setText(this.game.system.name);        
+    }
+    
+    update() {
+        // Navigation
+        this.updateNavigationDisplay();
+
+        // EFI
+        if(this.healthValue_cache!=this.game.player.ship.health || this.healthMaxValue_cache!=this.game.player.ship.maxHealth){
+            this.healthProgressBar.value = this.game.player.ship.health;
+            this.healthProgressBar.max = this.game.player.ship.maxHealth;
+        }
+        this.healthValue_cache = this.healthProgressBar.value
+        this.healthMaxValue_cache = this.healthProgressBar.max
         
         if(this.fuelPercentage_cache!=this.game.player.ship.fuelPercentage)
             this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;
@@ -49240,29 +58975,35 @@ class Minimap {
     }
     update(){
         this.dotsBitmapData.clear();
-        this.game.system.stellarObjects.forEach(function(gameObject) {
-                if(gameObject.sprite!=undefined){
-                    var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
-                    if(distance<(this.distanceFactor/this.scale)){
-                        var x = ((gameObject.sprite.x-this.game.player.ship.sprite.x)*this.scale)+this.size/2;
-                        var y = ((gameObject.sprite.y-this.game.player.ship.sprite.y)*this.scale)+this.size/2;
-                        var size = 1; // Default dot size
-                        if(gameObject.minimapSize!=undefined){
-                            size = gameObject.minimapSize;
-                        }
-                        var a = Math.abs(distance*(this.distanceFactor/100000)-1)+.1
-                        
-                        if(this.game.player.ship.navigationTarget == gameObject){
-                            this.dotsBitmapData.circle(x,y,size+3,`rgba(255,255,255,${a})`);                            
-                            this.dotsBitmapData.circle(x,y,size+2,`#3f3c46`);                            
-                            this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
-                        } else {
-                            this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
-                        }
-                    }
-                }
-        }.bind(this));
+        this.game.system.stellarObjects.forEach(this.drawDotsForGameObject,this);
+        this.game.system.planets.forEach(this.drawDotsForGameObject,this);
         this.dotsBitmapData.dirty = true;        
+    }
+    
+    drawDotsForGameObject(gameObject){
+        if(gameObject.sprite!=undefined){
+            var distance = this.game.physics.arcade.distanceBetween(gameObject.sprite, this.game.player.sprite);
+            if(distance<(this.distanceFactor/this.scale)){
+                var x = ((gameObject.sprite.x-this.game.player.ship.sprite.x)*this.scale)+this.size/2;
+                var y = ((gameObject.sprite.y-this.game.player.ship.sprite.y)*this.scale)+this.size/2;
+                var size = 1; // Default dot size
+                if(gameObject.minimapSize!=undefined){
+                    size = gameObject.minimapSize;
+                }
+                var a = Math.abs(distance*(this.distanceFactor/100000)-1)+.1
+                
+                if(this.game.player.ship.navigationTarget == gameObject){
+                    this.dotsBitmapData.circle(x,y,size+3,`rgba(255,255,255,${a})`);                            
+                    this.dotsBitmapData.circle(x,y,size+2,`#3f3c46`);                            
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                } else {
+                    this.dotsBitmapData.circle(x,y,size,`rgba(255,255,255,${a})`);                            
+                }
+                
+                // Player
+                this.dotsBitmapData.circle(this.size/2,this.size/2,1,`rgba(255,255,255,1)`);                            
+            }
+        }
     }
     
 }
@@ -49506,6 +59247,7 @@ class ArrivalScreen extends GuiScreen {
         this._destination = null;
         this.serviceButtons = [];
         this.serviceScreens = {};      
+        this.serviceSelectedIndex = null;
         
         this.setupKeys();
         this.setupScreen();
@@ -49520,6 +59262,18 @@ class ArrivalScreen extends GuiScreen {
     }
     
     setupKeys(){
+        var upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+        upKey.onUp.add(this.upKeyPressed, this);
+        
+        var downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+        downKey.onUp.add(this.downKeyPressed, this);
+
+        var leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
+        leftKey.onUp.add(this.leftKeyPressed, this);
+
+        var rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+        rightKey.onUp.add(this.rightKeyPressed, this);
+
         var escKey = game.input.keyboard.addKey(Phaser.Keyboard.ESC);
         escKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
@@ -49529,6 +59283,50 @@ class ArrivalScreen extends GuiScreen {
         lKey.onUp.add(function(){
             if(this.game.player.controlMode == CONTROL_MODE.landed) this.hide();
         }, this);
+    }
+    
+    upKeyPressed(){
+        // Later
+    }
+    
+    downKeyPressed(){
+        // Later
+    }
+    
+    leftKeyPressed(){
+        this.selectPreviousService();
+    }
+    
+    rightKeyPressed(){
+        this.selectNextService();
+    }
+    
+    selectNextService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+
+        this.serviceSelectedIndex++;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    selectPreviousService(){
+        if(this.serviceSelectedIndex==null){
+            this.serviceSelectedIndex = 0;
+            return;
+        }
+        
+        this.serviceSelectedIndex--;
+        this.serviceSelectedIndex = this.serviceSelectedIndex.clamp(0,this.destination.services.length-1);
+    
+        this.layout();
+    }
+    
+    clickSelectedService(){
+        
     }
     
     setupScreen(){
@@ -49642,6 +59440,8 @@ class ArrivalScreen extends GuiScreen {
     layout(){        
         this.cleanup();
         
+        console.log(this.serviceSelectedIndex);
+        
         // Description
         this.destDesc.setText(this.destination.description);
 
@@ -49667,6 +59467,10 @@ class ArrivalScreen extends GuiScreen {
             var serviceButton = new TwoLineButton(this.game,'service-button');
             serviceButton.screen = this;
             serviceButton.service = service;
+
+            if(servicesIndex==this.serviceSelectedIndex){
+                serviceButton.over = true;
+            }
 
             serviceButton.callbacks = {
                 onDown : function() {
@@ -51626,10 +61430,14 @@ class GalacticMap extends GameObject{
         }
 
         var getNextJump = function(){
-            var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
-            if(path.includes(nextJump)) return null;
-            path.push(nextJump);
-            validatePath();
+            if(path[path.length-1]){
+                var nextJump = path[path.length-1].systemWithinRangeTowardsSystem(maxJumpDistance,destinationSystem);
+                if(path.includes(nextJump)) return null;
+                path.push(nextJump);
+                validatePath();                
+            } else {
+                return null;
+            }
         }
 
         if(distanceToDestination<=maxJumpDistance){
@@ -51638,6 +61446,8 @@ class GalacticMap extends GameObject{
         } else {
             getNextJump();
         }
+         
+        path.clean(null); // remove all nulls;
                 
         return path;        
     }
@@ -51647,7 +61457,7 @@ class GalacticMap extends GameObject{
         var previousSystem = null;
 
         for(let system of path){
-            if(previousSystem){
+            if(previousSystem && system!=null){
                 distance+= system.distanceToStarSystem(previousSystem);
             }
             previousSystem = system;
@@ -51669,19 +61479,7 @@ class GalacticMap extends GameObject{
     
     drawMap(){      
         this.bmd.ctx.clearRect(0,0,this.width,this.height);
-        var zoom = this.mapZoom;
-                
-                
-        // Title
-        this.bmd.ctx.font = `18px ${FONT}`;
-        this.bmd.ctx.strokeStyle='#000000'
-        this.bmd.ctx.fillStyle='#FFFFFF'
-        this.bmd.ctx.lineWidth = 3;
-        this.drawShadowText(`${this.game.galaxy.name} Galaxy`, (this.mapScrollX)*zoom, (this.mapScrollY-32)*zoom);
-        this.bmd.ctx.font = `12px ${FONT}`;
-        this.bmd.ctx.fillStyle='#AAAAAA'
-        this.drawShadowText(`Local Cluster - Major Star Systems`, (this.mapScrollX)*zoom, (this.mapScrollY-12)*zoom);
-        
+        var zoom = this.mapZoom;        
         // Lines
         for(let system of this.starSystems){
             // Save distnce for later
@@ -51728,7 +61526,7 @@ class GalacticMap extends GameObject{
         // Stars
         for(let system of this.starSystems){                  
             // Black Space
-            this.bmd.ctx.fillStyle='#000000'
+            this.bmd.ctx.fillStyle='#111111'
             this.bmd.ctx.beginPath();
             this.bmd.ctx.arc((system.position.x+this.mapScrollX)*zoom,(system.position.y+this.mapScrollY)*zoom,system.size+5,0,2*Math.PI);
             this.bmd.ctx.fill();
@@ -51768,7 +61566,7 @@ class GalacticMap extends GameObject{
             
             var labelString = `${system.name}`
             this.bmd.ctx.font = `12px ${FONT}`;
-            this.bmd.ctx.strokeStyle='#000000'
+            this.bmd.ctx.strokeStyle='#111111'
             this.bmd.ctx.fillStyle='#FFFFFF'
             this.bmd.ctx.lineWidth = 3;
             
@@ -51785,7 +61583,7 @@ class GalacticMap extends GameObject{
             }
             
             if(this.currentPath){
-                if(system==this.currentPath.lastItem()){
+                if(system==this.currentPath.lastItem() && !system.isCurrentSystem){
                     if(system==this.navigationDestination){
                         this.bmd.ctx.fillStyle='#1aae5c'
                     } else {
@@ -51847,33 +61645,34 @@ class GalacticMap extends GameObject{
     
     drawGridLines(options){
         var zoom = this.mapZoom;
-        var major = options.major || 100;
-        var minor = options.minor || 25;            
+        var major = options.major || 100*zoom;
+        var minor = options.minor || 25*zoom;            
     	this.bmd.ctx.strokeStyle = options.color || "#333333";
     	
         // Verticle
-        for (var x = 0; x <= this.game.galaxy.settings.mapWidth*zoom; x+=minor) {
+        for (var x = 0; x <= this.game.galaxy.settings.mapWidth; x+=minor) {
             if (x % major == 0) {
                 this.bmd.ctx.lineWidth = 2;
             } else {
                 this.bmd.ctx.lineWidth = 1;                
             }
         	this.bmd.ctx.beginPath();
-        	this.bmd.ctx.moveTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)));
-        	this.bmd.ctx.lineTo(Math.round(((x+this.mapScrollX)*zoom)),Math.round(((this.mapScrollY)*zoom)+(this.game.galaxy.settings.mapHeight*zoom)));
+        	this.bmd.ctx.moveTo((x+this.mapScrollX)*zoom,this.mapScrollY*zoom);
+        	this.bmd.ctx.lineTo((x+this.mapScrollX)*zoom,(this.mapScrollY*zoom)+(this.game.galaxy.settings.mapHeight*zoom));
             this.bmd.ctx.stroke();
         }
 
+
         // Horizontal
-        for (var y = 0; y <= this.game.galaxy.settings.mapHeight*zoom; y+=minor) {
+        for (var y = 0; y <= this.game.galaxy.settings.mapHeight; y+=minor) {
             if (y % major == 0) {
                 this.bmd.ctx.lineWidth = 2;
             } else {
                 this.bmd.ctx.lineWidth = 1;                
             }
         	this.bmd.ctx.beginPath();
-        	this.bmd.ctx.moveTo(Math.round(((this.mapScrollX)*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
-        	this.bmd.ctx.lineTo(Math.round(((this.mapScrollX)*zoom)+(this.game.galaxy.settings.mapWidth*zoom)),Math.round(((y+this.mapScrollY)*zoom)));
+        	this.bmd.ctx.moveTo(this.mapScrollX*zoom,(y+this.mapScrollY)*zoom);
+        	this.bmd.ctx.lineTo((this.mapScrollX*zoom)+(this.game.galaxy.settings.mapWidth*zoom),(y+this.mapScrollY)*zoom);
             this.bmd.ctx.stroke();
         }
     }
@@ -52112,7 +61911,6 @@ class MapScreen extends GuiScreen {
         this.map.setupKeys();
         this.map.isActive = true;
         this.map.centerOnSystem(this.game.system);
-
     }
 
     didShow(){
@@ -52126,10 +61924,6 @@ class MapScreen extends GuiScreen {
 
         this.map.isActive = false;
         this.map.cleanup();
-
-        game.time.events.add(Phaser.Timer.SECOND * 1, function(){
-            this.game.hud.showSystemInfo();
-        }, this);
     }
 
     didHide(){
@@ -52156,9 +61950,48 @@ class MapScreen extends GuiScreen {
 
 class Economy {
     constructor(game) {
-        this.game = game;
+        this.game = game;    
+        this.markets = [];
+
+        // Updates
+        this.game.time.events.loop(5000, this.updateAllMarkets, this);
     }
     
+    // Markets
+    registerMarket(market,restock = true){
+        market['stockItem'] = this.stockItem;
+
+        this.markets.push(market);
+        if(restock) this.restockMarket(market);
+    }
+    restockMarket(market){
+        // Based on certain properites, determine the items for sale in a given market.
+        if(market.hasService(PLANET_SERVICES.fuelDepot)){
+            market.stockItem('small_fuel_drum',tombola.range(1,2));
+            market.stockItem('theta_crystal',tombola.range(1,5));
+        }   
+        if(market.hasService(PLANET_SERVICES.shipyard)){
+            market.stockItem('med_repair_kit',tombola.range(1,2));
+            market.stockItem('light_repair_kit',tombola.range(1,2));
+            market.stockItem('basic_engine',tombola.range(0,1));
+        }   
+
+
+        
+
+    }
+    updateMarket(market){
+        
+    }
+    updateAllMarkets(){
+
+    }
+
+    stockItem(itemKey, amount = 1){
+        this.addItemsToInventory(amount, InventoryObject.make(itemKey,this.game));
+    }
+    
+    // Fuel
     get globalFuelPrice(){
         return .033;
     }

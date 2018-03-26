@@ -10,9 +10,12 @@ class HUD {
         var width = 100;
         var borderRadius = 5;
 
+        this.tweens = {};
+
         this.masterAlarmSound = game.add.audio('master_alarm');
         this.titleNotificationSound = game.add.audio('title-notification');
         this.panelToggleSound = game.add.audio('panel-toggle');
+        this.lowFuelSound = game.add.audio('low-fuel-warning');
 
         // Updaters
         game.time.events.loop(Phaser.Timer.SECOND * .35, this.slowUpdate, this);
@@ -34,7 +37,7 @@ class HUD {
         // Date
         this.stardateLabel = new Phaser.BitmapText(
             this.game.game, 
-            this.game.camera.width-8,
+            this.game.camera.width-8-140,
             10,
             'pixelmix_8',
             this.game.starDate,
@@ -341,7 +344,8 @@ class HUD {
         );
         this.message__subTitle.alpha = 0;
         this.group.add(this.message__subTitle)
-
+        
+        // Nav Arrow
         this.navigationArrow = this.game.make.sprite(0,0, 'nav-arrow');
         this.navigationArrow.anchor.set(-10,.5);
         this.navArrowResetPostionTween = this.game.add.tween(this.navigationArrow).to({
@@ -352,7 +356,24 @@ class HUD {
 
         this.group.add(this.navigationArrow);
 
+        
+        this.messageTextY = this.game.camera.height-100;
+        this.messageText = this.game.add.text(
+            0,
+            0, 
+            '', 
+            { font: `14px ${FONT}`, fill: "#FFFFFF", align: 'center',  boundsAlignH: 'center' }, 
+            this.group,
+        );
+        this.messageText.setTextBounds(0, 0, screenWidth-this.sidebarWidth, screenHeight);
+        this.messageText.stroke = '#000000';
+        this.messageText.strokeThickness = 3;
+        this.messageText.alpha = 0;
 
+        this.tweens.messageFadeIn = this.game.add.tween(this.messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
+    	this.tweens.messageMoveUp = this.game.add.tween(this.messageText).to( { y: '-30' }, 300, "Quart.easeOut", false);
+        this.tweens.messageFadeOut = this.game.add.tween(this.messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, 2000);
+    
         // Blinky
         this.blinkyMessageText = this.game.add.text(
             this.game.camera.width/2,
@@ -396,24 +417,12 @@ class HUD {
     }
 
     message(message){
-        var delay = 2000;
-        var messageText = this.game.add.text(
-            (this.game.camera.width/2)-50,
-            this.game.camera.height-100, 
-            message, 
-            { font: `18px ${FONT}`, fill: "#FFFFFF", align: 'center' }, 
-        );
-
-        messageText.anchor.x = .5;
-        messageText.fixedToCamera = true;
-        messageText.alpha = 0;
+        this.messageText.y =  this.messageTextY;
+        this.messageText.setText(message);
     
-        var fadeIn = this.game.add.tween(messageText).to( { alpha: 1 }, 300, "Quart.easeOut", false);
-    	var moveUp = this.game.add.tween(messageText).to( { y: '-30' }, 300, "Quart.easeOut", true);
-        var fadeOut = this.game.add.tween(messageText).to( { alpha: 0 }, 300, "Quart.easeOut", false, delay);
-    
-        fadeIn.chain(fadeOut);
-        fadeIn.start();
+        this.tweens.messageFadeIn.chain(this.tweens.messageFadeOut);
+        this.tweens.messageFadeIn.start();
+        this.tweens.messageMoveUp.start();
     }
 
     warning(message){
@@ -508,6 +517,13 @@ class HUD {
         game.add.tween(this.o2gaugeBg).to( {x: '+100'}, 600, "Quart.easeOut", true);
         game.add.tween(this.o2gaugeArrow).to( {x: '+100'}, 600, "Quart.easeOut", true);        
     }
+
+    hideO2Panel(){
+        this.masterAlarm = false;
+        game.add.tween(this.o2gaugeBg).to( {x: '-100'}, 600, "Quart.easeOut", true);
+        game.add.tween(this.o2gaugeArrow).to( {x: '-100'}, 600, "Quart.easeOut", true);        
+    }
+
     
     set o2Percent(o2){
         this.o2gaugeArrow.y = (this.o2gaugeBg.y + 29) - (107*o2) + 107;
@@ -549,6 +565,15 @@ class HUD {
             this.updateFTLPanel(true);
         }
     }
+    
+    lowFuel(){
+        this.message("Low Fuel");
+        this.lowFuelSound.loopFull();
+    }
+    
+    hasFuel(){
+        this.lowFuelSound.stop();
+    }
         
     updateFTLPanel(force){
         if(this.ftlPanel.y == this.ftlPanelY-200 || force){ // If is showing
@@ -587,7 +612,7 @@ class HUD {
                     this.ftlPanelHelpText.setText('(H) Hide')
                 }
             this.ftlPanelText.setText(panelText);
-            this.ftlPanelStatusText.setText('JUMPS (3/3)');
+            this.ftlPanelStatusText.setText(`CHARGES: ${this.game.player.ship.jumpsRemaining}`);
             this.ftlPanelStatusText.x = 101;
         }
     }
@@ -625,7 +650,6 @@ class HUD {
         }
         this.healthValue_cache = this.healthProgressBar.value
         this.healthMaxValue_cache = this.healthProgressBar.max
-
         
         if(this.fuelPercentage_cache!=this.game.player.ship.fuelPercentage)
             this.fuelProgressBar.valuePercent = this.game.player.ship.fuelPercentage;

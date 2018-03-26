@@ -249,15 +249,15 @@ class GameObject {
     }
 
     destroy(){
-        this.alive = false;
-
         this.game.unregister(this);        
         if(this.sprite!=undefined){
             this.sprite.destroy();
         }
+        delete this;
     }
 
     destroyEmitter(){
+        debugger;
         this.destroy();        
     } 
 
@@ -310,6 +310,6 @@ class GameObject {
     }
 
     update(){
-        
+        this.game.counter++;
     }
 }

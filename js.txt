@@ -28,6 +28,7 @@ app/equipment/batteries.js
 app/equipment/BasicFuelTank.js
 app/equipment/RepairKit.js
 app/equipment/FuelKit.js
+app/equipment/FTLFuel.js
 app/weapons/_weapon.js
 app/ships/_ship.js
 app/engines/_engine.js

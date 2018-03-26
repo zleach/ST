@@ -2,7 +2,7 @@ class Player extends GameObject {
     constructor(game) {
         super(game);
 
-        this.ship = new BasicMiner(game,this.game.world.centerX,this.game.world.centerY);
+        this.ship = new BasicMiner(game,this.game.world.centerX-350,this.game.world.centerY-200);
         this.sprite = this.ship.sprite;
 
         this.name = 'Dash Riprock';
@@ -60,7 +60,10 @@ class Player extends GameObject {
         }, this);
         var aKey = game.input.keyboard.addKey(Phaser.Keyboard.A);
         aKey.onUp.add(function(){
-            if(this.controlMode == CONTROL_MODE.play) this.game.hud.abortFTL();
+            if(this.controlMode == CONTROL_MODE.play) {
+                this.game.hud.abortFTL();
+                this.ship.abortJump();
+            }
         }, this);
         var hKey = game.input.keyboard.addKey(Phaser.Keyboard.H);
         hKey.onUp.add(function(){
@@ -93,6 +96,7 @@ class Player extends GameObject {
         if(!this.inDarkness){
             // Wait a bit to hit the lights
             game.time.events.add(Phaser.Timer.SECOND * 2, function(){
+                if(this.currentNebula)
                 this.game.hud.title(
                     `${this.currentNebula.name}, ${this.game.system.name} System`,
                     moment(this.game.starDate).format('MMMM Do YYYY, HH:mm'),
@@ -100,15 +104,16 @@ class Player extends GameObject {
             }, this);
 
             game.time.events.add(Phaser.Timer.SECOND * 3, function(){
-                this.game.planets.mask = this.ship.lightMask;
-                this.game.asteroids.mask = this.ship.lightMask;
-                this.game.stars.mask = this.ship.lightMask;
-                // Hack to show only player ship
-                this.ship.sprite.visible = false;
-                this.game.ships.setAll('mask', this.ship.lightMask,false,true);
-                this.ship.sprite.visible = true;
-                this.ship.lightMask.visible = true;    
-            
+                if(this.currentNebula){
+                    this.game.planets.mask = this.ship.lightMask;
+                    this.game.asteroids.mask = this.ship.lightMask;
+                    this.game.stars.mask = this.ship.lightMask;
+                    // Hack to show only player ship
+                    this.ship.sprite.visible = false;
+                    this.game.ships.setAll('mask', this.ship.lightMask,false,true);
+                    this.ship.sprite.visible = true;
+                    this.ship.lightMask.visible = true;    
+                }
             }, this);
 
             this.inDarkness = true;
@@ -179,14 +184,18 @@ class Player extends GameObject {
     
     hiss(){
         if(this.allowHissSound) {
-            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);
+            }
         }        
         this.allowHissSound = false;
     }
     
     reverseHiss(){
         if(this.allowHissSoundForReverse) {
-            this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
+            if(!this.ship.hyperDriveEngaged && !this.ship.fuelQuanity){
+                this.hissSounds[this.game.rnd.integerInRange(0,this.hissSounds.length-1)].play('',0,.4);            
+            }
         }
         this.allowHissSoundForReverse = false;
     }
@@ -202,15 +211,16 @@ class Player extends GameObject {
             }
         }
 
+
         // Normal "Play" control mode"
         if(this.controlMode == CONTROL_MODE.play && !this.ship.isDocked){
             // Accel
-            if (this.cursors.up.isDown) {
+            if (this.cursors.up.isDown && !this.ship.hyperDriveEngaged) {
                 this.ship.accelerate();
-            } else if(this.cursors.down.isDown) {
+            } else if(this.cursors.down.isDown && !this.ship.hyperDriveEngaged) {
                 this.reverseHiss();
                 this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
                 this.ship.goInReverse();
             } else {
                 this.allowHissSoundForReverse = true;
@@ -222,7 +232,7 @@ class Player extends GameObject {
                 this.hiss();
 
                 this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
 
                 if(this.cursors.left.shiftKey){
                     this.ship.moveLeft();
@@ -233,7 +243,7 @@ class Player extends GameObject {
                 this.hiss();
 
                 this.rcsSoundCountdown = 1;
-                if(!this.rcsSound.isPlaying) this.rcsSound.loopFull(.33);
+                if(!this.rcsSound.isPlaying && !this.ship.hyperDriveEngaged && this.ship.fuelQuanity) this.rcsSound.loopFull(.33);
 
                 if(this.cursors.right.shiftKey){
                     this.ship.moveRight();

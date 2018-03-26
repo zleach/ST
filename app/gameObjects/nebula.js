@@ -7,7 +7,8 @@ class Nebula extends GameObject {
         var size = options.size;
         if(size==undefined) size = 2000;
         this.size = size;
-
+        this.system = options.system;
+            
         var xPos = game.rnd.integerInRange(x-this.size, x+this.size);
         var yPos = game.rnd.integerInRange(y-this.size, y+this.size);
 
@@ -27,15 +28,14 @@ class Nebula extends GameObject {
             } else {
                 var iceteroid = new Iceteroid(this.game,this.iceteroids,'small',xPos,yPos);                
             }
-            options.system.stellarObjects.push(iceteroid);
+            this.system.stellarObjects.push(iceteroid);
         }
 
         this.buoy = new Buoy(this.game,x,y);
         this.buoy.description = `${Names.proper()} Ice Nebula`
         this.name = this.buoy.description;
-        options.system.stellarObjects.push(this.buoy);
+        this.system.stellarObjects.push(this.buoy);
 
-  
         this.shouldShowNebulaEffect = false;
         this.nebulaSpawnInterval = 10;
         this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
@@ -66,7 +66,6 @@ class Nebula extends GameObject {
         this.smokeEmitter = this.game.ps.createEmitter();
         this.smokeEmitter.addToWorld();
 
-
     	this.particlesEmitter = game.add.emitter(0,0, 500);
     	this.particlesEmitter.width = game.camera.width;
     	this.particlesEmitter.height = game.camera.height;
@@ -93,79 +92,85 @@ class Nebula extends GameObject {
         this.ambientSound = game.add.audio('nebula-ambient-1');
     }
     
+    destroy(){
+        if(this.shouldShowNebulaEffect) this.game.player.exitDarkness();
+        super.destroy();
+    }
+    
     update(){
         super.update();
         
-        this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.buoy.sprite, this.game.player.sprite);
-    
-        if(this.distanceToPlayer<=this.size*1.5){
-            this.game.player.enterDarkness(this);
-            this.shouldShowNebulaEffect = true;
-        } else {
-            this.game.player.exitDarkness(this);
-            this.shouldShowNebulaEffect = false;
-        }
+        if(this.system == this.game.system){    
+            this.distanceToPlayer = this.game.physics.arcade.distanceBetween(this.buoy.sprite, this.game.player.sprite);
         
-        if(this.shouldShowNebulaEffect){
-            
-            // Particles
-            this.particlesEmitter.on = true;   
-            this.particlesEmitter.x = this.game.camera.x + this.game.camera.width/2;
-            this.particlesEmitter.y = this.game.camera.y + this.game.camera.height/2;
-
-            // Overlay
-            this.nebulaOverlay.visible = true;
-            
-            if(this.nebulaOverlay.alpha<=this.nebulaOverlayTargetAlpha)
-                this.nebulaOverlay.alpha+=this.nebulaOverlayStepAlpha
-
-            if(this.game.stars.alpha>=this.game.starsTargetAlpha)
-                this.game.stars.alpha-=this.nebulaOverlayStepAlpha
-            
-            if(this.game.stars.alpha<=this.game.starsTargetAlpha)
-                this.game.stars.alpha=this.game.starsTargetAlpha    
-            
-            // Smoke
-            if(this.nebulaSpawnCountdown==0){
-                this.smokeEmitter.emit(
-                    'nebula-cloud',
-                    this.game.camera.x + this.game.rnd.integerInRange(0, this.game.camera.width), 
-                    this.game.camera.y + this.game.rnd.integerInRange(0, this.game.camera.height),
-                ) 
-                this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+            if(this.distanceToPlayer<=this.size*1.5){
+                this.game.player.enterDarkness(this);
+                this.shouldShowNebulaEffect = true;
             } else {
-                this.nebulaSpawnCountdown--;
+                this.game.player.exitDarkness(this);
+                this.shouldShowNebulaEffect = false;
             }
             
-            // Sound
-            if(!this.ambientSound.isPlaying) {
-                console.log("Start Loop");
-                this.ambientSound.loopFull(AMBIENT_VOLUME);
-            }            
-        } else {
-            // Stop Particles
-            this.particlesEmitter.on = false;   
+            if(this.shouldShowNebulaEffect){   
+                // Particles
+                this.particlesEmitter.on = true;   
+                this.particlesEmitter.x = this.game.camera.x + this.game.camera.width/2;
+                this.particlesEmitter.y = this.game.camera.y + this.game.camera.height/2;
+    
+                // Overlay
+                this.nebulaOverlay.visible = true;
+                
+                if(this.nebulaOverlay.alpha<=this.nebulaOverlayTargetAlpha)
+                    this.nebulaOverlay.alpha+=this.nebulaOverlayStepAlpha
+    
+                if(this.game.stars.alpha>=this.game.starsTargetAlpha)
+                    this.game.stars.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.game.stars.alpha<=this.game.starsTargetAlpha)
+                    this.game.stars.alpha=this.game.starsTargetAlpha    
+                
+                // Smoke
+                if(this.nebulaSpawnCountdown==0){
+                    this.smokeEmitter.emit(
+                        'nebula-cloud',
+                        this.game.camera.x + this.game.rnd.integerInRange(0, this.game.camera.width), 
+                        this.game.camera.y + this.game.rnd.integerInRange(0, this.game.camera.height),
+                    ) 
+                    this.nebulaSpawnCountdown = this.nebulaSpawnInterval;
+                } else {
+                    this.nebulaSpawnCountdown--;
+                }
+                
+                // Sound
+                if(!this.ambientSound.isPlaying) {
+                    console.log("Start Loop");
+                    this.ambientSound.loopFull(AMBIENT_VOLUME);
+                }            
+            } else {
+                // Stop Particles
+                this.particlesEmitter.on = false;   
+                
+                // Hide overlay
+                this.nebulaOverlay.alpha-=this.nebulaOverlayStepAlpha
+                
+                if(this.nebulaOverlay.alpha<this.nebulaOverlayStepAlpha){
+                    this.nebulaOverlay.alpha = 0;
+                    this.nebulaOverlay.visible = false;
+                }
+                
+                // Stars
+                this.game.stars.alpha+=this.nebulaOverlayStepAlpha
+                if(this.game.stars.alpha>=1)
+                    this.game.stars.alpha=1;        
             
-            // Hide overlay
-            this.nebulaOverlay.alpha-=this.nebulaOverlayStepAlpha
-            
-            if(this.nebulaOverlay.alpha<this.nebulaOverlayStepAlpha){
-                this.nebulaOverlay.alpha = 0;
-                this.nebulaOverlay.visible = false;
+                // Stop sound
+                if(this.ambientSound.isPlaying && this.ambientSound.volume == AMBIENT_VOLUME) {
+                    this.ambientSound.fadeOut(3000);    
+                }
+                this.ambientSound.onFadeComplete.addOnce(function(){
+                    this.ambientSound.stop();
+                }, this);
             }
-            
-            // Stars
-            this.game.stars.alpha+=this.nebulaOverlayStepAlpha
-            if(this.game.stars.alpha>=1)
-                this.game.stars.alpha=1;        
-        
-            // Stop sound
-            if(this.ambientSound.isPlaying && this.ambientSound.volume == AMBIENT_VOLUME) {
-                this.ambientSound.fadeOut(3000);    
-            }
-            this.ambientSound.onFadeComplete.addOnce(function(){
-                this.ambientSound.stop();
-            }, this);
         }
     }
     

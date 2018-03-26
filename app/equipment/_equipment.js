@@ -2,7 +2,6 @@ class Equipment extends InventoryObject {
     constructor(game,options) {
         super(game,options);
 
-        this.game.register(this); // Equipment must be registered
         this.parentObject = options.parentObject;
 
         this.isEquippable = true;
@@ -16,7 +15,7 @@ class Equipment extends InventoryObject {
     }
     
     set equipped(equipped){
-        this._equipped = equipped;        
+        this._equipped = equipped;                
     }
     
     get equipped(){
@@ -38,6 +37,8 @@ class Equipment extends InventoryObject {
             }
 
         }
+
+        this.game.register(this);
     }
     
     unequip(){        
@@ -52,6 +53,8 @@ class Equipment extends InventoryObject {
                 this.parentObject.unequipEquipment(this);
             }
         }
+        
+        this.game.unregister(this);
     }
     
     update(){

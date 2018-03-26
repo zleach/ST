@@ -5,7 +5,6 @@ class Iceteroid extends GameObject {
         this.group = group
         this.emitFlakes = false;
         
-        
         if(x==undefined) x = this.game.world.centerX+game.rnd.integerInRange(-1000, 1000);
         if(y==undefined) y = this.game.world.centerY+game.rnd.integerInRange(-1000, 1000);
         if(size==undefined) size = 'large';
@@ -92,16 +91,15 @@ class Iceteroid extends GameObject {
     } 
        
     explode(){
-	    var emitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
-	    this.game.asteroids.add(emitter);
-        emitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`,0,7);
-        emitter.gravity = 0;
-        emitter.maxRotation = 100;
-        emitter.minRotation = 30;
-        emitter.minParticleScale = .2;
-        emitter.maxParticleScale = .6;
-        emitter.explode(6000, game.rnd.integerInRange(3, 7));
-        this.game.time.events.add(5000, this.destroyEmitter, emitter);
+	    this.explodeEmitter = this.game.add.emitter(this.sprite.x,this.sprite.y, 100);
+	    this.game.asteroids.add(this.explodeEmitter);
+        this.explodeEmitter.makeParticles(`ice-small-${game.rnd.integerInRange(1, 5)}`,0,7);
+        this.explodeEmitter.gravity = 0;
+        this.explodeEmitter.maxRotation = 100;
+        this.explodeEmitter.minRotation = 30;
+        this.explodeEmitter.minParticleScale = .2;
+        this.explodeEmitter.maxParticleScale = .6;
+        this.explodeEmitter.explode(6000, game.rnd.integerInRange(3, 7));
         this.explodeSounds[this.game.rnd.integerInRange(0,this.explodeSounds.length-1)].play();
     }
     
@@ -123,6 +121,13 @@ class Iceteroid extends GameObject {
         }
         
         // Spin
-        this.sprite.body.angularVelocity = this.roationSpeed;                
+        if(this.sprite.body!=undefined) this.sprite.body.angularVelocity = this.roationSpeed;                
+    }
+
+    destroy(){
+        if(this.explodeEmitter) this.explodeEmitter.destroy();
+        this.hitEmitter.destroy();   
+             
+        super.destroy();
     }
 }
